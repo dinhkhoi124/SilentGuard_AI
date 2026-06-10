@@ -58,3 +58,7 @@ out/
 # AI logs — tracked structure, ignored content
 .ai-log/*.jsonl
 .ai-log/archive/
+
+#front end
+frontend/.next/
+frontend/node_modules/

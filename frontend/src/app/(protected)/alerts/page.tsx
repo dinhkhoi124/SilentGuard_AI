@@ -7,6 +7,7 @@ import MainLayout from "@/components/layout/MainLayout";
 import EventTypeBadge from "@/components/alerts/EventTypeBadge";
 import AlertStatusBadge from "@/components/alerts/AlertStatusBadge";
 import { mockAlerts } from "@/lib/mock-data";
+import { getConfidenceStyle } from "@/lib/utils";
 import type { AlertFilter } from "@/lib/types";
 
 const filterLabels: Record<AlertFilter, string> = {
@@ -140,14 +141,7 @@ export default function AlertsPage() {
                     {alert.timestamp}
                   </div>
                   <span
-                    className={[
-                      "text-xs font-bold",
-                      alert.confidence >= 80
-                        ? "text-red-600"
-                        : alert.confidence >= 60
-                          ? "text-orange-500"
-                          : "text-gray-400",
-                    ].join(" ")}
+                    className={`text-xs font-bold ${getConfidenceStyle(alert.confidence).text}`}
                   >
                     {alert.confidence}% conf.
                   </span>

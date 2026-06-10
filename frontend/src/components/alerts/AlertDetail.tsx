@@ -1,43 +1,44 @@
-'use client'
+"use client";
 
-import React, { useState } from 'react'
-import { CheckCircle, Clock, Shield, CheckSquare } from 'lucide-react'
-import type { Alert, Role } from '@/lib/types'
+import React, { useState } from "react";
+import { CheckCircle, Clock, Shield, CheckSquare } from "lucide-react";
+import type { Alert, Role } from "@/lib/types";
+import { getConfidenceStyle, getConfidenceLabel } from "@/lib/utils";
 
 interface AlertDetailProps {
-  alert: Alert
-  onConfirm: (note: string) => void
-  onReject: (note: string) => void
-  onEscalate: (note: string) => void
-  userRole: Role
+  alert: Alert;
+  onConfirm: (note: string) => void;
+  onReject: (note: string) => void;
+  onEscalate: (note: string) => void;
+  userRole: Role;
 }
 
 // ─── Timeline ────────────────────────────────────────────────────────────────
 
 const timelineSteps = [
-  'AI detect',
-  'Anonymize',
-  'Operator review',
-  'Confirm / Reject',
-  'Driver notified',
-]
+  "AI detect",
+  "Anonymize",
+  "Operator review",
+  "Confirm / Reject",
+  "Driver notified",
+];
 
 function getActiveStep(status: string): number {
-  if (status === 'pending') return 2       // "Operator review"
-  if (status === 'confirmed' || status === 'rejected') return 3  // "Confirm/Reject"
-  return 4
+  if (status === "pending") return 2; // "Operator review"
+  if (status === "confirmed" || status === "rejected") return 3; // "Confirm/Reject"
+  return 4;
 }
 
 function Timeline({ status }: { status: string }) {
-  const activeStep = getActiveStep(status)
+  const activeStep = getActiveStep(status);
 
   return (
     <div className="w-full bg-white border border-gray-200 rounded-xl px-6 py-4 mb-6">
       <div className="flex items-center justify-between">
         {timelineSteps.map((step, idx) => {
-          const isDone = idx < activeStep
-          const isCurrent = idx === activeStep
-          const isFuture = idx > activeStep
+          const isDone = idx < activeStep;
+          const isCurrent = idx === activeStep;
+          const isFuture = idx > activeStep;
 
           return (
             <React.Fragment key={step}>
@@ -46,10 +47,10 @@ function Timeline({ status }: { status: string }) {
                 <div
                   className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold border-2 transition-all ${
                     isDone
-                      ? 'bg-green-500 border-green-500 text-white'
+                      ? "bg-green-500 border-green-500 text-white"
                       : isCurrent
-                      ? 'bg-blue-500 border-blue-500 text-white'
-                      : 'bg-gray-100 border-gray-200 text-gray-400'
+                        ? "bg-blue-500 border-blue-500 text-white"
+                        : "bg-gray-100 border-gray-200 text-gray-400"
                   }`}
                 >
                   {isDone ? (
@@ -63,10 +64,10 @@ function Timeline({ status }: { status: string }) {
                 <span
                   className={`text-xs text-center max-w-[70px] leading-tight ${
                     isDone
-                      ? 'text-green-600 font-medium'
+                      ? "text-green-600 font-medium"
                       : isCurrent
-                      ? 'text-blue-600 font-semibold'
-                      : 'text-gray-400'
+                        ? "text-blue-600 font-semibold"
+                        : "text-gray-400"
                   }`}
                 >
                   {step}
@@ -77,16 +78,16 @@ function Timeline({ status }: { status: string }) {
               {idx < timelineSteps.length - 1 && (
                 <div
                   className={`flex-1 h-0.5 mx-2 rounded ${
-                    idx < activeStep ? 'bg-green-400' : 'bg-gray-200'
+                    idx < activeStep ? "bg-green-400" : "bg-gray-200"
                   }`}
                 />
               )}
             </React.Fragment>
-          )
+          );
         })}
       </div>
     </div>
-  )
+  );
 }
 
 // ─── Skeleton Stick Figures ───────────────────────────────────────────────────
@@ -95,19 +96,66 @@ function SkeletonFigure({ x, animation }: { x: number; animation: string }) {
   return (
     <g className={animation}>
       {/* Head */}
-      <circle cx={x} cy={30} r={9} fill="none" stroke="#22d3ee" strokeWidth="2.5" />
+      <circle
+        cx={x}
+        cy={30}
+        r={9}
+        fill="none"
+        stroke="#22d3ee"
+        strokeWidth="2.5"
+      />
       {/* Body */}
-      <line x1={x} y1={39} x2={x} y2={75} stroke="#22d3ee" strokeWidth="2.5" strokeLinecap="round" />
+      <line
+        x1={x}
+        y1={39}
+        x2={x}
+        y2={75}
+        stroke="#22d3ee"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+      />
       {/* Left arm */}
-      <line x1={x} y1={50} x2={x - 18} y2={63} stroke="#22d3ee" strokeWidth="2.5" strokeLinecap="round" />
+      <line
+        x1={x}
+        y1={50}
+        x2={x - 18}
+        y2={63}
+        stroke="#22d3ee"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+      />
       {/* Right arm */}
-      <line x1={x} y1={50} x2={x + 18} y2={63} stroke="#22d3ee" strokeWidth="2.5" strokeLinecap="round" />
+      <line
+        x1={x}
+        y1={50}
+        x2={x + 18}
+        y2={63}
+        stroke="#22d3ee"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+      />
       {/* Left leg */}
-      <line x1={x} y1={75} x2={x - 14} y2={98} stroke="#22d3ee" strokeWidth="2.5" strokeLinecap="round" />
+      <line
+        x1={x}
+        y1={75}
+        x2={x - 14}
+        y2={98}
+        stroke="#22d3ee"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+      />
       {/* Right leg */}
-      <line x1={x} y1={75} x2={x + 14} y2={98} stroke="#22d3ee" strokeWidth="2.5" strokeLinecap="round" />
+      <line
+        x1={x}
+        y1={75}
+        x2={x + 14}
+        y2={98}
+        stroke="#22d3ee"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+      />
     </g>
-  )
+  );
 }
 
 function SkeletonVisualization({ eventType }: { eventType: string }) {
@@ -119,68 +167,160 @@ function SkeletonVisualization({ eventType }: { eventType: string }) {
         viewBox="0 0 200 120"
         className="overflow-visible"
       >
-        <style>{`
-          @keyframes sway1 { 0%,100%{transform:translateX(-3px) rotate(-5deg)} 50%{transform:translateX(3px) rotate(5deg)} }
-          @keyframes sway2 { 0%,100%{transform:translateX(3px) rotate(4deg)} 50%{transform:translateX(-3px) rotate(-4deg)} }
-          .anim1 { animation: sway1 2s ease-in-out infinite; transform-origin: 60px 60px; }
-          .anim2 { animation: sway2 2.3s ease-in-out infinite; transform-origin: 130px 60px; }
-        `}</style>
+        {/* keyframes defined globally in globals.css to avoid duplication */}
 
         {/* Floor line */}
-        <line x1={20} y1={108} x2={180} y2={108} stroke="#374151" strokeWidth="1.5" strokeDasharray="4 3" opacity={0.4} />
+        <line
+          x1={20}
+          y1={108}
+          x2={180}
+          y2={108}
+          stroke="#374151"
+          strokeWidth="1.5"
+          strokeDasharray="4 3"
+          opacity={0.4}
+        />
 
-        {eventType === 'Fight' ? (
+        {eventType === "Fight" ? (
           <>
             {/* Two figures facing each other, leaning in */}
-            <SkeletonFigure x={62} animation="anim1" />
-            <SkeletonFigure x={138} animation="anim2" />
+            <SkeletonFigure x={62} animation="skeleton-anim1" />
+            <SkeletonFigure x={138} animation="skeleton-anim2" />
             {/* Impact lines between them */}
-            <line x1={88} y1={52} x2={112} y2={52} stroke="#ef4444" strokeWidth="1.5" strokeDasharray="3 2" opacity={0.7} />
-            <line x1={90} y1={57} x2={110} y2={47} stroke="#ef4444" strokeWidth="1.5" opacity={0.5} />
+            <line
+              x1={88}
+              y1={52}
+              x2={112}
+              y2={52}
+              stroke="#ef4444"
+              strokeWidth="1.5"
+              strokeDasharray="3 2"
+              opacity={0.7}
+            />
+            <line
+              x1={90}
+              y1={57}
+              x2={110}
+              y2={47}
+              stroke="#ef4444"
+              strokeWidth="1.5"
+              opacity={0.5}
+            />
           </>
         ) : (
           <>
             {/* One figure standing, one on the floor */}
-            <SkeletonFigure x={70} animation="anim1" />
+            <SkeletonFigure x={70} animation="skeleton-anim1" />
             {/* Fallen figure (rotated 90deg) */}
-            <g transform="translate(140, 85) rotate(-85)" className="anim2">
-              <circle cx={0} cy={0} r={9} fill="none" stroke="#22d3ee" strokeWidth="2.5" />
-              <line x1={0} y1={9} x2={0} y2={45} stroke="#22d3ee" strokeWidth="2.5" strokeLinecap="round" />
-              <line x1={0} y1={22} x2={-18} y2={32} stroke="#22d3ee" strokeWidth="2.5" strokeLinecap="round" />
-              <line x1={0} y1={22} x2={18} y2={32} stroke="#22d3ee" strokeWidth="2.5" strokeLinecap="round" />
-              <line x1={0} y1={45} x2={-14} y2={58} stroke="#22d3ee" strokeWidth="2.5" strokeLinecap="round" />
-              <line x1={0} y1={45} x2={14} y2={58} stroke="#22d3ee" strokeWidth="2.5" strokeLinecap="round" />
+            <g
+              transform="translate(140, 85) rotate(-85)"
+              className="skeleton-anim2"
+            >
+              <circle
+                cx={0}
+                cy={0}
+                r={9}
+                fill="none"
+                stroke="#22d3ee"
+                strokeWidth="2.5"
+              />
+              <line
+                x1={0}
+                y1={9}
+                x2={0}
+                y2={45}
+                stroke="#22d3ee"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+              />
+              <line
+                x1={0}
+                y1={22}
+                x2={-18}
+                y2={32}
+                stroke="#22d3ee"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+              />
+              <line
+                x1={0}
+                y1={22}
+                x2={18}
+                y2={32}
+                stroke="#22d3ee"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+              />
+              <line
+                x1={0}
+                y1={45}
+                x2={-14}
+                y2={58}
+                stroke="#22d3ee"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+              />
+              <line
+                x1={0}
+                y1={45}
+                x2={14}
+                y2={58}
+                stroke="#22d3ee"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+              />
             </g>
           </>
         )}
 
         {/* Bounding boxes */}
-        <rect x={38} y={16} width={48} height={90} rx={4}
-          fill="none" stroke="#22d3ee" strokeWidth="1" strokeDasharray="3 2" opacity={0.35} />
-        <rect x={110} y={16} width={62} height={90} rx={4}
-          fill="none" stroke="#22d3ee" strokeWidth="1" strokeDasharray="3 2" opacity={0.35} />
+        <rect
+          x={38}
+          y={16}
+          width={48}
+          height={90}
+          rx={4}
+          fill="none"
+          stroke="#22d3ee"
+          strokeWidth="1"
+          strokeDasharray="3 2"
+          opacity={0.35}
+        />
+        <rect
+          x={110}
+          y={16}
+          width={62}
+          height={90}
+          rx={4}
+          fill="none"
+          stroke="#22d3ee"
+          strokeWidth="1"
+          strokeDasharray="3 2"
+          opacity={0.35}
+        />
       </svg>
 
       {/* Scan line */}
+      {/* scanline — keyframe defined in globals.css */}
       <div className="absolute inset-x-0 top-0 h-full overflow-hidden pointer-events-none rounded-lg">
         <div
           className="absolute inset-x-0 h-px bg-cyan-400/50"
-          style={{ animation: 'scanline 3s linear infinite' }}
+          style={{ animation: "scanline 3s linear infinite" }}
         />
       </div>
-      <style>{`
-        @keyframes scanline { 0%{top:5%} 100%{top:95%} }
-      `}</style>
     </div>
-  )
+  );
 }
 
 // ─── Confidence Label ─────────────────────────────────────────────────────────
+// Delegates to the shared util so colors are consistent across all screens.
 
-function confidenceLabel(value: number, type: string): { text: string; color: string } {
-  if (value >= 80) return { text: `Cao · ${type} pattern rõ`, color: 'text-green-600' }
-  if (value >= 40) return { text: 'Trung bình · Operator cần xem clip', color: 'text-amber-600' }
-  return { text: 'Thấp · Khả năng false positive cao', color: 'text-red-600' }
+function confidenceLabel(
+  value: number,
+  type: string,
+): { text: string; color: string } {
+  const { text: color } = getConfidenceStyle(value);
+  return { text: getConfidenceLabel(value, type), color };
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
@@ -192,12 +332,13 @@ export default function AlertDetail({
   onEscalate,
   userRole,
 }: AlertDetailProps) {
-  const [note, setNote] = useState(alert.reviewNote ?? '')
+  const [note, setNote] = useState(alert.reviewNote ?? "");
   const canReview =
-    alert.status === 'pending' && (userRole === 'admin' || userRole === 'operator')
+    alert.status === "pending" &&
+    (userRole === "admin" || userRole === "operator");
 
-  const conf = confidenceLabel(alert.confidence, alert.eventType)
-  const mttdOk = alert.mttd <= 30
+  const conf = confidenceLabel(alert.confidence, alert.eventType);
+  const mttdOk = alert.mttd <= 30;
 
   return (
     <div className="space-y-6">
@@ -240,14 +381,21 @@ export default function AlertDetail({
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
                 Vị trí trên xe
               </p>
-              <p className="text-sm text-gray-800">{alert.camera} · Khu vực giữa xe</p>
+              <p className="text-sm text-gray-800">
+                {alert.camera} · Khu vực giữa xe
+              </p>
             </div>
           </div>
 
           {/* Privacy note */}
           <div className="flex items-start gap-2 text-xs text-gray-400">
-            <CheckSquare size={13} className="mt-0.5 flex-shrink-0 text-gray-400" />
-            <span>Clip gốc không được lưu. Chỉ hiển thị skeleton visualization.</span>
+            <CheckSquare
+              size={13}
+              className="mt-0.5 flex-shrink-0 text-gray-400"
+            />
+            <span>
+              Clip gốc không được lưu. Chỉ hiển thị skeleton visualization.
+            </span>
           </div>
         </div>
 
@@ -278,7 +426,9 @@ export default function AlertDetail({
             <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">
               MTTD
             </p>
-            <p className="text-2xl font-bold text-gray-900 mb-1">{alert.mttd}s</p>
+            <p className="text-2xl font-bold text-gray-900 mb-1">
+              {alert.mttd}s
+            </p>
             {mttdOk ? (
               <p className="text-sm text-green-600 flex items-center gap-1">
                 <CheckCircle size={14} />
@@ -335,7 +485,7 @@ export default function AlertDetail({
           )}
 
           {/* Review Info (for confirmed/rejected) */}
-          {alert.status !== 'pending' && (
+          {alert.status !== "pending" && (
             <div className="bg-white border border-gray-200 rounded-xl p-4">
               <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-3">
                 Thông tin duyệt
@@ -345,22 +495,30 @@ export default function AlertDetail({
                   <span className="text-gray-500">Trạng thái</span>
                   <span
                     className={`font-semibold ${
-                      alert.status === 'confirmed' ? 'text-green-600' : 'text-gray-500'
+                      alert.status === "confirmed"
+                        ? "text-green-600"
+                        : "text-gray-500"
                     }`}
                   >
-                    {alert.status === 'confirmed' ? '✓ Confirmed' : '✗ Rejected'}
+                    {alert.status === "confirmed"
+                      ? "✓ Confirmed"
+                      : "✗ Rejected"}
                   </span>
                 </div>
                 {alert.reviewedBy && (
                   <div className="flex justify-between">
                     <span className="text-gray-500">Operator</span>
-                    <span className="font-medium text-gray-700">{alert.reviewedBy}</span>
+                    <span className="font-medium text-gray-700">
+                      {alert.reviewedBy}
+                    </span>
                   </div>
                 )}
                 {alert.reviewedAt && (
                   <div className="flex justify-between">
                     <span className="text-gray-500">Lúc</span>
-                    <span className="font-medium text-gray-700">{alert.reviewedAt}</span>
+                    <span className="font-medium text-gray-700">
+                      {alert.reviewedAt}
+                    </span>
                   </div>
                 )}
                 {alert.reviewNote && (
@@ -375,5 +533,5 @@ export default function AlertDetail({
         </div>
       </div>
     </div>
-  )
+  );
 }

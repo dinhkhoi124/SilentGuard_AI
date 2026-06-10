@@ -7,6 +7,7 @@ import MainLayout from "@/components/layout/MainLayout";
 import EventTypeBadge from "@/components/alerts/EventTypeBadge";
 import AlertStatusBadge from "@/components/alerts/AlertStatusBadge";
 import { mockAlerts } from "@/lib/mock-data";
+import { getConfidenceStyle } from "@/lib/utils";
 import type { EventType } from "@/lib/types";
 
 type TypeFilter = "all" | EventType;
@@ -122,14 +123,7 @@ export default function EventLogPage() {
                   </td>
                   <td className="px-4 py-3">
                     <span
-                      className={[
-                        "font-bold text-xs",
-                        alert.confidence >= 80
-                          ? "text-red-600"
-                          : alert.confidence >= 60
-                            ? "text-orange-500"
-                            : "text-gray-400",
-                      ].join(" ")}
+                      className={`font-bold text-xs ${getConfidenceStyle(alert.confidence).text}`}
                     >
                       {alert.confidence}%
                     </span>

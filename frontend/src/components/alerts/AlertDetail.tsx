@@ -312,17 +312,6 @@ function SkeletonVisualization({ eventType }: { eventType: string }) {
   );
 }
 
-// ─── Confidence Label ─────────────────────────────────────────────────────────
-// Delegates to the shared util so colors are consistent across all screens.
-
-function confidenceLabel(
-  value: number,
-  type: string,
-): { text: string; color: string } {
-  const { text: color } = getConfidenceStyle(value);
-  return { text: getConfidenceLabel(value, type), color };
-}
-
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function AlertDetail({
@@ -337,7 +326,10 @@ export default function AlertDetail({
     alert.status === "pending" &&
     (userRole === "admin" || userRole === "operator");
 
-  const conf = confidenceLabel(alert.confidence, alert.eventType);
+  // Derive confidence presentation directly from shared utilities.
+  // No local wrapper needed — keeps a single source of truth.
+  const confStyle = getConfidenceStyle(alert.confidence);
+  const confLabel = getConfidenceLabel(alert.confidence, alert.eventType);
   const mttdOk = alert.mttd <= 30;
 
   return (
@@ -406,10 +398,14 @@ export default function AlertDetail({
             <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">
               Confidence AI
             </p>
-            <p className="text-4xl font-bold text-blue-600 leading-none mb-1">
+            <p
+              className={`text-4xl font-bold leading-none mb-1 ${confStyle.text}`}
+            >
               {alert.confidence}%
             </p>
-            <p className={`text-sm font-medium ${conf.color}`}>{conf.text}</p>
+            <p className={`text-sm font-medium ${confStyle.text}`}>
+              {confLabel}
+            </p>
           </div>
 
           {/* Bus & Route */}

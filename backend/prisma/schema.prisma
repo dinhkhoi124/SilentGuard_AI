@@ -1,0 +1,51 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Event {
+  id             String   @id @default(cuid())
+  busId          String
+  routeId        String?
+  driverId       String?
+  eventType      String
+  confidence     Float
+  timestamp      DateTime
+  clipUrl        String?
+  status         String   @default("pending")
+  aiModelVersion String?
+  locationLat    Float?
+  locationLng    Float?
+  createdAt      DateTime @default(now())
+  review         Review?
+
+  @@index([timestamp(sort: Desc)])
+  @@index([eventType, timestamp(sort: Desc)])
+  @@index([busId, timestamp(sort: Desc)])
+  @@index([routeId, timestamp(sort: Desc)])
+}
+
+model Review {
+  id             String   @id @default(cuid())
+  eventId        String   @unique
+  event          Event    @relation(fields: [eventId], references: [id])
+  reviewerId     String
+  action         String
+  note           String?
+  learningSignal Boolean  @default(true)
+  videoTimestamp Float?
+  reviewedAt     DateTime @default(now())
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  role      String
+  busId     String?
+  createdAt DateTime @default(now())
+}

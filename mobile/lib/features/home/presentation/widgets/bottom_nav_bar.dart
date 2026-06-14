@@ -1,3 +1,5 @@
+// lib/features/home/presentation/widgets/bottom_nav_bar.dart
+
 import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:mobile/core/utils/app_colors.dart';
@@ -17,10 +19,10 @@ class BottomNavBar extends StatelessWidget {
         top: false,
         child: Row(
           children: [
-            _NavItem(icon: Iconsax.home, label: 'Home', active: true),
-            _NavItem(icon: Iconsax.task_square, label: 'Smart'),
-            _NavItem(icon: Iconsax.chart, label: 'Reports', hasBadge: true),
-            _NavItem(icon: Iconsax.profile_circle, label: 'Account'),
+            _NavItem(icon: Iconsax.home, label: 'Trang chủ', active: true),
+            _NavItem(icon: Iconsax.task_square, label: 'Tự động'),
+            _NavItem(icon: Iconsax.chart, label: 'Báo cáo', hasBadge: true),
+            _NavItem(icon: Iconsax.profile_circle, label: 'Tài khoản'),
           ],
         ),
       ),

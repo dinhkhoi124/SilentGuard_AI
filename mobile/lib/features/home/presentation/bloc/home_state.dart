@@ -17,6 +17,10 @@ final class HomeLoading extends HomeState {
   const HomeLoading();
 }
 
+final class HomeNavigateToDevices extends HomeState {
+  const HomeNavigateToDevices();
+}
+
 final class HomeLoaded extends HomeState {
   const HomeLoaded({
     required this.weather,

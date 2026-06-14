@@ -57,6 +57,13 @@ App có ngôn ngữ thiết kế bo góc rất mạnh (Heavily Rounded Style):
 * **Mô tả:** Xuất hiện ở màn hình Notification.
 * **Cấu trúc:** `Left Circle Avatar` (chứa icon phân loại) + `Column` (Title bold + Body text regular + Time caption) + `Blue Unread Dot` (nếu chưa đọc) + `Trailing Arrow`.
 
+### 2.5 Hệ thống Nút bấm Chuẩn (Button System)
+Để đảm bảo trải nghiệm đồng bộ, toàn bộ nút bấm trong app bắt buộc phải tuân theo 3 loại sau:
+1. **PrimaryButton:** Dùng cho hành động chính (Sign Up, Add Device). Nền Xanh (`0xFF3661F6`), chữ Trắng.
+2. **SecondaryButton:** Dùng cho hành động phụ song song (Sign In). Nền Xanh Nhạt (`0xFFEFF3FF`), chữ Xanh.
+3. **SocialButton:** Dùng cho đăng nhập bên thứ ba. Nền Trắng, viền Xám mảnh (`0xFFEEEEEE`), chữ Đen kèm Icon gốc của hãng (Google, Apple...).
+
+*Lưu ý:* Tất cả các nút đều phải sử dụng kiểu bo góc nhộng (`StadiumBorder`) để khớp 100% với giao diện thiết kế.
 ---
 
 ## 3. Quy Tắc Viết Code (Vibe Code Rules)

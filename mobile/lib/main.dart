@@ -1,14 +1,14 @@
+// lib/main.dart
+
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:mobile/core/router/app_router.dart';
+import 'package:mobile/core/router/auth_notifier.dart';
 import 'package:mobile/core/theme/app_theme.dart';
-import 'package:mobile/features/home/presentation/bloc/home_bloc.dart';
-import 'package:mobile/features/home/presentation/bloc/home_event.dart';
-import 'package:mobile/features/home/presentation/pages/home_page.dart';
-import 'package:mobile/injection_container.dart';
+import 'package:mobile/injection_container.dart' as di;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await init();
+  await di.init();
   runApp(const MyApp());
 }
 
@@ -17,14 +17,13 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider(
-      create: (_) => sl<HomeBloc>()..add(const HomeStarted()),
-      child: MaterialApp(
-        title: 'Smart Home',
-        debugShowCheckedModeBanner: false,
-        theme: AppTheme.light,
-        home: const HomePage(),
-      ),
+    final appRouter = AppRouter(di.sl<AuthNotifier>());
+
+    return MaterialApp.router(
+      title: 'Smartify',
+      debugShowCheckedModeBanner: false,
+      theme: AppTheme.light,
+      routerConfig: appRouter.router,
     );
   }
 }

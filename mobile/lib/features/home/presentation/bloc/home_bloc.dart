@@ -9,12 +9,13 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     : super(const HomeInitial()) {
     on<HomeStarted>(_onStarted);
     on<RoomFilterChanged>(_onRoomFilterChanged);
-    on<AddDeviceTapped>((event, emit) {});
+    on<AddDeviceTapped>(_onAddDeviceTapped);
     on<NotificationTapped>((event, emit) {});
   }
 
   final GetDevices getDevices;
   final GetWeather getWeather;
+  HomeLoaded? _lastLoaded;
 
   Future<void> _onStarted(HomeStarted event, Emitter<HomeState> emit) async {
     emit(const HomeLoading());
@@ -23,28 +24,33 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
 
     weatherResult.fold(
       (failure) => emit(HomeError(failure)),
-      (weather) => devicesResult.fold(
-        (failure) => emit(HomeError(failure)),
-        (devices) => emit(
-          HomeLoaded(
-            weather: weather,
-            devices: devices,
-            selectedRoom: 'Living Room',
-          ),
-        ),
-      ),
+      (weather) =>
+          devicesResult.fold((failure) => emit(HomeError(failure)), (devices) {
+            _lastLoaded = HomeLoaded(
+              weather: weather,
+              devices: devices,
+              selectedRoom: 'Living Room',
+            );
+            emit(_lastLoaded!);
+          }),
     );
   }
 
   void _onRoomFilterChanged(RoomFilterChanged event, Emitter<HomeState> emit) {
-    final currentState = state;
-    if (currentState is! HomeLoaded) return;
-    emit(
-      HomeLoaded(
-        weather: currentState.weather,
-        devices: currentState.devices,
-        selectedRoom: event.roomName,
-      ),
+    final currentState = _lastLoaded;
+    if (currentState == null) return;
+    _lastLoaded = HomeLoaded(
+      weather: currentState.weather,
+      devices: currentState.devices,
+      selectedRoom: event.roomName,
     );
+    emit(_lastLoaded!);
+  }
+
+  void _onAddDeviceTapped(AddDeviceTapped event, Emitter<HomeState> emit) {
+    final currentState = _lastLoaded;
+    if (currentState == null) return;
+    emit(const HomeNavigateToDevices());
+    emit(currentState);
   }
 }

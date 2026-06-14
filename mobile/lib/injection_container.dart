@@ -1,4 +1,9 @@
+// lib/injection_container.dart
+
 import 'package:get_it/get_it.dart';
+import 'package:mobile/core/router/auth_notifier.dart';
+import 'package:mobile/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:mobile/features/devices/presentation/bloc/devices_bloc.dart';
 import 'package:mobile/features/home/data/repositories/home_repository_impl.dart';
 import 'package:mobile/features/home/domain/repositories/home_repository.dart';
 import 'package:mobile/features/home/domain/usecases/get_devices.dart';
@@ -11,6 +16,9 @@ Future<void> init() async {
   if (sl.isRegistered<HomeBloc>()) return;
 
   sl
+    ..registerLazySingleton(AuthNotifier.new)
+    ..registerFactory(AuthBloc.new)
+    ..registerFactory(DevicesBloc.new)
     ..registerFactory(() => HomeBloc(getDevices: sl(), getWeather: sl()))
     ..registerLazySingleton(() => GetDevices(sl()))
     ..registerLazySingleton(() => GetWeather(sl()))

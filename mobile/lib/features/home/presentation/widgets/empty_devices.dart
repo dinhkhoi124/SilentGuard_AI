@@ -1,3 +1,5 @@
+// lib/features/home/presentation/widgets/empty_devices.dart
+
 import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:mobile/core/utils/app_colors.dart';
@@ -19,7 +21,7 @@ class EmptyDevices extends StatelessWidget {
         ),
         const SizedBox(height: 20),
         const Text(
-          'No Devices',
+          'Chưa có thiết bị',
           style: TextStyle(
             color: AppColors.darkText,
             fontSize: 20,
@@ -28,14 +30,14 @@ class EmptyDevices extends StatelessWidget {
         ),
         const SizedBox(height: 7),
         const Text(
-          "You haven't added a device yet.",
+          'Bạn chưa thêm thiết bị nào.',
           style: TextStyle(color: AppColors.mutedText, fontSize: 14),
         ),
         const SizedBox(height: 22),
         ElevatedButton.icon(
           onPressed: onAddDevice,
           icon: const Icon(Iconsax.add, size: 18),
-          label: const Text('Add Device'),
+          label: const Text('Thêm thiết bị'),
           style: ElevatedButton.styleFrom(
             backgroundColor: AppColors.primary,
             foregroundColor: Colors.white,

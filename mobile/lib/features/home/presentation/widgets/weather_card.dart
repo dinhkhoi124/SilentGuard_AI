@@ -1,3 +1,5 @@
+// lib/features/home/presentation/widgets/weather_card.dart
+
 import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:mobile/core/utils/app_colors.dart';
@@ -67,7 +69,9 @@ class WeatherCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  weather.condition,
+                  weather.condition == 'Today Cloudy'
+                      ? 'Hôm nay có mây'
+                      : weather.condition,
                   style: TextStyle(
                     color: Colors.white.withValues(alpha: 0.68),
                     fontSize: 13,
@@ -84,12 +88,12 @@ class WeatherCard extends StatelessWidget {
                     _WeatherStat(
                       icon: Iconsax.drop,
                       value: '${weather.humidity.toStringAsFixed(1)}%',
-                      label: 'Humidity',
+                      label: 'Độ ẩm',
                     ),
                     _WeatherStat(
                       icon: Iconsax.wind,
                       value: '${weather.windSpeed.toStringAsFixed(1)} m/s',
-                      label: 'Wind',
+                      label: 'Gió',
                     ),
                   ],
                 ),

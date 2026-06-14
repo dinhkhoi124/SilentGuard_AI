@@ -1,3 +1,5 @@
+// lib/features/home/presentation/widgets/room_filter_chips.dart
+
 import 'package:flutter/material.dart';
 import 'package:mobile/core/utils/app_colors.dart';
 
@@ -15,6 +17,13 @@ class RoomFilterChips extends StatelessWidget {
     'Kitchen',
     'Bathroom',
   ];
+  static const roomLabels = {
+    'All Rooms': 'Tất cả phòng',
+    'Living Room': 'Phòng khách',
+    'Bedroom': 'Phòng ngủ',
+    'Kitchen': 'Nhà bếp',
+    'Bathroom': 'Phòng tắm',
+  };
 
   final String selectedRoom;
   final ValueChanged<String> onSelected;
@@ -57,7 +66,7 @@ class RoomFilterChips extends StatelessWidget {
                         : null,
                   ),
                   child: Text(
-                    room,
+                    roomLabels[room] ?? room,
                     style: TextStyle(
                       color: selected ? Colors.white : AppColors.darkText,
                       fontSize: 13,

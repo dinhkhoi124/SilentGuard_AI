@@ -1,4 +1,4 @@
-// lib/features/devices/domain/entities/camera_device.dart
+// lib/features/home/domain/entities/camera_device.dart
 
 import 'package:equatable/equatable.dart';
 

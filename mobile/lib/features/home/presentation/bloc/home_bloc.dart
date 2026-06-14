@@ -1,8 +1,8 @@
 // lib/features/home/presentation/bloc/home_bloc.dart
 
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:mobile/features/devices/data/mock_devices.dart';
-import 'package:mobile/features/devices/domain/entities/camera_device.dart';
+import 'package:mobile/features/home/data/mock_devices.dart';
+import 'package:mobile/features/home/domain/entities/camera_device.dart';
 import 'package:mobile/features/home/domain/usecases/get_weather.dart';
 import 'package:mobile/features/home/presentation/bloc/home_event.dart';
 import 'package:mobile/features/home/presentation/bloc/home_state.dart';
@@ -30,7 +30,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
         HomeLoaded(
           weather: weather,
           devices: const [],
-          selectedRoom: 'Living Room',
+          selectedRoom: 'All Rooms',
         ),
       );
     });

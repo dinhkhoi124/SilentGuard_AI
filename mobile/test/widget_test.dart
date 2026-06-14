@@ -82,7 +82,10 @@ void main() {
     expect(find.text('CAMERA PHÒNG KHÁCH'), findsOneWidget);
     expect(find.text('CAMERA PHÒNG NGỦ'), findsNothing);
 
-    await tester.tap(find.byIcon(Icons.more_vert).first);
+    final cameraMenu = find.byIcon(Icons.more_vert).first;
+    await tester.ensureVisible(cameraMenu);
+    await tester.pumpAndSettle();
+    await tester.tap(cameraMenu);
     await tester.pumpAndSettle();
     await tester.tap(find.text('Xóa thiết bị'));
     await tester.pumpAndSettle();

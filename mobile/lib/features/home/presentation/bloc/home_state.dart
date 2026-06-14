@@ -1,7 +1,7 @@
 // lib/features/home/presentation/bloc/home_state.dart
 
 import 'package:equatable/equatable.dart';
-import 'package:mobile/features/devices/domain/entities/camera_device.dart';
+import 'package:mobile/features/home/domain/entities/camera_device.dart';
 import 'package:mobile/features/home/domain/entities/weather_info.dart';
 
 sealed class HomeState extends Equatable {

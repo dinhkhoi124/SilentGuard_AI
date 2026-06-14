@@ -1,8 +1,8 @@
-// lib/features/devices/presentation/widgets/camera_card.dart
+// lib/features/home/presentation/widgets/camera_card.dart
 
 import 'package:flutter/material.dart';
 import 'package:mobile/core/utils/app_colors.dart';
-import 'package:mobile/features/devices/domain/entities/camera_device.dart';
+import 'package:mobile/features/home/domain/entities/camera_device.dart';
 
 class CameraCard extends StatelessWidget {
   const CameraCard({
@@ -27,6 +27,7 @@ class CameraCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(16),
         ),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             SizedBox(
@@ -36,159 +37,149 @@ class CameraCard extends StatelessWidget {
                 children: [
                   const ColoredBox(color: Colors.black),
                   Positioned(
-                    top: 8,
-                    left: 8,
-                    right: 8,
-                    child: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      alignment: Alignment.centerLeft,
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            width: 8,
-                            height: 8,
-                            decoration: BoxDecoration(
-                              color: device.isArmed
-                                  ? const Color(0xFF4CAF50)
-                                  : AppColors.mutedText,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                          const SizedBox(width: 4),
-                          const Icon(Icons.wifi, size: 14, color: Colors.white),
-                          const SizedBox(width: 4),
-                          const Icon(
-                            Icons.directions_walk,
-                            size: 14,
-                            color: Colors.white,
-                          ),
-                          const SizedBox(width: 12),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.black45,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: const Row(
-                              children: [
-                                Icon(
-                                  Icons.videocam_outlined,
-                                  size: 12,
-                                  color: Colors.white,
-                                ),
-                                Text(
-                                  ' 1/2',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 11,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 4),
-                          const _HudButton(icon: Icons.fullscreen),
-                          const SizedBox(width: 4),
-                          _buildThreeDotMenu(context),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const Positioned(
-                    right: 0,
                     top: 0,
-                    bottom: 0,
-                    child: Center(
-                      child: _HudButton(
-                        icon: Icons.chevron_right,
-                        backgroundColor: Colors.white24,
-                        size: 24,
+                    left: 0,
+                    right: 0,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 6,
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 8,
+                                height: 8,
+                                decoration: BoxDecoration(
+                                  color: device.isArmed
+                                      ? const Color(0xFF4CAF50)
+                                      : AppColors.mutedText,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              const Icon(
+                                Icons.wifi,
+                                size: 13,
+                                color: Colors.white,
+                              ),
+                              const SizedBox(width: 4),
+                              const Icon(
+                                Icons.directions_walk,
+                                size: 13,
+                                color: Colors.white,
+                              ),
+                            ],
+                          ),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 3,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.black45,
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: const Row(
+                                  children: [
+                                    Icon(
+                                      Icons.videocam_outlined,
+                                      size: 11,
+                                      color: Colors.white,
+                                    ),
+                                    SizedBox(width: 3),
+                                    Text(
+                                      '1/2',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 10,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              const _HudButton(
+                                icon: Icons.fullscreen,
+                                size: 26,
+                              ),
+                              const SizedBox(width: 2),
+                              _buildThreeDotMenu(context),
+                            ],
+                          ),
+                        ],
                       ),
                     ),
                   ),
                 ],
               ),
             ),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 8,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                device.name,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppColors.darkText,
-                                ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              device.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.darkText,
                               ),
-                              const SizedBox(height: 2),
-                              Text(
-                                device.status,
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  color: device.isArmed
-                                      ? const Color(0xFF4CAF50)
-                                      : AppColors.mutedText,
-                                ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              device.status,
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: device.isArmed
+                                    ? const Color(0xFF4CAF50)
+                                    : AppColors.mutedText,
                               ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
-                        Container(
-                          width: 32,
-                          height: 32,
-                          decoration: BoxDecoration(
-                            color: device.isArmed
-                                ? const Color(0xFFF5F5F5)
-                                : AppColors.lightBlue,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Icon(
-                            device.isArmed
-                                ? Icons.videocam_off_outlined
-                                : Icons.videocam_outlined,
-                            size: 16,
-                            color: device.isArmed
-                                ? AppColors.mutedText
-                                : AppColors.primary,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: Row(
-                        children: List.generate(device.accessories.length, (
-                          index,
-                        ) {
-                          return _AccessoryToggle(
-                            label: device.accessories[index],
-                            value: device.accessoryStates[index],
-                            onTap: () => onToggleAccessory(device.id, index),
-                          );
-                        }),
                       ),
-                    ),
-                  ],
-                ),
+                      Container(
+                        width: 32,
+                        height: 32,
+                        decoration: BoxDecoration(
+                          color: device.isArmed
+                              ? const Color(0xFFF5F5F5)
+                              : AppColors.lightBlue,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(
+                          device.isArmed
+                              ? Icons.videocam_off_outlined
+                              : Icons.videocam_outlined,
+                          size: 16,
+                          color: device.isArmed
+                              ? AppColors.mutedText
+                              : AppColors.primary,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                ],
               ),
             ),
           ],
@@ -200,12 +191,8 @@ class CameraCard extends StatelessWidget {
   Widget _buildThreeDotMenu(BuildContext context) {
     return PopupMenuButton<String>(
       padding: EdgeInsets.zero,
-      style: IconButton.styleFrom(
-        minimumSize: const Size.square(28),
-        maximumSize: const Size.square(28),
-        padding: EdgeInsets.zero,
-      ),
-      icon: const _HudButton(icon: Icons.more_vert),
+      constraints: const BoxConstraints(),
+      icon: const _HudButton(icon: Icons.more_vert, size: 26),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       color: Colors.white,
       elevation: 4,
@@ -318,14 +305,9 @@ class CameraCard extends StatelessWidget {
 }
 
 class _HudButton extends StatelessWidget {
-  const _HudButton({
-    required this.icon,
-    this.backgroundColor = Colors.black45,
-    this.size = 28,
-  });
+  const _HudButton({required this.icon, this.size = 28});
 
   final IconData icon;
-  final Color backgroundColor;
   final double size;
 
   @override
@@ -334,7 +316,7 @@ class _HudButton extends StatelessWidget {
       width: size,
       height: size,
       decoration: BoxDecoration(
-        color: backgroundColor,
+        color: Colors.black45,
         borderRadius: BorderRadius.circular(6),
       ),
       child: Icon(icon, size: 16, color: Colors.white),

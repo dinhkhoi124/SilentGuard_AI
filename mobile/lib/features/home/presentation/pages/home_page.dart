@@ -4,12 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:mobile/core/utils/app_colors.dart';
-import 'package:mobile/features/devices/domain/entities/camera_device.dart';
-import 'package:mobile/features/devices/presentation/widgets/camera_card.dart';
+import 'package:mobile/features/home/domain/entities/camera_device.dart';
 import 'package:mobile/features/home/presentation/bloc/home_bloc.dart';
 import 'package:mobile/features/home/presentation/bloc/home_event.dart';
 import 'package:mobile/features/home/presentation/bloc/home_state.dart';
 import 'package:mobile/features/home/presentation/widgets/bottom_nav_bar.dart';
+import 'package:mobile/features/home/presentation/widgets/camera_card.dart';
 import 'package:mobile/features/home/presentation/widgets/empty_devices.dart';
 import 'package:mobile/features/home/presentation/widgets/room_filter_chips.dart';
 import 'package:mobile/features/home/presentation/widgets/weather_card.dart';
@@ -101,7 +101,6 @@ class _LoadedHome extends StatelessWidget {
                   onSelected: (room) =>
                       context.read<HomeBloc>().add(RoomFilterChanged(room)),
                 ),
-                const SizedBox(height: 32),
                 AnimatedSwitcher(
                   duration: const Duration(milliseconds: 400),
                   transitionBuilder: (child, animation) {
@@ -158,7 +157,7 @@ class _InlineDeviceGrid extends StatelessWidget {
             crossAxisCount: 2,
             crossAxisSpacing: 12,
             mainAxisSpacing: 12,
-            childAspectRatio: 0.72,
+            childAspectRatio: 1,
           ),
           itemCount: devices.length,
           itemBuilder: (context, index) {
@@ -197,27 +196,24 @@ class _InlineDeviceGrid extends StatelessWidget {
             );
           },
         ),
-        if (devices.length < 4) ...[
-          const SizedBox(height: 16),
-          ElevatedButton.icon(
-            onPressed: () =>
-                context.read<HomeBloc>().add(const AddDeviceTapped()),
-            icon: const Icon(Iconsax.add, size: 18),
-            label: const Text('Thêm thiết bị'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: Colors.white,
-              elevation: 0,
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              shape: const StadiumBorder(),
-              textStyle: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-              ),
+        const SizedBox(height: 16),
+        ElevatedButton.icon(
+          onPressed: () =>
+              context.read<HomeBloc>().add(const AddDeviceTapped()),
+          icon: const Icon(Iconsax.add, size: 18),
+          label: const Text('Thêm thiết bị'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.primary,
+            foregroundColor: Colors.white,
+            elevation: 0,
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            shape: const StadiumBorder(),
+            textStyle: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
             ),
           ),
-        ],
-        const SizedBox(height: 24),
+        ),
       ],
     );
   }

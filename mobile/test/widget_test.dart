@@ -69,17 +69,18 @@ void main() {
     expect(find.text('Nhà của tôi'), findsOneWidget);
   });
 
-  testWidgets('mở danh sách camera và xóa thiết bị', (tester) async {
+  testWidgets('thêm và xóa camera trực tiếp trên trang chủ', (tester) async {
     sl<AuthNotifier>().login();
     await tester.pumpWidget(const MyApp());
     await tester.pumpAndSettle();
 
+    expect(find.text('Chưa có thiết bị'), findsOneWidget);
+
     await tester.tap(find.byType(FloatingActionButton).last);
     await tester.pumpAndSettle();
 
-    expect(find.text('Thiết bị của tôi'), findsOneWidget);
     expect(find.text('CAMERA PHÒNG KHÁCH'), findsOneWidget);
-    expect(find.text('CAMERA PHÒNG NGỦ'), findsOneWidget);
+    expect(find.text('CAMERA PHÒNG NGỦ'), findsNothing);
 
     await tester.tap(find.byIcon(Icons.more_vert).first);
     await tester.pumpAndSettle();
@@ -94,6 +95,15 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('CAMERA PHÒNG KHÁCH'), findsNothing);
+    expect(find.text('Chưa có thiết bị'), findsOneWidget);
+
+    await tester.tap(find.byType(FloatingActionButton).last);
+    await tester.pumpAndSettle();
+    expect(find.text('CAMERA PHÒNG KHÁCH'), findsOneWidget);
+
+    await tester.tap(find.byType(FloatingActionButton).last);
+    await tester.pumpAndSettle();
+    expect(find.text('CAMERA PHÒNG KHÁCH'), findsOneWidget);
     expect(find.text('CAMERA PHÒNG NGỦ'), findsOneWidget);
   });
 }

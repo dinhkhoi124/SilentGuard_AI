@@ -1,16 +1,20 @@
 // lib/features/devices/presentation/widgets/camera_card.dart
 
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:mobile/core/utils/app_colors.dart';
 import 'package:mobile/features/devices/domain/entities/camera_device.dart';
-import 'package:mobile/features/devices/presentation/bloc/devices_bloc.dart';
-import 'package:mobile/features/devices/presentation/bloc/devices_event.dart';
 
 class CameraCard extends StatelessWidget {
-  const CameraCard({super.key, required this.device});
+  const CameraCard({
+    super.key,
+    required this.device,
+    required this.onDelete,
+    required this.onToggleAccessory,
+  });
 
   final CameraDevice device;
+  final ValueChanged<String> onDelete;
+  final void Function(String deviceId, int accessoryIndex) onToggleAccessory;
 
   @override
   Widget build(BuildContext context) {
@@ -178,9 +182,7 @@ class CameraCard extends StatelessWidget {
                           return _AccessoryToggle(
                             label: device.accessories[index],
                             value: device.accessoryStates[index],
-                            onTap: () => context.read<DevicesBloc>().add(
-                              AccessoryToggled(device.id, index),
-                            ),
+                            onTap: () => onToggleAccessory(device.id, index),
                           );
                         }),
                       ),
@@ -267,7 +269,7 @@ class CameraCard extends StatelessWidget {
               shape: const StadiumBorder(),
             ),
             onPressed: () {
-              context.read<DevicesBloc>().add(DeviceDeleted(device.id));
+              onDelete(device.id);
               Navigator.pop(context);
             },
             child: const Text('Xóa', style: TextStyle(color: Colors.white)),

@@ -1,5 +1,7 @@
+// lib/features/home/presentation/bloc/home_state.dart
+
 import 'package:equatable/equatable.dart';
-import 'package:mobile/features/home/domain/entities/device.dart';
+import 'package:mobile/features/devices/domain/entities/camera_device.dart';
 import 'package:mobile/features/home/domain/entities/weather_info.dart';
 
 sealed class HomeState extends Equatable {
@@ -17,10 +19,6 @@ final class HomeLoading extends HomeState {
   const HomeLoading();
 }
 
-final class HomeNavigateToDevices extends HomeState {
-  const HomeNavigateToDevices();
-}
-
 final class HomeLoaded extends HomeState {
   const HomeLoaded({
     required this.weather,
@@ -29,8 +27,20 @@ final class HomeLoaded extends HomeState {
   });
 
   final WeatherInfo weather;
-  final List<Device> devices;
+  final List<CameraDevice> devices;
   final String selectedRoom;
+
+  HomeLoaded copyWith({
+    WeatherInfo? weather,
+    List<CameraDevice>? devices,
+    String? selectedRoom,
+  }) {
+    return HomeLoaded(
+      weather: weather ?? this.weather,
+      devices: devices ?? this.devices,
+      selectedRoom: selectedRoom ?? this.selectedRoom,
+    );
+  }
 
   @override
   List<Object?> get props => [weather, devices, selectedRoom];

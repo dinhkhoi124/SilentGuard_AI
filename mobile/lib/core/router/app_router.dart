@@ -7,7 +7,6 @@ import 'package:mobile/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:mobile/features/auth/presentation/pages/signin_page.dart';
 import 'package:mobile/features/auth/presentation/pages/signup_page.dart';
 import 'package:mobile/features/auth/presentation/pages/welcome_page.dart';
-import 'package:mobile/features/devices/presentation/pages/devices_page.dart';
 import 'package:mobile/features/home/presentation/bloc/home_bloc.dart';
 import 'package:mobile/features/home/presentation/bloc/home_event.dart';
 import 'package:mobile/features/home/presentation/pages/home_page.dart';
@@ -51,10 +50,6 @@ class AppRouter {
           create: (_) => sl<HomeBloc>()..add(const HomeStarted()),
           child: const HomePage(),
         ),
-      ),
-      GoRoute(
-        path: '/devices',
-        builder: (context, state) => const DevicesPage(),
       ),
     ],
   );

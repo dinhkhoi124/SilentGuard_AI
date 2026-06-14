@@ -2,14 +2,14 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:go_router/go_router.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:mobile/core/utils/app_colors.dart';
+import 'package:mobile/features/devices/domain/entities/camera_device.dart';
+import 'package:mobile/features/devices/presentation/widgets/camera_card.dart';
 import 'package:mobile/features/home/presentation/bloc/home_bloc.dart';
 import 'package:mobile/features/home/presentation/bloc/home_event.dart';
 import 'package:mobile/features/home/presentation/bloc/home_state.dart';
 import 'package:mobile/features/home/presentation/widgets/bottom_nav_bar.dart';
-import 'package:mobile/features/home/presentation/widgets/device_grid.dart';
 import 'package:mobile/features/home/presentation/widgets/empty_devices.dart';
 import 'package:mobile/features/home/presentation/widgets/room_filter_chips.dart';
 import 'package:mobile/features/home/presentation/widgets/weather_card.dart';
@@ -19,67 +19,59 @@ class HomePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BlocListener<HomeBloc, HomeState>(
-      listener: (context, state) {
-        if (state is HomeNavigateToDevices) {
-          context.push('/devices');
-        }
-      },
-      child: PopScope(
-        canPop: false,
-        onPopInvokedWithResult: (didPop, result) {},
-        child: Scaffold(
-          appBar: AppBar(
-            automaticallyImplyLeading: false,
-            toolbarHeight: 72,
-            titleSpacing: 20,
-            title: const Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'Nhà của tôi',
-                  style: TextStyle(
-                    color: AppColors.darkText,
-                    fontSize: 22,
-                    fontWeight: FontWeight.w700,
-                  ),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {},
+      child: Scaffold(
+        appBar: AppBar(
+          automaticallyImplyLeading: false,
+          toolbarHeight: 72,
+          titleSpacing: 20,
+          title: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Nhà của tôi',
+                style: TextStyle(
+                  color: AppColors.darkText,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w700,
                 ),
-                SizedBox(width: 7),
-                Icon(Iconsax.arrow_down, size: 17, color: AppColors.darkText),
-              ],
-            ),
-            actions: [
-              _TopBarButton(
-                icon: Iconsax.cpu,
-                tooltip: 'Trợ lý AI',
-                onPressed: () {},
               ),
-              const SizedBox(width: 4),
-              _TopBarButton(
-                icon: Iconsax.notification,
-                tooltip: 'Thông báo',
-                hasBadge: true,
-                onPressed: () =>
-                    context.read<HomeBloc>().add(const NotificationTapped()),
-              ),
-              const SizedBox(width: 14),
+              SizedBox(width: 7),
+              Icon(Iconsax.arrow_down, size: 17, color: AppColors.darkText),
             ],
           ),
-          body: BlocBuilder<HomeBloc, HomeState>(
-            builder: (context, state) {
-              return switch (state) {
-                HomeInitial() || HomeLoading() => const Center(
-                  child: CircularProgressIndicator(color: AppColors.primary),
-                ),
-                HomeNavigateToDevices() => const SizedBox.shrink(),
-                HomeError(:final message) => _ErrorView(message: message),
-                HomeLoaded() => _LoadedHome(state: state),
-              };
-            },
-          ),
-          floatingActionButton: const _HomeFabs(),
-          bottomNavigationBar: const BottomNavBar(),
+          actions: [
+            _TopBarButton(
+              icon: Iconsax.cpu,
+              tooltip: 'Trợ lý AI',
+              onPressed: () {},
+            ),
+            const SizedBox(width: 4),
+            _TopBarButton(
+              icon: Iconsax.notification,
+              tooltip: 'Thông báo',
+              hasBadge: true,
+              onPressed: () =>
+                  context.read<HomeBloc>().add(const NotificationTapped()),
+            ),
+            const SizedBox(width: 14),
+          ],
         ),
+        body: BlocBuilder<HomeBloc, HomeState>(
+          builder: (context, state) {
+            return switch (state) {
+              HomeInitial() || HomeLoading() => const Center(
+                child: CircularProgressIndicator(color: AppColors.primary),
+              ),
+              HomeError(:final message) => _ErrorView(message: message),
+              HomeLoaded() => _LoadedHome(state: state),
+            };
+          },
+        ),
+        floatingActionButton: const _HomeFabs(),
+        bottomNavigationBar: const BottomNavBar(),
       ),
     );
   }
@@ -92,12 +84,6 @@ class _LoadedHome extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final filteredDevices = state.selectedRoom == 'All Rooms'
-        ? state.devices
-        : state.devices
-              .where((device) => device.room == state.selectedRoom)
-              .toList();
-
     return SafeArea(
       top: false,
       child: CustomScrollView(
@@ -115,19 +101,124 @@ class _LoadedHome extends StatelessWidget {
                   onSelected: (room) =>
                       context.read<HomeBloc>().add(RoomFilterChanged(room)),
                 ),
-                const SizedBox(height: 54),
-                if (filteredDevices.isEmpty)
-                  EmptyDevices(
-                    onAddDevice: () =>
-                        context.read<HomeBloc>().add(const AddDeviceTapped()),
-                  )
-                else
-                  DeviceGrid(devices: filteredDevices),
+                const SizedBox(height: 32),
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 400),
+                  transitionBuilder: (child, animation) {
+                    return FadeTransition(opacity: animation, child: child);
+                  },
+                  child: state.devices.isEmpty
+                      ? _EmptyDeviceSection(
+                          key: const ValueKey('empty'),
+                          onAddDevice: () => context.read<HomeBloc>().add(
+                            const AddDeviceTapped(),
+                          ),
+                        )
+                      : _InlineDeviceGrid(
+                          key: const ValueKey('grid'),
+                          devices: state.devices,
+                        ),
+                ),
               ],
             ),
           ),
         ],
       ),
+    );
+  }
+}
+
+class _EmptyDeviceSection extends StatelessWidget {
+  const _EmptyDeviceSection({super.key, required this.onAddDevice});
+
+  final VoidCallback onAddDevice;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 22, bottom: 40),
+      child: EmptyDevices(onAddDevice: onAddDevice),
+    );
+  }
+}
+
+class _InlineDeviceGrid extends StatelessWidget {
+  const _InlineDeviceGrid({super.key, required this.devices});
+
+  final List<CameraDevice> devices;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
+            childAspectRatio: 0.72,
+          ),
+          itemCount: devices.length,
+          itemBuilder: (context, index) {
+            final device = devices[index];
+            return AnimatedSwitcher(
+              duration: const Duration(milliseconds: 350),
+              transitionBuilder: (child, animation) {
+                return FadeTransition(
+                  opacity: animation,
+                  child: SlideTransition(
+                    position:
+                        Tween<Offset>(
+                          begin: const Offset(0, 0.1),
+                          end: Offset.zero,
+                        ).animate(
+                          CurvedAnimation(
+                            parent: animation,
+                            curve: Curves.easeOut,
+                          ),
+                        ),
+                    child: child,
+                  ),
+                );
+              },
+              child: CameraCard(
+                key: ValueKey(device.id),
+                device: device,
+                onDelete: (deviceId) =>
+                    context.read<HomeBloc>().add(HomeDeviceDeleted(deviceId)),
+                onToggleAccessory: (deviceId, accessoryIndex) {
+                  context.read<HomeBloc>().add(
+                    HomeAccessoryToggled(deviceId, accessoryIndex),
+                  );
+                },
+              ),
+            );
+          },
+        ),
+        if (devices.length < 4) ...[
+          const SizedBox(height: 16),
+          ElevatedButton.icon(
+            onPressed: () =>
+                context.read<HomeBloc>().add(const AddDeviceTapped()),
+            icon: const Icon(Iconsax.add, size: 18),
+            label: const Text('Thêm thiết bị'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              shape: const StadiumBorder(),
+              textStyle: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+        const SizedBox(height: 24),
+      ],
     );
   }
 }

@@ -109,4 +109,37 @@ void main() {
     expect(find.text('CAMERA PHÒNG KHÁCH'), findsOneWidget);
     expect(find.text('CAMERA PHÒNG NGỦ'), findsOneWidget);
   });
+
+  testWidgets('mở trang chi tiết camera từ thẻ camera', (tester) async {
+    sl<AuthNotifier>().login();
+    await tester.pumpWidget(const MyApp());
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byType(FloatingActionButton).last);
+    await tester.pumpAndSettle();
+
+    final cameraName = find.text('CAMERA PHÒNG KHÁCH');
+    await tester.ensureVisible(cameraName);
+    await tester.pumpAndSettle();
+    await tester.tap(cameraName);
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+
+    expect(find.text('Phòng khách'), findsOneWidget);
+    expect(find.text('Trạng thái an toàn'), findsOneWidget);
+
+    await tester.scrollUntilVisible(
+      find.text('Sự kiện gần nhất'),
+      250,
+      scrollable: find.byType(Scrollable).last,
+    );
+    expect(find.text('Sự kiện gần nhất'), findsOneWidget);
+
+    await tester.scrollUntilVisible(
+      find.text('Lịch sử sự kiện'),
+      250,
+      scrollable: find.byType(Scrollable).last,
+    );
+    expect(find.text('Lịch sử sự kiện'), findsOneWidget);
+  });
 }

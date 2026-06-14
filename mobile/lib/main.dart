@@ -20,7 +20,7 @@ class MyApp extends StatelessWidget {
     final appRouter = AppRouter(di.sl<AuthNotifier>());
 
     return MaterialApp.router(
-      title: 'Smartify',
+      title: 'WatchNest',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       routerConfig: appRouter.router,

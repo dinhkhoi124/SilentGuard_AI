@@ -39,7 +39,6 @@ class HomePage extends StatelessWidget {
                 ),
               ),
               SizedBox(width: 7),
-              Icon(Iconsax.arrow_down, size: 17, color: AppColors.darkText),
             ],
           ),
           actions: [

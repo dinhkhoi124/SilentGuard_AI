@@ -1076,61 +1076,51 @@ def encode_clip(frames: list, fps: int = 30) -> bytes | None:
         return None
 
     h, w = frames[0].shape[:2]
-    tmp_dir = tempfile.mkdtemp()
-    proc = None
     try:
-        output_path = os.path.join(tmp_dir, "clip.mp4")
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            output_path = os.path.join(tmp_dir, "clip.mp4")
 
-        # Encode với FFmpeg qua pipe
-        ffmpeg_cmd = [
-            "ffmpeg", "-y",
-            "-f", "rawvideo",
-            "-vcodec", "rawvideo",
-            "-s", f"{w}x{h}",
-            "-pix_fmt", "bgr24",
-            "-r", str(fps),
-            "-i", "pipe:0",
-            "-vf", "scale=854:480",    # Downscale to 480p
-            "-vcodec", "libx264",
-            "-crf", "28",               # Quality (lower = better, 28 ≈ 800kbps)
-            "-preset", "fast",
-            "-pix_fmt", "yuv420p",
-            output_path
-        ]
+            # Encode với FFmpeg qua pipe
+            ffmpeg_cmd = [
+                "ffmpeg", "-y",
+                "-f", "rawvideo",
+                "-vcodec", "rawvideo",
+                "-s", f"{w}x{h}",
+                "-pix_fmt", "bgr24",
+                "-r", str(fps),
+                "-i", "pipe:0",
+                "-vf", "scale=854:480",    # Downscale to 480p
+                "-vcodec", "libx264",
+                "-crf", "28",               # Quality (lower = better, 28 ≈ 800kbps)
+                "-preset", "fast",
+                "-pix_fmt", "yuv420p",
+                output_path
+            ]
 
-        proc = subprocess.Popen(ffmpeg_cmd, stdin=subprocess.PIPE, stderr=subprocess.DEVNULL)
+            proc = None
+            try:
+                proc = subprocess.Popen(ffmpeg_cmd, stdin=subprocess.PIPE, stderr=subprocess.DEVNULL)
 
-        for frame in frames:
-            proc.stdin.write(frame.tobytes())
+                for frame in frames:
+                    proc.stdin.write(frame.tobytes())
 
-        proc.stdin.close()
-        proc.wait()
+                proc.stdin.close()
+                proc.wait()
 
-        if not os.path.exists(output_path):
-            return None
+                if not os.path.exists(output_path):
+                    return None
 
-        with open(output_path, "rb") as f:
-            clip_bytes = f.read()
+                with open(output_path, "rb") as f:
+                    clip_bytes = f.read()
 
-        return clip_bytes
+                return clip_bytes
+            finally:
+                # Đóng tiến trình trước khi thoát context manager để tránh giữ lock file trên Windows
+                if proc and proc.poll() is None:
+                    proc.kill()
     except Exception as e:
         print(f"[ERROR] Error encoding clip: {e}")
         return None
-    finally:
-        # Dọn dẹp tài nguyên và thư mục tạm trong mọi trường hợp (tránh leak)
-        if proc and proc.poll() is None:
-            proc.kill()
-        try:
-            target_file = os.path.join(tmp_dir, "clip.mp4")
-            if os.path.exists(target_file):
-                os.unlink(target_file)
-        except Exception:
-            pass
-        try:
-            if os.path.exists(tmp_dir):
-                os.rmdir(tmp_dir)
-        except Exception:
-            pass
 
 
 # ============================================================

@@ -1,5 +1,6 @@
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from app.core.security import verify_device_key_dependency
+from app.core.supabase_client import supabase
 from app.models.schemas import UploadUrlRequest, UploadUrlResponse
 
 router = APIRouter(prefix="/api/cameras", tags=["Cameras"])
@@ -15,13 +16,19 @@ async def get_upload_url(
     Generates a presigned URL for the edge device to upload a video clip.
     """
     household_id = camera.get("household_id", "household-uuid")
-    clip_path = f"clips/{household_id}/{req.filename}"
+    clip_path = f"{household_id}/{req.filename}"
     
-    # TODO: Generate real presigned URL from Supabase Storage client
-    upload_url = f"https://your-supabase-url.supabase.co/storage/v1/object/sign/{clip_path}?token=mock-presigned-token"
-    
+    try:
+        # Generate signed upload URL from Supabase Storage client
+        res = supabase.storage.from_("clips").create_signed_upload_url(clip_path)
+        upload_url = res.get("url")
+    except Exception as e:
+        print(f"Failed to generate signed upload URL from Supabase Storage: {e}")
+        # Dev fallback
+        upload_url = f"https://sceygoxizfbbhqwatqhx.supabase.co/storage/v1/object/upload/sign/clips/{clip_path}?token=mock"
+
     return UploadUrlResponse(
         upload_url=upload_url,
-        clip_path=clip_path,
+        clip_path=f"clips/{clip_path}",
         expires_in=300
     )

@@ -45,13 +45,14 @@ class CameraCard extends StatelessWidget {
                       right: 0,
                       child: Padding(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 6,
+                          horizontal: 10,
                           vertical: 6,
                         ),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          crossAxisAlignment: CrossAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            // 3 icon bên trái
                             Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
@@ -79,38 +80,38 @@ class CameraCard extends StatelessWidget {
                                 ),
                               ],
                             ),
+
+                            // 2 icon bên phải
                             Row(
+                              mainAxisAlignment: MainAxisAlignment.end,
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 Container(
                                   padding: const EdgeInsets.symmetric(
-                                    horizontal: 6,
-                                    vertical: 3,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: Colors.black45,
-                                    borderRadius: BorderRadius.circular(6),
+                                    vertical: 2,
                                   ),
                                   child: const Row(
+                                    mainAxisSize: MainAxisSize.min,
                                     children: [
                                       Icon(
-                                        Icons.videocam_outlined,
-                                        size: 11,
+                                        Icons.battery_5_bar,
+                                        size: 12,
                                         color: Colors.white,
                                       ),
-                                      SizedBox(width: 3),
+                                      SizedBox(width: 2),
                                       Text(
                                         '1/2',
                                         style: TextStyle(
                                           color: Colors.white,
                                           fontSize: 10,
+                                          height: 1,
                                         ),
                                       ),
                                     ],
                                   ),
                                 ),
-
-                                const SizedBox(width: 2),
+                                  const SizedBox(width: 6),
+                                  
                                 _buildThreeDotMenu(context),
                               ],
                             ),
@@ -195,7 +196,6 @@ class CameraCard extends StatelessWidget {
     return PopupMenuButton<String>(
       padding: EdgeInsets.zero,
       constraints: const BoxConstraints(),
-      icon: const _HudButton(icon: Icons.more_vert, size: 26),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       color: Colors.white,
       elevation: 4,
@@ -235,6 +235,11 @@ class CameraCard extends StatelessWidget {
           _showSettingsBottomSheet(context);
         }
       },
+      child: Icon(
+        Icons.more_vert,
+        size: 16,
+        color: Colors.white,
+      ),
     );
   }
 
@@ -271,6 +276,7 @@ class CameraCard extends StatelessWidget {
 
   void _showSettingsBottomSheet(BuildContext context) {
     showModalBottomSheet<void>(
+      backgroundColor: Colors.white,
       context: context,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),

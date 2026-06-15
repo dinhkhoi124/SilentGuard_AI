@@ -37,11 +37,12 @@ class _CameraDetailPageState extends State<CameraDetailPage> {
   void initState() {
     super.initState();
     _updateTime();
-    _clockTimer = Timer.periodic(
-      const Duration(seconds: 1),
-      (_) => _updateTime(),
-    );
-    _initVideo();
+    _clockTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) _updateTime();
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _initVideo();
+    });
   }
 
   void _updateTime() {

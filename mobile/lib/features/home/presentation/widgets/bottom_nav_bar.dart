@@ -10,20 +10,22 @@ class BottomNavBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 76,
       decoration: const BoxDecoration(
         color: AppColors.surface,
         border: Border(top: BorderSide(color: Color(0xFFEEEEEE))),
       ),
       child: const SafeArea(
         top: false,
-        child: Row(
-          children: [
-            _NavItem(icon: Iconsax.home, label: 'Trang chủ', active: true),
-            _NavItem(icon: Iconsax.task_square, label: 'Tự động'),
-            _NavItem(icon: Iconsax.chart, label: 'Báo cáo', hasBadge: true),
-            _NavItem(icon: Iconsax.profile_circle, label: 'Tài khoản'),
-          ],
+        child: SizedBox(
+          height: 64,
+          child: Row(
+            children: [
+              _NavItem(icon: Iconsax.home, label: 'Trang chủ', active: true),
+              _NavItem(icon: Iconsax.task_square, label: 'Tự động'),
+              _NavItem(icon: Iconsax.chart, label: 'Báo cáo', hasBadge: true),
+              _NavItem(icon: Iconsax.profile_circle, label: 'Tài khoản'),
+            ],
+          ),
         ),
       ),
     );

@@ -23,6 +23,7 @@ class HomePage extends StatelessWidget {
       canPop: false,
       onPopInvokedWithResult: (didPop, result) {},
       child: Scaffold(
+        resizeToAvoidBottomInset: false,
         appBar: AppBar(
           automaticallyImplyLeading: false,
           toolbarHeight: 72,
@@ -156,7 +157,7 @@ class _InlineDeviceGrid extends StatelessWidget {
             crossAxisCount: 2,
             crossAxisSpacing: 12,
             mainAxisSpacing: 12,
-            childAspectRatio: 1,
+            childAspectRatio: 0.75,
           ),
           itemCount: devices.length,
           itemBuilder: (context, index) {

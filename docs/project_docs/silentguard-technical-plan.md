@@ -1001,14 +1001,16 @@ class SeverityStateMachine:
             self.state = self.STATE_FALL_DETECTED
             self.fall_detected_at = ts
 
-    def on_person_stood_up(self) -> None:
-        """Gọi khi detect thấy người đứng dậy (body_angle > 70°)."""
+    def on_person_stood_up(self) -> str:
+        """Gọi khi detect thấy người đứng dậy (body_angle > 70°). Trả về trạng thái đạt được."""
+        final_state = self.STATE_NORMAL
         if self.state == self.STATE_FALL_DETECTED:
             elapsed = time.time() - self.fall_detected_at
             if elapsed < LOW_TO_MEDIUM_S:
-                self.state = self.STATE_LOW
+                final_state = self.STATE_LOW
             # LOW = log only, không push notification
         self._reset()
+        return final_state
 
     def _reset(self) -> None:
         self.state = self.STATE_NORMAL
@@ -1063,66 +1065,62 @@ class SeverityStateMachine:
 
 
 # ============================================================
-# VIDEO BLUR + ENCODE
+# VIDEO ENCODE
 # ============================================================
-def blur_and_encode_clip(frames: list, fps: int = 30) -> bytes | None:
+def encode_clip(frames: list, fps: int = 30) -> bytes | None:
     """
-    Encode các frame thành H.264 MP4 (Tạm thời bỏ qua phần blur mặt để đơn giản hóa).
+    Encode các frame thành H.264 MP4.
     Trả về bytes của file MP4 hoặc None nếu lỗi.
     """
     if not frames:
         return None
 
     h, w = frames[0].shape[:2]
-    tmp_dir = tempfile.mkdtemp()
-    output_path = os.path.join(tmp_dir, "clip.mp4")
-
-    # Encode với FFmpeg qua pipe
-    ffmpeg_cmd = [
-        "ffmpeg", "-y",
-        "-f", "rawvideo",
-        "-vcodec", "rawvideo",
-        "-s", f"{w}x{h}",
-        "-pix_fmt", "bgr24",
-        "-r", str(fps),
-        "-i", "pipe:0",
-        "-vf", "scale=854:480",    # Downscale to 480p
-        "-vcodec", "libx264",
-        "-crf", "28",               # Quality (lower = better, 28 ≈ 800kbps)
-        "-preset", "fast",
-        "-pix_fmt", "yuv420p",
-        output_path
-    ]
-
-    proc = None
     try:
-        proc = subprocess.Popen(ffmpeg_cmd, stdin=subprocess.PIPE, stderr=subprocess.DEVNULL)
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            output_path = os.path.join(tmp_dir, "clip.mp4")
 
-        for frame in frames:
-            # Tạm thời bỏ qua phần blur mặt, ghi trực tiếp frame
-            proc.stdin.write(frame.tobytes())
+            # Encode với FFmpeg qua pipe
+            ffmpeg_cmd = [
+                "ffmpeg", "-y",
+                "-f", "rawvideo",
+                "-vcodec", "rawvideo",
+                "-s", f"{w}x{h}",
+                "-pix_fmt", "bgr24",
+                "-r", str(fps),
+                "-i", "pipe:0",
+                "-vf", "scale=854:480",    # Downscale to 480p
+                "-vcodec", "libx264",
+                "-crf", "28",               # Quality (lower = better, 28 ≈ 800kbps)
+                "-preset", "fast",
+                "-pix_fmt", "yuv420p",
+                output_path
+            ]
 
-        proc.stdin.close()
-        proc.wait()
+            proc = None
+            try:
+                proc = subprocess.Popen(ffmpeg_cmd, stdin=subprocess.PIPE, stderr=subprocess.DEVNULL)
 
-        if not os.path.exists(output_path):
-            return None
+                for frame in frames:
+                    proc.stdin.write(frame.tobytes())
 
-        with open(output_path, "rb") as f:
-            clip_bytes = f.read()
+                proc.stdin.close()
+                proc.wait()
 
-        return clip_bytes
+                if not os.path.exists(output_path):
+                    return None
+
+                with open(output_path, "rb") as f:
+                    clip_bytes = f.read()
+
+                return clip_bytes
+            finally:
+                # Đóng tiến trình trước khi thoát context manager để tránh giữ lock file trên Windows
+                if proc and proc.poll() is None:
+                    proc.kill()
     except Exception as e:
         print(f"[ERROR] Error encoding clip: {e}")
         return None
-    finally:
-        # Dọn dẹp tài nguyên và thư mục tạm trong mọi trường hợp (tránh leak)
-        if proc and proc.poll() is None:
-            proc.kill()
-        if os.path.exists(output_path):
-            os.unlink(output_path)
-        if os.path.exists(tmp_dir):
-            os.rmdir(tmp_dir)
 
 
 # ============================================================
@@ -1222,7 +1220,7 @@ async def run_pipeline():
                 collecting_post_frames = False
                 all_frames = frame_buffer.get_clip_frames(CLIP_PRE_EVENT_FRAMES, post_event_frames)
                 post_event_frames = []
-                clip_bytes = blur_and_encode_clip(all_frames, fps=TARGET_FPS)
+                clip_bytes = encode_clip(all_frames, fps=TARGET_FPS)
                 await send_event_to_backend(
                     severity=state_machine.state,
                     confidence=fall_confidence,

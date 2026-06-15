@@ -5,6 +5,39 @@ from app.models.schemas import FCMTokenUpdateRequest
 
 router = APIRouter(prefix="/api/users", tags=["Users"])
 
+@router.post("/login", status_code=status.HTTP_200_OK)
+async def login_user(user: dict = Depends(get_current_user)):
+    """
+    POST /api/users/login
+    Ref: Section 3 Auth Flow
+    Verifies Firebase token and registers/provisions user in the DB.
+    Returns details of the logged in user.
+    """
+    return {
+        "status": "success",
+        "user": user
+    }
+
+@router.post("/logout", status_code=status.HTTP_200_OK)
+async def logout_user(user: dict = Depends(get_current_user)):
+    """
+    POST /api/users/logout
+    Clears the user's registered FCM token on logout.
+    """
+    user_id = user.get("id")
+    try:
+        # Clear FCM token to prevent sending notifications after logout
+        supabase.table("users").update({"fcm_token": None}).eq("id", user_id).execute()
+        return {
+            "status": "ok",
+            "message": "Logged out successfully. FCM token cleared."
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={"error": {"code": "DATABASE_ERROR", "message": f"Failed to clear FCM token on logout: {str(e)}"}}
+        )
+
 @router.post("/device-token")
 async def register_device_token(
     req: FCMTokenUpdateRequest,

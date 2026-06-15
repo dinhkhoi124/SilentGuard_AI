@@ -31,7 +31,47 @@ Authorization: Bearer <FIREBASE_ID_TOKEN>
 
 ## 3. Các API Endpoints Chính (Mobile App)
 
-### 3.1 Đăng ký FCM token nhận Push Notification (`POST /api/users/device-token`)
+### 3.1 Đăng nhập hệ thống (`POST /api/users/login`)
+Verify Firebase Token của người dùng, thực hiện JIT Provisioning (khởi tạo tài khoản tự động trong DB nếu chưa có) và trả về thông tin user.
+
+- **Headers**:
+```http
+Authorization: Bearer <FIREBASE_ID_TOKEN>
+```
+- **Response 200 OK**:
+```json
+{
+  "status": "success",
+  "user": {
+    "id": "uuid-nội-bộ-của-user",
+    "firebase_uid": "firebase-uid-chuẩn",
+    "full_name": "Tên Người Dùng",
+    "email": "user@example.com",
+    "role": "family"
+  }
+}
+```
+
+---
+
+### 3.2 Đăng xuất hệ thống (`POST /api/users/logout`)
+Đăng xuất tài khoản, tự động hủy liên kết (clear) token FCM ở DB để tránh nhận thông báo đẩy sau khi đăng xuất.
+
+- **Headers**:
+```http
+Authorization: Bearer <FIREBASE_ID_TOKEN>
+```
+- **Response 200 OK**:
+```json
+{
+  "status": "ok",
+  "message": "Logged out successfully. FCM token cleared."
+}
+```
+
+---
+
+### 3.3 Đăng ký FCM token nhận Push Notification (`POST /api/users/device-token`)
 Gọi mỗi khi ứng dụng khởi chạy hoặc khi token FCM thay đổi (rotate) để đảm bảo nhận được thông báo khẩn cấp.
 
 - **Request Body**:
@@ -49,7 +89,7 @@ Gọi mỗi khi ứng dụng khởi chạy hoặc khi token FCM thay đổi (rot
 
 ---
 
-### 3.2 Lấy danh sách cảnh báo ngã (`GET /api/alerts`)
+### 3.4 Lấy danh sách cảnh báo ngã (`GET /api/alerts`)
 Lấy danh sách các sự kiện bất thường.
 
 - **Query Parameters**:
@@ -81,7 +121,7 @@ Lấy danh sách các sự kiện bất thường.
 
 ---
 
-### 3.3 Xem chi tiết cảnh báo + Link Video (`GET /api/events/{event_id}`)
+### 3.5 Xem chi tiết cảnh báo + Link Video (`GET /api/events/{event_id}`)
 Dùng để tải thông tin chi tiết của một sự kiện ngã và nhận **Signed URL** để phát video clip.
 
 - **Response 200 OK**:
@@ -104,7 +144,7 @@ Trả về chi tiết 1 event tương tự như trong list nhưng bổ sung trư
 
 ---
 
-### 3.4 Phản hồi cảnh báo (`PATCH /api/alerts/{event_id}/review`)
+### 3.6 Phản hồi cảnh báo (`PATCH /api/alerts/{event_id}/review`)
 Gọi khi người nhà xác nhận trạng thái cảnh báo trên App (ví dụ: đã kiểm tra hoặc báo động giả).
 
 - **Request Body**:
@@ -124,7 +164,7 @@ Gọi khi người nhà xác nhận trạng thái cảnh báo trên App (ví d�
 
 ---
 
-### 3.5 Xem báo cáo ngày (`GET /api/reports/daily`)
+### 3.7 Xem báo cáo ngày (`GET /api/reports/daily`)
 Báo cáo tổng hợp tình trạng sức khỏe/sự cố của người cao tuổi do AI Claude tổng hợp.
 
 - **Query Parameters**:
@@ -141,7 +181,7 @@ Báo cáo tổng hợp tình trạng sức khỏe/sự cố của người cao t
 
 ---
 
-### 3.6 Dashboard Summary (`GET /api/dashboard/summary`)
+### 3.8 Dashboard Summary (`GET /api/dashboard/summary`)
 Thống kê nhanh các chỉ số hiển thị trên trang chủ App.
 
 - **Response 200 OK**:
@@ -161,7 +201,7 @@ Thống kê nhanh các chỉ số hiển thị trên trang chủ App.
 
 ---
 
-### 3.7 Cấu hình ngưỡng cảnh báo (`GET/PUT /api/settings/thresholds`)
+### 3.9 Cấu hình ngưỡng cảnh báo (`GET/PUT /api/settings/thresholds`)
 - **GET**: Lấy cấu hình hiện tại.
 - **PUT**: Cập nhật cấu hình mới.
 
@@ -180,7 +220,7 @@ Thống kê nhanh các chỉ số hiển thị trên trang chủ App.
 
 ---
 
-### 3.8 Đặt cấu hình bằng chat với AI (`POST /api/llm/config`)
+### 3.10 Đặt cấu hình bằng chat với AI (`POST /api/llm/config`)
 Dành cho tính năng ra lệnh bằng giọng nói/tin nhắn cấu hình.
 
 - **Request Body**:
@@ -193,7 +233,7 @@ Dành cho tính năng ra lệnh bằng giọng nói/tin nhắn cấu hình.
 
 ---
 
-### 3.9 Quản lý danh bạ liên hệ khẩn cấp (`GET/POST/PATCH/DELETE /api/contacts`)
+### 3.11 Quản lý danh bạ liên hệ khẩn cấp (`GET/POST/PATCH/DELETE /api/contacts`)
 Hệ thống liên hệ khẩn cấp dạng danh sách ưu tiên để escalate cuộc gọi/thông báo khi người dùng chính không phản hồi.
 
 - **POST**: Thêm liên hệ mới.

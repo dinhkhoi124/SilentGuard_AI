@@ -1,154 +1,106 @@
-# ✅ TODO — VinBus SafeWatch AI
+# SilentGuard AI — Theo dõi tiến độ
 
-> Cập nhật file này sau mỗi lần hoàn thành một việc.
-> Format: `- [x]` = xong · `- [ ]` = chưa làm · `- [~]` = đang làm
-
----
-
-## Giai đoạn 0 — Frontend (Next.js) ✅
-
-- [x] Cấu trúc thư mục Next.js 14 App Router
-- [x] Auth context + localStorage session
-- [x] Login page (3 tài khoản demo)
-- [x] Sidebar với RBAC (admin / operator / driver)
-- [x] Dashboard — metric cards + bar chart + top buses
-- [x] Alert List — filter tabs + confidence bar + status badge
-- [x] Alert Detail — timeline + skeleton SVG animation + Confirm/Reject/Escalate
-- [x] Fleet page — grid xe + trạng thái online/offline
-- [x] Event Log — bảng + filter + sort
-- [x] Users page — bảng phân quyền (Admin only)
-- [x] Settings page — ngưỡng confidence + toggle notification
-- [x] 4 Paths page — flow xử lý alert
-- [x] Driver view — giao diện riêng nhận cảnh báo
-- [x] Build production thành công (13/13 trang)
+> Cập nhật lần cuối: Sprint 2 đang chạy  
+> Format: `- [x]` Xong · `- [~]` Đang làm · `- [ ]` Chưa làm
 
 ---
 
-## Giai đoạn 1 — Backend Node.js (Fastify + Prisma + Socket.io) 🔵 Đang làm
+## Giai đoạn 0 — Sprint 1: Thiết kế & Lên kế hoạch ✅
 
-### 1.1 Cấu trúc & Config
-- [x] `backend/package.json` (Fastify, Prisma, Socket.io, tsx)
-- [x] `backend/tsconfig.json`
-- [x] `backend/.env.example`
-- [x] `backend/.gitignore`
-
-### 1.2 Database
-- [x] `backend/prisma/schema.prisma` — 3 model: Event, Review, User
-- [x] Index đúng theo ADR-008 (timestamp, eventType, busId, routeId)
-- [x] Chạy `prisma db push` → migrate schema vào SQLite
-- [x] Chạy `npm run db:seed` → seed 80 events + 3 users
-
-### 1.3 Server
-- [x] `backend/src/server.ts` — Fastify + CORS + routes
-- [x] `backend/src/db.ts` — Prisma client singleton
-- [x] `backend/src/socket.ts` — Socket.io setup + emit helper
-
-### 1.4 API Endpoints
-- [x] `POST /api/events/detect` — AI service gửi alert vào
-- [x] `GET /api/alerts` — operator lấy danh sách (filter by status)
-- [x] `GET /api/alerts/:id` — chi tiết 1 alert
-- [x] `PATCH /api/alerts/:id/review` — operator confirm / reject / escalate
-- [x] `GET /api/dashboard/summary` — metrics tổng quan
-- [x] `GET /api/analytics/timeseries` — chart ngày/tuần/tháng
-- [x] `GET /api/analytics/buses` — top xe sự cố
-- [ ] `GET /api/analytics/export?format=xlsx` — xuất Excel
-
-### 1.5 Mock AI Script
-- [x] `scripts/mock_ai.py` — gửi fake alert mỗi 15–30s
-- [ ] Chạy thử: `python scripts/mock_ai.py` → xem alert xuất hiện trên terminal
-
-### 1.6 Seed Data
-- [x] `backend/src/seed.ts` — 80 events + 3 users, trải đều 7 ngày
-- [x] Verify: chart dashboard có data đủ đa dạng sau seed
+- [x] Xác định vấn đề & persona (người cao tuổi sống một mình, gia đình lo ngại)
+- [x] PRD v1 (Problem Statement, Solution, User Stories)
+- [x] Kiến trúc 3 lớp (Edge → Backend → Mobile)
+- [x] Tech stack decision (FastAPI + Supabase + Firebase Auth/FCM)
+- [x] Severity classification (4 mức: LOW / MEDIUM / HIGH / CRITICAL)
+- [x] 4 Paths (Happy Path / Low-confidence / Failure / Correction)
+- [x] API contract draft
+- [x] DB schema draft
+- [x] GitHub repo setup
+- [x] Phân công task theo backlog (T-001 → T-028)
 
 ---
 
-## Giai đoạn 2 — Kết nối Frontend → Backend thật
+## Giai đoạn 1 — Sprint 2: Core Pipeline + API + Alert Engine 🔵 Đang làm
 
-- [ ] Cài `socket.io-client` vào `frontend/`
-- [ ] Tạo `frontend/src/lib/api.ts` — fetch wrapper trỏ đến `localhost:3001`
-- [ ] Dashboard page: thay `mockDashboardStats` bằng `GET /api/dashboard/summary`
-- [ ] Alerts page: thay `mockAlerts` bằng `GET /api/alerts`
-- [ ] Alert Detail: thay mock bằng `GET /api/alerts/:id` + `PATCH /api/alerts/:id/review`
-- [ ] Socket.io client: nhận `new-alert` event → hiển thị realtime trên Alerts page
-- [ ] Analytics timeseries: kết nối `GET /api/analytics/timeseries` → chart
-- [ ] Fleet page: kết nối dữ liệu thật (hoặc giữ mock nếu chưa có bus management API)
+### AI Engineer — Edge Device
 
----
+- [~] **T-008** Fall Detection model (YOLOv8-Pose fine-tune trên URFD + Le2i dataset)
+- [ ] **T-009** Severity Classifier edge (rule-based: duration bất động + motion score)
+- [ ] **T-010** Privacy layer (blur mặt bằng OpenCV trước khi encode clip)
+- [ ] **T-011** Clip capture 10s (circular buffer FFmpeg: T-8s trước ngã → T+2s sau)
+- [ ] Test edge pipeline end-to-end với camera IP thật (kiểm tra FPS + độ trễ)
 
-## Giai đoạn 3 — Auth thật (JWT)
+### Backend — FastAPI + Supabase
 
-- [ ] Cài `@fastify/jwt` vào backend
-- [ ] `POST /api/auth/login` — trả JWT token
-- [ ] Middleware guard các route cần auth
-- [ ] Frontend: lưu JWT trong localStorage, gửi kèm mọi request
-- [ ] Refresh token khi hết hạn 8 giờ (theo PRD)
-- [ ] RBAC thật: middleware kiểm tra role trước khi cho phép action
+- [ ] **T-007** Firebase token verification (`firebase-admin` SDK, middleware FastAPI)
+- [ ] Setup FastAPI project + kết nối Supabase (env, connection pool)
+- [ ] DB schema migrate (bảng: `events`, `alert_reviews`, `devices`, `users`)
+- [ ] **T-012** `POST /api/events/detect` — nhận event từ edge device
+- [ ] **T-013** `GET /api/alerts` + `PATCH /api/alerts/:id/review` — alert list & review
+- [ ] **T-014** Alert Engine (severity double-check + FCM push + auto-call logic Twilio/VGTS)
+- [ ] **T-017** `GET /api/dashboard/summary` — thống kê tổng quan
+- [ ] **T-021** `GET /api/events` — event log lịch sử (có filter date/severity)
+- [ ] **T-024** Camera offline detection (heartbeat timeout → push thông báo mất kết nối)
 
----
+### Frontend / Mobile — Flutter hoặc React Native
 
-## Giai đoạn 4 — AI Service thật (Python FastAPI + YOLOv8)
-
-- [ ] Setup Python env cho AI service (tách khỏi `src/` boilerplate hiện tại)
-- [ ] Download dataset: RWF-2000 (fight), Le2i (fall)
-- [ ] Quay staged data: 100–200 clip góc overhead 45–60°
-- [ ] Chạy data validation script (có trong `technical-plan.md`)
-- [ ] Train YOLOv8-Pose (skeleton extraction)
-- [ ] Train LSTM action classifier
-- [ ] Privacy layer: blur face + skeleton render với OpenCV
-- [ ] Wrap vào FastAPI: `POST /ai/infer` nhận RTSP stream
-- [ ] Test: precision ≥ 85%, recall ≥ 80%, FPR < 10%
-- [ ] Kết nối: AI service gọi `POST /api/events/detect` trên backend
+- [ ] **T-005** Wireframe 4 màn hình chính (Figma: Home, Alert List, Alert Detail, Settings)
+- [ ] **T-015** Home / Alert List screen (badge số alert chưa đọc, sort by time)
+- [ ] **T-016** Alert Detail screen (clip player blur, severity badge, nút Confirm / Dismiss)
+- [ ] Firebase Auth client setup (login flow: email + password hoặc Google)
+- [ ] FCM token registration + nhận push notification khi app background/foreground
 
 ---
 
-## Giai đoạn 5 — Analytics nâng cao
+## Giai đoạn 2 — Sprint 3: LLM + Dashboard + Bug Fix
 
-- [ ] `GET /api/analytics/export?format=xlsx` — xuất Excel với ExcelJS
-- [ ] Filter theo tuyến (`route_id`) trên analytics/buses
-- [ ] Alert fatigue rate — track Reject / total alert
-- [ ] Learning signal dashboard — tỷ lệ Confirm/Reject theo model version
-- [ ] Cân nhắc TimescaleDB nếu query > 2s (hiện tại dùng PostgreSQL thuần)
-
----
-
-## Giai đoạn 6 — Deploy
-
-- [ ] Tạo `backend/.dockerignore` + `Dockerfile` cho backend
-- [ ] Cập nhật `docker-compose.yml` — thêm backend service + database volume
-- [ ] Tạo Supabase project → lấy `DATABASE_URL` PostgreSQL
-- [ ] Chạy `prisma migrate deploy` trên PostgreSQL
-- [ ] Deploy backend lên Render.com (Web Service)
-- [ ] Deploy frontend lên Vercel (hoặc Render Static Site)
-- [ ] Upgrade Render free tier → paid ($7/tháng) trước khi demo (tránh sleep)
-- [ ] Cấu hình environment variables trên Render
-- [ ] Smoke test: URL online, login, alert realtime hoạt động
+- [ ] **T-018** LLM alert message (Claude Sonnet → tiếng Việt, tự nhiên, không robot — VD: "Mẹ bạn có vẻ bị ngã tại phòng khách lúc 14:32, đã nằm yên hơn 1 phút")
+- [ ] **T-019** Daily report generation (Claude tóm tắt 24h events cho gia đình mỗi sáng)
+- [ ] **T-020** Config via chat (parse "tắt alert ban đêm từ 10pm đến 6am" → lưu config_json)
+- [ ] **T-022** Learning Signal (lưu confirm/dismiss từ gia đình → dataset retrain sau)
+- [ ] Dashboard charts: số alert theo ngày, phân bố theo severity, giờ nguy hiểm cao nhất
+- [ ] Severity threshold configurable per user (VD: ông A bất động 45s mới push thay vì 30s)
+- [ ] Sửa bug từ Sprint 2 testing (backlog bug tracker)
 
 ---
 
-## Giai đoạn 7 — Driver Notification & Polish
+## Giai đoạn 3 — Sprint 4: Deploy + Production
 
-- [ ] Driver notification qua WebSocket (room riêng theo busId)
-- [ ] Auto-escalate sau 2 phút nếu operator chưa action (theo ADR-004)
-- [ ] Âm thanh cảnh báo cho alert đỏ (confidence ≥ 70%)
-- [ ] Test MTTD thực tế < 30s end-to-end
-- [ ] Kiểm tra Definition of Done (checklist trong `technical-plan.md`)
+- [ ] Docker hóa FastAPI backend (`Dockerfile` + `docker-compose`)
+- [ ] Deploy backend lên Render hoặc Railway (auto-deploy từ GitHub main)
+- [ ] Supabase production setup (storage bucket, Row Level Security policies)
+- [ ] Firebase project production config (tách prod/dev environment)
+- [ ] Edge device hardening (auto-restart systemd service, watchdog timer)
+- [ ] End-to-end test với camera thật trong môi trường thực (phòng ngủ, phòng khách)
+- [ ] Test MTTD (Mean Time To Detect) < 60s từ té ngã đến mobile nhận push
+- [ ] Definition of Done checklist pass đầy đủ
+- [ ] Demo preparation (kịch bản demo 5 phút, slide, video fallback)
 
 ---
 
-## 📊 Tiến độ tổng quan
+## Giai đoạn 4 — Post-MVP (Addon v2, ngoài scope hiện tại)
+
+- [ ] Facial recognition — nhận diện đúng người (OUT OF SCOPE MVP)
+- [ ] Phát hiện đột quỵ khi ngồi yên bất thường (behavioral anomaly)
+- [ ] Behavioral baseline cá nhân hóa theo thói quen của từng cụ
+- [ ] Tích hợp dịch vụ cấp cứu 115 thật (API hoặc SIP trunk)
+- [ ] Multi-camera support trong một căn hộ
+- [ ] Báo cáo sức khỏe tuần/tháng gửi qua email
+
+---
+
+## Tổng quan tiến độ
 
 ```
-Giai đoạn 0 — Frontend     ████████████ 100%  ✅
-Giai đoạn 1 — Backend      ██████████░░  90%  🔵 Gần xong
-Giai đoạn 2 — Kết nối      ░░░░░░░░░░░░   0%  ⏳
-Giai đoạn 3 — Auth JWT      ░░░░░░░░░░░░   0%  ⏳
-Giai đoạn 4 — AI Service   ░░░░░░░░░░░░   0%  ⏳
-Giai đoạn 5 — Analytics    ░░░░░░░░░░░░   0%  ⏳
-Giai đoạn 6 — Deploy       ░░░░░░░░░░░░   0%  ⏳
-Giai đoạn 7 — Polish       ░░░░░░░░░░░░   0%  ⏳
+Sprint 1 — Thiết kế       ██████████████████████████  100% ✅
+Sprint 2 — Core Pipeline  ████░░░░░░░░░░░░░░░░░░░░░░   15% 🔵
+Sprint 3 — LLM + Dashboard░░░░░░░░░░░░░░░░░░░░░░░░░░    0% ⬜
+Sprint 4 — Deploy + Prod  ░░░░░░░░░░░░░░░░░░░░░░░░░░    0% ⬜
+
+Tổng MVP: [████░░░░░░░░░░░░░░░░░░░░░░]  ~25% hoàn thành
 ```
 
----
-
-*Cập nhật lần cuối: Giai đoạn 1 gần xong — server chạy OK, DB seeded, TypeScript clean. Còn: export Excel + test mock_ai.py*
+> **Blocker cần giải quyết ngay:**  
+> 🔴 Camera IP: xác nhận resolution/FPS đủ để YOLOv8 detect pose  
+> 🔴 Edge device: benchmark RPi 5 vs Jetson Nano với budget thực tế  
+> 🔴 Dataset: URFD + Le2i có đủ góc camera cao (top-down VN phổ biến) không?

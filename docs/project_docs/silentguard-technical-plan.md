@@ -1032,8 +1032,8 @@ class SeverityStateMachine:
             if body_angle is not None and body_angle > 70.0:
                 elapsed = now - self.fall_detected_at
                 if elapsed < LOW_TO_MEDIUM_S:
-                    self.state = self.STATE_LOW
-                    # LOW: chỉ log, không push
+                    # LOW: chỉ log, không push. Reset state machine về NORMAL ngay để tránh bị treo ở STATE_LOW.
+                    self._reset()
                     return self.STATE_LOW, False
             # Kiểm tra thời gian bất động
             elapsed = now - self.fall_detected_at
@@ -1067,7 +1067,7 @@ class SeverityStateMachine:
 # ============================================================
 def blur_and_encode_clip(frames: list, fps: int = 30) -> bytes | None:
     """
-    Blur khuôn mặt trong từng frame và encode thành H.264 MP4.
+    Encode các frame thành H.264 MP4 (Tạm thời bỏ qua phần blur mặt để đơn giản hóa).
     Trả về bytes của file MP4 hoặc None nếu lỗi.
     """
     if not frames:
@@ -1076,10 +1076,6 @@ def blur_and_encode_clip(frames: list, fps: int = 30) -> bytes | None:
     h, w = frames[0].shape[:2]
     tmp_dir = tempfile.mkdtemp()
     output_path = os.path.join(tmp_dir, "clip.mp4")
-
-    # Ghi frames vào video writer tạm (không có blur trước)
-    # Dùng face detector để blur
-    face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
 
     # Encode với FFmpeg qua pipe
     ffmpeg_cmd = [
@@ -1090,7 +1086,7 @@ def blur_and_encode_clip(frames: list, fps: int = 30) -> bytes | None:
         "-pix_fmt", "bgr24",
         "-r", str(fps),
         "-i", "pipe:0",
-        "-vf", f"scale=854:480",    # Downscale to 480p
+        "-vf", "scale=854:480",    # Downscale to 480p
         "-vcodec", "libx264",
         "-crf", "28",               # Quality (lower = better, 28 ≈ 800kbps)
         "-preset", "fast",
@@ -1098,35 +1094,35 @@ def blur_and_encode_clip(frames: list, fps: int = 30) -> bytes | None:
         output_path
     ]
 
-    proc = subprocess.Popen(ffmpeg_cmd, stdin=subprocess.PIPE, stderr=subprocess.DEVNULL)
+    proc = None
+    try:
+        proc = subprocess.Popen(ffmpeg_cmd, stdin=subprocess.PIPE, stderr=subprocess.DEVNULL)
 
-    for frame in frames:
-        blurred = frame.copy()
+        for frame in frames:
+            # Tạm thời bỏ qua phần blur mặt, ghi trực tiếp frame
+            proc.stdin.write(frame.tobytes())
 
-        # Gaussian blur trên toàn bộ khuôn mặt detect được
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
-        for (x, y, fw, fh) in faces:
-            roi = blurred[y:y+fh, x:x+fw]
-            roi = cv2.GaussianBlur(roi, (51, 51), 0)
-            blurred[y:y+fh, x:x+fw] = roi
+        proc.stdin.close()
+        proc.wait()
 
-        proc.stdin.write(blurred.tobytes())
+        if not os.path.exists(output_path):
+            return None
 
-    proc.stdin.close()
-    proc.wait()
+        with open(output_path, "rb") as f:
+            clip_bytes = f.read()
 
-    if not os.path.exists(output_path):
+        return clip_bytes
+    except Exception as e:
+        print(f"[ERROR] Error encoding clip: {e}")
         return None
-
-    with open(output_path, "rb") as f:
-        clip_bytes = f.read()
-
-    # Cleanup
-    os.unlink(output_path)
-    os.rmdir(tmp_dir)
-
-    return clip_bytes
+    finally:
+        # Dọn dẹp tài nguyên và thư mục tạm trong mọi trường hợp (tránh leak)
+        if proc and proc.poll() is None:
+            proc.kill()
+        if os.path.exists(output_path):
+            os.unlink(output_path)
+        if os.path.exists(tmp_dir):
+            os.rmdir(tmp_dir)
 
 
 # ============================================================

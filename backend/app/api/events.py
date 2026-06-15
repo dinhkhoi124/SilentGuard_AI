@@ -39,6 +39,12 @@ async def detect_event(
     try:
         supabase.table("events").insert(event_data).execute()
     except Exception as e:
+        from app.core.config import settings
+        if settings.APP_ENV == "production":
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail={"error": {"code": "DATABASE_ERROR", "message": f"Failed to save event to database: {str(e)}"}}
+            )
         print(f"Database insertion failed: {e}. Running in dev mock fallback.")
 
     # Step 4: Nếu severity != LOW -> gọi AlertEngine.process(event)

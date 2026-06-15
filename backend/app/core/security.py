@@ -99,8 +99,9 @@ async def verify_device_key_dependency(x_device_key: str = Header(None, alias="X
         if isinstance(e, HTTPException):
             raise e
         # Development fallback
-        print(f"Error querying cameras table: {e}. Fallback to mock.")
-        if x_device_key.startswith("sg_dev_"):
+        from app.core.config import settings
+        if settings.APP_ENV != "production" and x_device_key.startswith("sg_dev_"):
+            print(f"Error querying cameras table: {e}. Fallback to mock.")
             return {"id": "mock-camera-id", "household_id": "mock-household-id", "name": "Mock Camera"}
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

@@ -3,6 +3,8 @@ from fastapi import FastAPI, status
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
+from app.core.config import settings
+
 # Import routers from app.api
 from app.api.events import router as events_router
 from app.api.cameras import router as cameras_router
@@ -21,10 +23,24 @@ app = FastAPI(
     version="1.0.0"
 )
 
+# Parse CORS origins
+if settings.APP_ENV == "production":
+    if settings.CORS_ORIGINS:
+        origins = [o.strip() for o in settings.CORS_ORIGINS.split(",") if o.strip()]
+    else:
+        # Default trusted domains for production
+        origins = [
+            "https://silentguard.ai",
+            "https://app.silentguard.ai"
+        ]
+else:
+    # Allow all origins in non-production environments
+    origins = ["*"]
+
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

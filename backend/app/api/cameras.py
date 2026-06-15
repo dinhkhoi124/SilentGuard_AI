@@ -23,6 +23,12 @@ async def get_upload_url(
         res = supabase.storage.from_("clips").create_signed_upload_url(clip_path)
         upload_url = res.get("url")
     except Exception as e:
+        from app.core.config import settings
+        if settings.APP_ENV == "production":
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail={"error": {"code": "STORAGE_ERROR", "message": f"Failed to generate presigned upload URL: {str(e)}"}}
+            )
         print(f"Failed to generate signed upload URL from Supabase Storage: {e}")
         # Dev fallback
         upload_url = f"https://sceygoxizfbbhqwatqhx.supabase.co/storage/v1/object/upload/sign/clips/{clip_path}?token=mock"

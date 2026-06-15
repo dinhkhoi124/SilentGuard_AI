@@ -10,5 +10,6 @@ class Settings:
     FIREBASE_SERVICE_ACCOUNT_PATH: str = os.getenv("FIREBASE_SERVICE_ACCOUNT_PATH", "./firebase-service-account.json")
     ANTHROPIC_API_KEY: str = os.getenv("ANTHROPIC_API_KEY", "")
     APP_ENV: str = os.getenv("APP_ENV", "development")
+    CORS_ORIGINS: str = os.getenv("CORS_ORIGINS", "")
 
 settings = Settings()

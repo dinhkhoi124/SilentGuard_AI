@@ -35,22 +35,43 @@ class _SignInPageState extends State<SignInPage> {
     showDialog<void>(
       context: context,
       barrierDismissible: false,
-      barrierColor: Colors.black.withValues(alpha: 0.35),
+      barrierColor: Colors.black.withValues(alpha: 0.22),
       builder: (_) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        insetPadding: const EdgeInsets.symmetric(horizontal: 34),
+        elevation: 0,
+        backgroundColor: AppColors.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
         child: const Padding(
-          padding: EdgeInsets.symmetric(vertical: 40, horizontal: 32),
+          padding: EdgeInsets.symmetric(vertical: 34, horizontal: 28),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              CircularProgressIndicator(
-                color: AppColors.primary,
-                strokeWidth: 3,
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  color: AppColors.lightBlue,
+                  borderRadius: BorderRadius.all(Radius.circular(20)),
+                ),
+                child: SizedBox.square(
+                  dimension: 56,
+                  child: Center(
+                    child: SizedBox.square(
+                      dimension: 24,
+                      child: CircularProgressIndicator(
+                        color: AppColors.primary,
+                        strokeWidth: 2.6,
+                      ),
+                    ),
+                  ),
+                ),
               ),
-              SizedBox(height: 24),
+              SizedBox(height: 20),
               Text(
                 'Đang đăng nhập...',
-                style: TextStyle(fontSize: 16, color: AppColors.darkText),
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.darkText,
+                ),
               ),
             ],
           ),
@@ -75,7 +96,7 @@ class _SignInPageState extends State<SignInPage> {
       ..showSnackBar(
         const SnackBar(
           content: Text('Email hoặc mật khẩu không đúng.'),
-          backgroundColor: Color(0xFFE53935),
+          backgroundColor: AppColors.destructive,
         ),
       );
   }
@@ -305,18 +326,18 @@ class _AuthTextField extends StatelessWidget {
       onFieldSubmitted: obscureText ? (_) => _submit(context) : null,
       decoration: InputDecoration(
         filled: true,
-        fillColor: const Color(0xFFF5F6FA),
+        fillColor: AppColors.surfaceSoft,
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(16),
           borderSide: BorderSide.none,
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(16),
           borderSide: BorderSide.none,
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: AppColors.primary, width: 1.4),
         ),
         prefixIcon: Icon(prefixIcon, color: AppColors.mutedText),
         suffixIcon: suffixIcon,

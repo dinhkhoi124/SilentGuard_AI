@@ -128,32 +128,126 @@ class _CameraDetailPageState extends State<CameraDetailPage> {
   Future<void> _showCameraOptions() async {
     await showModalBottomSheet<void>(
       context: context,
+      barrierColor: Colors.black.withValues(alpha: 0.18),
       builder: (sheetContext) => SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: SizedBox(
-            width: double.infinity,
-            child: FilledButton.icon(
-              onPressed: () async {
-                Navigator.of(sheetContext).pop();
-                final scheduled = await sl<LocalNotificationService>()
-                    .scheduleFallAlert(widget.device);
-                if (!mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      scheduled
-                          ? 'Thông báo giả lập sẽ xuất hiện sau 5 giây.'
-                          : 'Cần cấp quyền thông báo để giả lập cảnh báo.',
+          padding: const EdgeInsets.fromLTRB(20, 10, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const _SheetHandle(),
+              const SizedBox(height: 18),
+              const Text(
+                'Tùy chọn camera',
+                style: TextStyle(
+                  color: AppColors.darkText,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                widget.device.location,
+                style: const TextStyle(
+                  color: AppColors.mutedText,
+                  fontSize: 13,
+                ),
+              ),
+              const SizedBox(height: 18),
+              InkWell(
+                borderRadius: BorderRadius.circular(20),
+                onTap: () async {
+                  Navigator.of(sheetContext).pop();
+                  final scheduled = await sl<LocalNotificationService>()
+                      .scheduleFallAlert(widget.device);
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        scheduled
+                            ? 'Thông báo giả lập sẽ xuất hiện sau 5 giây.'
+                            : 'Cần cấp quyền thông báo để giả lập cảnh báo.',
+                      ),
+                    ),
+                  );
+                },
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceSoft,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Padding(
+                    padding: EdgeInsets.all(16),
+                    child: Row(
+                      children: [
+                        DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: AppColors.lightBlue,
+                            borderRadius: BorderRadius.all(Radius.circular(14)),
+                          ),
+                          child: SizedBox.square(
+                            dimension: 42,
+                            child: Icon(
+                              Icons.notifications_active_outlined,
+                              color: AppColors.primary,
+                              size: 22,
+                            ),
+                          ),
+                        ),
+                        SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Giả lập cảnh báo té ngã',
+                                style: TextStyle(
+                                  color: AppColors.darkText,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              SizedBox(height: 4),
+                              Text(
+                                'Gửi thông báo sau 5 giây.',
+                                style: TextStyle(
+                                  color: AppColors.mutedText,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Icon(
+                          Icons.chevron_right_rounded,
+                          color: AppColors.mutedText,
+                        ),
+                      ],
                     ),
                   ),
-                );
-              },
-              icon: const Icon(Icons.notifications_active_outlined),
-              label: const Text('Giả lập cảnh báo té ngã'),
-            ),
+                ),
+              ),
+            ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _SheetHandle extends StatelessWidget {
+  const _SheetHandle();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: AppColors.border,
+          borderRadius: BorderRadius.circular(99),
+        ),
+        child: const SizedBox(width: 40, height: 5),
       ),
     );
   }

@@ -11,46 +11,72 @@ class EmptyDevices extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        const SizedBox(
-          width: 126,
-          height: 116,
-          child: CustomPaint(painter: _ClipboardPainter()),
-        ),
-        const SizedBox(height: 20),
-        const Text(
-          'Chưa có thiết bị',
-          style: TextStyle(
-            color: AppColors.darkText,
-            fontSize: 20,
-            fontWeight: FontWeight.w700,
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(28),
+        boxShadow: const [
+          BoxShadow(
+            color: AppColors.shadow,
+            blurRadius: 24,
+            offset: Offset(0, 12),
           ),
-        ),
-        const SizedBox(height: 7),
-        const Text(
-          'Bạn chưa thêm thiết bị nào.',
-          style: TextStyle(color: AppColors.mutedText, fontSize: 14),
-        ),
-        const SizedBox(height: 22),
-        ElevatedButton.icon(
-          onPressed: onAddDevice,
-          icon: const Icon(Iconsax.add, size: 18),
-          label: const Text('Thêm thiết bị'),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.primary,
-            foregroundColor: Colors.white,
-            elevation: 0,
-            padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
-            shape: const StadiumBorder(),
-            textStyle: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(24, 28, 24, 26),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(
+              width: 126,
+              height: 116,
+              child: CustomPaint(painter: _ClipboardPainter()),
             ),
-          ),
+            const SizedBox(height: 22),
+            const Text(
+              'Chưa có thiết bị',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: AppColors.darkText,
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Bạn chưa thêm thiết bị nào.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: AppColors.mutedText,
+                fontSize: 14,
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: onAddDevice,
+              icon: const Icon(Iconsax.add, size: 18),
+              label: const Text('Thêm thiết bị'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 28,
+                  vertical: 14,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                textStyle: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 }

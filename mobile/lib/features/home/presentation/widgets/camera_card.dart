@@ -22,12 +22,18 @@ class CameraCard extends StatelessWidget {
     return GestureDetector(
       onTap: () => context.push('/camera/${device.id}'),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(18),
         child: DecoratedBox(
           decoration: BoxDecoration(
             color: AppColors.surface,
-            border: Border.all(color: const Color(0xFFE8E8EE)),
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(18),
+            boxShadow: const [
+              BoxShadow(
+                color: AppColors.shadow,
+                blurRadius: 22,
+                offset: Offset(0, 10),
+              ),
+            ],
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -52,7 +58,6 @@ class CameraCard extends StatelessWidget {
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // 3 icon bên trái
                             Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
@@ -80,17 +85,13 @@ class CameraCard extends StatelessWidget {
                                 ),
                               ],
                             ),
-
-                            // 2 icon bên phải
                             Row(
                               mainAxisAlignment: MainAxisAlignment.end,
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 2,
-                                  ),
-                                  child: const Row(
+                                const Padding(
+                                  padding: EdgeInsets.symmetric(vertical: 2),
+                                  child: Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
                                       Icon(
@@ -111,7 +112,6 @@ class CameraCard extends StatelessWidget {
                                   ),
                                 ),
                                 const SizedBox(width: 6),
-
                                 _buildThreeDotMenu(context),
                               ],
                             ),
@@ -143,7 +143,7 @@ class CameraCard extends StatelessWidget {
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
                                   fontSize: 11,
-                                  fontWeight: FontWeight.bold,
+                                  fontWeight: FontWeight.w700,
                                   color: AppColors.darkText,
                                 ),
                               ),
@@ -165,9 +165,9 @@ class CameraCard extends StatelessWidget {
                           height: 32,
                           decoration: BoxDecoration(
                             color: device.isArmed
-                                ? const Color(0xFFF5F5F5)
+                                ? AppColors.surfaceSoft
                                 : AppColors.lightBlue,
-                            borderRadius: BorderRadius.circular(8),
+                            borderRadius: BorderRadius.circular(10),
                           ),
                           child: Icon(
                             device.isArmed
@@ -195,16 +195,23 @@ class CameraCard extends StatelessWidget {
   Widget _buildThreeDotMenu(BuildContext context) {
     return PopupMenuButton<String>(
       padding: EdgeInsets.zero,
-      constraints: const BoxConstraints(),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      color: Colors.white,
-      elevation: 4,
+      constraints: const BoxConstraints(minWidth: 206),
+      offset: const Offset(0, 10),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      color: AppColors.surface,
+      surfaceTintColor: Colors.transparent,
+      elevation: 0,
+      shadowColor: AppColors.shadow,
       itemBuilder: (_) => const [
         PopupMenuItem(
           value: 'settings',
+          height: 48,
           child: Row(
             children: [
-              Icon(Icons.settings_outlined, size: 18, color: AppColors.primary),
+              _MenuIcon(
+                icon: Icons.settings_outlined,
+                color: AppColors.primary,
+              ),
               SizedBox(width: 10),
               Text(
                 'Cài đặt thiết bị',
@@ -213,16 +220,19 @@ class CameraCard extends StatelessWidget {
             ],
           ),
         ),
-        PopupMenuDivider(),
         PopupMenuItem(
           value: 'delete',
+          height: 48,
           child: Row(
             children: [
-              Icon(Icons.delete_outline, size: 18, color: Color(0xFFE53935)),
+              _MenuIcon(
+                icon: Icons.delete_outline,
+                color: AppColors.destructive,
+              ),
               SizedBox(width: 10),
               Text(
                 'Xóa thiết bị',
-                style: TextStyle(fontSize: 14, color: Color(0xFFE53935)),
+                style: TextStyle(fontSize: 14, color: AppColors.destructive),
               ),
             ],
           ),
@@ -235,73 +245,238 @@ class CameraCard extends StatelessWidget {
           _showSettingsBottomSheet(context);
         }
       },
-      child: Icon(Icons.more_vert, size: 16, color: Colors.white),
+      child: const Icon(Icons.more_vert, size: 16, color: Colors.white),
     );
   }
 
   void _showDeleteConfirmDialog(BuildContext context) {
     showDialog<void>(
       context: context,
-      builder: (_) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text(
-          'Xóa thiết bị',
-          style: TextStyle(fontWeight: FontWeight.bold),
+      barrierColor: Colors.black.withValues(alpha: 0.22),
+      builder: (dialogContext) => Dialog(
+        insetPadding: const EdgeInsets.symmetric(horizontal: 28),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(22, 22, 22, 18),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const _DialogIcon(
+                icon: Icons.delete_outline,
+                color: AppColors.destructive,
+              ),
+              const SizedBox(height: 18),
+              const Text(
+                'Xóa thiết bị',
+                style: TextStyle(
+                  color: AppColors.darkText,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Bạn có chắc muốn xóa "${device.name}" không?',
+                style: const TextStyle(
+                  color: AppColors.mutedText,
+                  fontSize: 14,
+                  height: 1.45,
+                ),
+              ),
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextButton(
+                      onPressed: () => Navigator.pop(dialogContext),
+                      child: const Text('Hủy'),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: FilledButton(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: AppColors.destructive,
+                        foregroundColor: Colors.white,
+                      ),
+                      onPressed: () {
+                        onDelete(device.id);
+                        Navigator.pop(dialogContext);
+                      },
+                      child: const Text('Xóa'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
-        content: Text('Bạn có chắc muốn xóa "${device.name}" không?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Hủy'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFE53935),
-              shape: const StadiumBorder(),
-            ),
-            onPressed: () {
-              onDelete(device.id);
-              Navigator.pop(context);
-            },
-            child: const Text('Xóa', style: TextStyle(color: Colors.white)),
-          ),
-        ],
       ),
     );
   }
 
   void _showSettingsBottomSheet(BuildContext context) {
     showModalBottomSheet<void>(
-      backgroundColor: Colors.white,
       context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      barrierColor: Colors.black.withValues(alpha: 0.18),
+      builder: (_) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 10, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const _SheetHandle(),
+              const SizedBox(height: 18),
+              const Text(
+                'Cài đặt thiết bị',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.darkText,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                device.name,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.darkText,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Vị trí: ${device.location}',
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: AppColors.mutedText,
+                  height: 1.35,
+                ),
+              ),
+              const SizedBox(height: 18),
+              const _InfoPanel(
+                icon: Icons.tune_rounded,
+                title: 'Tùy chỉnh đang được chuẩn bị',
+                message: 'Các lựa chọn cấu hình camera sẽ sẵn sàng sau.',
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
       ),
-      builder: (_) => Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+    );
+  }
+}
+
+class _MenuIcon extends StatelessWidget {
+  const _MenuIcon({required this.icon, required this.color});
+
+  final IconData icon;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: SizedBox.square(
+        dimension: 30,
+        child: Icon(icon, size: 17, color: color),
+      ),
+    );
+  }
+}
+
+class _DialogIcon extends StatelessWidget {
+  const _DialogIcon({required this.icon, required this.color});
+
+  final IconData icon;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: SizedBox.square(
+        dimension: 48,
+        child: Icon(icon, color: color, size: 24),
+      ),
+    );
+  }
+}
+
+class _SheetHandle extends StatelessWidget {
+  const _SheetHandle();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: AppColors.border,
+          borderRadius: BorderRadius.circular(99),
+        ),
+        child: const SizedBox(width: 40, height: 5),
+      ),
+    );
+  }
+}
+
+class _InfoPanel extends StatelessWidget {
+  const _InfoPanel({
+    required this.icon,
+    required this.title,
+    required this.message,
+  });
+
+  final IconData icon;
+  final String title;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: AppColors.surfaceSoft,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Cài đặt: ${device.name}',
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: AppColors.darkText,
+            _MenuIcon(icon: icon, color: AppColors.primary),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      color: AppColors.darkText,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    message,
+                    style: const TextStyle(
+                      color: AppColors.mutedText,
+                      fontSize: 13,
+                      height: 1.4,
+                    ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 8),
-            Text(
-              'Vị trí: ${device.location}',
-              style: const TextStyle(fontSize: 14, color: AppColors.mutedText),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'Tính năng sắp ra mắt...',
-              style: TextStyle(fontSize: 14, color: AppColors.mutedText),
-            ),
-            const SizedBox(height: 24),
           ],
         ),
       ),

@@ -37,7 +37,7 @@ class RoomFilterChips extends StatelessWidget {
         children: rooms.map((room) {
           final selected = room == selectedRoom;
           return Padding(
-            padding: const EdgeInsets.only(right: 10),
+            padding: const EdgeInsets.only(right: 9),
             child: Semantics(
               button: true,
               selected: selected,
@@ -46,21 +46,23 @@ class RoomFilterChips extends StatelessWidget {
                 borderRadius: BorderRadius.circular(99),
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 180),
-                  height: 38,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  height: 40,
+                  padding: const EdgeInsets.symmetric(horizontal: 17),
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
                     color: selected ? AppColors.primary : AppColors.surface,
                     borderRadius: BorderRadius.circular(99),
                     border: Border.all(
-                      color: selected ? AppColors.primary : AppColors.border,
+                      color: selected
+                          ? AppColors.primary
+                          : AppColors.border.withValues(alpha: 0.55),
                     ),
                     boxShadow: selected
                         ? [
                             BoxShadow(
-                              color: AppColors.primary.withValues(alpha: 0.18),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4),
+                              color: AppColors.primary.withValues(alpha: 0.14),
+                              blurRadius: 14,
+                              offset: const Offset(0, 6),
                             ),
                           ]
                         : null,

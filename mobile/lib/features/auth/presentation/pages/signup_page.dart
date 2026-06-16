@@ -317,18 +317,18 @@ class _AuthTextField extends StatelessWidget {
           prefixIcon: Icon(prefixIcon, color: AppColors.mutedText),
           suffixIcon: suffixIcon,
           filled: true,
-          fillColor: const Color(0xFFF5F6FA),
+          fillColor: AppColors.surfaceSoft,
           border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(16),
             borderSide: BorderSide.none,
           ),
           enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(16),
             borderSide: BorderSide.none,
           ),
           focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: AppColors.primary),
+            borderRadius: BorderRadius.circular(16),
+            borderSide: const BorderSide(color: AppColors.primary, width: 1.4),
           ),
         ),
       ),

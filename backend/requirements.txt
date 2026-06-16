@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+supabase
+firebase-admin
+python-dotenv
+apscheduler
+anthropic
+pydantic
+python-multipart

@@ -1,273 +1,278 @@
-# 🗺️ PROJECT MAP — Team C2-128 · VinBus SafeWatch AI
+# 🗺️ Project Map — SilentGuard AI
 
-> Tài liệu này mô tả **từng thư mục / file làm việc gì** trong dự án.
-> Đọc file này trước khi chỉnh sửa bất kỳ phần nào của codebase.
+> **Team 128** · Mentor: Công Nguyễn · AI20K Build Cohort 2
 
 ---
 
-## 🏗️ Tổng quan dự án
+## Tổng quan dự án
 
 | Thông tin | Chi tiết |
 |---|---|
-| **Tên dự án** | VinBus SafeWatch AI |
-| **Mục tiêu** | Hệ thống AI giám sát an toàn hành khách trên xe buýt qua camera ẩn danh |
-| **3 chức năng cốt lõi** | Phát hiện sự cố (té ngã / xô xát) · Ẩn danh hình ảnh · Cảnh báo thời gian thực |
-| **Người dùng mục tiêu** | Nhân viên giám sát an toàn tại Trung tâm Điều hành VinBus |
-| **Tech Stack chính** | FastAPI · LangGraph · OpenAI · Python 3.11 · Docker |
-| **Thành viên** | Đoàn Công Phú (PM) · Vũ Quang Vinh (PO) · Đinh Văn Anh Khôi (Tech Lead) |
+| **Tên dự án** | SilentGuard AI |
+| **Mục tiêu** | Phát hiện té ngã thụ động cho người cao tuổi, alert gia đình < 60 giây |
+| **Tech Stack** | Python · YOLOv8-Pose · FastAPI · Supabase · Firebase · Claude |
+| **Thời gian** | 6 tuần · 4 Sprint |
+| **Repo** | https://github.com/AI20K-Build-Cohort-2/C2-App-128 |
+| **Stakeholder** | Gia đình người cao tuổi sống một mình |
 
 ---
 
-## 📁 Cấu trúc thư mục đầy đủ
+## Cây thư mục
 
 ```
 team-128/
-├── src/                        ← 🧠 Toàn bộ source code chính
-│   ├── main.py                 ← Entry point khởi động app
-│   ├── config.py               ← Cấu hình môi trường (env vars)
-│   ├── agents/                 ← LangGraph AI Agent
-│   │   ├── graph.py            ← Định nghĩa state graph (nodes + edges)
-│   │   ├── state.py            ← Schema trạng thái agent (TypedDict)
-│   │   ├── nodes/              ← Các node xử lý trong graph
-│   │   │   └── example_node.py ← Node phân tích và tạo response
-│   │   └── tools/              ← Công cụ agent có thể gọi
-│   │       └── example_tool.py ← Tool tìm kiếm & tính toán
-│   ├── api/                    ← FastAPI backend
-│   │   └── routes.py           ← Định nghĩa API endpoints
-│   ├── models/                 ← Pydantic data schemas
-│   │   └── schemas.py          ← ChatRequest / ChatResponse models
-│   └── services/               ← Business logic & integrations
-│       └── llm.py              ← Khởi tạo LLM (OpenAI ChatGPT)
 │
-├── tests/                      ← 🧪 Toàn bộ test suite (pytest)
-│   ├── conftest.py             ← Fixtures dùng chung cho toàn bộ tests
-│   ├── test_agents/            ← Test cho LangGraph agent & graph
-│   │   └── test_graph.py       ← Test luồng graph, node, conditional edges
-│   └── test_api/               ← Test cho API endpoints
-│       └── test_routes.py      ← Test /chat, /status, /health
+├── 📄 README.md                    ← Giới thiệu dự án, quick start, roadmap
+├── 📄 ARCHITECTURE.md              ← Kiến trúc 3 lớp, DB schema, API contract, sequence diagram
+├── 📄 PROJECT_MAP.md               ← File này — bản đồ thư mục & phân công
 │
-├── docs/                       ← 📚 Tài liệu kỹ thuật
-│   ├── architecture_diagram.md ← Sơ đồ kiến trúc hệ thống (Mermaid)
-│   ├── project_summary_report.md ← PRD đầy đủ: user stories, API, RBAC, wireframe
-│   └── guide/                  ← 📖 Guidebook kỹ thuật 10 chương
-│       ├── chapter-01.md → chapter-10.md  ← Hướng dẫn chi tiết từng phần
-│       ├── architecture/       ← Tài liệu về kiến trúc hệ thống
-│       ├── langgraph/          ← Hướng dẫn dùng LangGraph
-│       ├── patterns/           ← Design patterns được dùng
-│       ├── anti-patterns/      ← Những thứ cần tránh
-│       ├── testing/            ← Hướng dẫn viết test
-│       ├── devops/             ← CI/CD, Docker, deploy
-│       ├── setup/              ← Cài đặt môi trường
-│       ├── code-style/         ← Coding conventions
-│       ├── bmad/               ← BMAD methodology docs
-│       ├── deliverables/       ← Yêu cầu bàn giao
-│       ├── resources/          ← Tài nguyên tham khảo
-│       ├── book-media/         ← Media cho tài liệu
-│       ├── cost-management.md  ← Quản lý chi phí API / cloud
-│       ├── free-accounts.md    ← Danh sách tài khoản miễn phí
-│       └── troubleshooting.md  ← Xử lý lỗi thường gặp
+├── 📁 src/                         ← ✅ BACKEND CHÍNH của SilentGuard AI (FastAPI)
+│   │                                  (thay thế toàn bộ boilerplate cũ từ Sprint 2 trở đi)
+│   │
+│   ├── 📁 edge/                    ← AI Engineer: Edge pipeline chạy trên Raspberry Pi / NUC
+│   │   ├── run_edge.py             ← Entry point — khởi động camera + inference loop
+│   │   ├── capture.py              ← Kết nối RTSP, pull frame 15 FPS (OpenCV/GStreamer)
+│   │   ├── pose_detector.py        ← YOLOv8-Pose: load model, inference, trả keypoints
+│   │   ├── fall_classifier.py      ← Rule-based: phân tích keypoints → phát hiện té ngã
+│   │   ├── severity_engine.py      ← Duration timer → phân loại LOW/MEDIUM/HIGH/CRITICAL
+│   │   ├── anonymizer.py           ← Blur mặt (OpenCV) + encode clip H.264 10 giây
+│   │   ├── event_sender.py         ← POST /api/events/detect lên Backend (httpx async)
+│   │   ├── offline_queue.py        ← Queue local khi mất kết nối, gửi lại khi online
+│   │   ├── requirements-edge.txt   ← ultralytics, opencv-python, httpx, ...
+│   │   └── .env.edge.example       ← Biến môi trường edge (BACKEND_URL, DEVICE_API_KEY)
+│   │
+│   ├── 📁 api/                     ← Backend Engineer: FastAPI routes & business logic
+│   │   ├── __init__.py
+│   │   ├── routes/
+│   │   │   ├── events.py           ← POST /detect · GET / · GET /{id} · PATCH /{id}/review
+│   │   │   ├── devices.py          ← GET /devices · POST /devices · PUT /devices/{id}
+│   │   │   ├── users.py            ← POST /users/fcm-token · GET /users/me
+│   │   │   └── reports.py          ← GET /reports/daily (Claude LLM)
+│   │   ├── models/
+│   │   │   ├── event.py            ← Pydantic schema: EventCreate, EventResponse, ReviewRequest
+│   │   │   ├── device.py           ← Pydantic schema: DeviceCreate, DeviceStatus
+│   │   │   └── user.py             ← Pydantic schema: UserProfile, FCMTokenRequest
+│   │   ├── dependencies.py         ← Firebase ID Token verification (FastAPI Depends)
+│   │   └── middleware.py           ← CORS, logging, error handler
+│   │
+│   ├── 📁 alert/                   ← Backend Engineer: Alert Engine + Push + Auto-call
+│   │   ├── engine.py               ← Orchestrator: nhận event → quyết định action theo severity
+│   │   ├── fcm_sender.py           ← Firebase Admin SDK: gửi FCM push notification
+│   │   ├── auto_call.py            ← Auto-call logic: gọi điện khi HIGH/CRITICAL
+│   │   └── escalation.py           ← CRITICAL: gọi tất cả emergency contacts liên tục
+│   │
+│   ├── 📁 llm/                     ← Backend Engineer: Claude integration
+│   │   ├── alert_message.py        ← Sinh alert message tự nhiên từ {severity, duration, location}
+│   │   ├── daily_report.py         ← Tổng hợp sự kiện ngày → báo cáo cho gia đình
+│   │   └── config_parser.py        ← Parse cấu hình ngôn ngữ tự nhiên → threshold JSON
+│   │
+│   ├── 📁 db/                      ← Backend Engineer: Supabase client & queries
+│   │   ├── client.py               ← Khởi tạo Supabase Python client
+│   │   ├── events_repo.py          ← CRUD cho bảng events
+│   │   ├── reviews_repo.py         ← CRUD cho bảng alert_reviews
+│   │   └── devices_repo.py         ← CRUD cho bảng devices
+│   │
+│   ├── config.py                   ← Pydantic Settings: đọc .env, validate
+│   ├── main.py                     ← FastAPI app entry point, include routers
+│   ├── requirements.txt            ← fastapi, uvicorn, supabase, firebase-admin, anthropic, ...
+│   └── .env.example                ← Template biến môi trường backend
 │
-├── scripts/                    ← 🔌 Script tiện ích & AI logging
-│   ├── log_hook.py             ← Auto-log AI usage (Claude/Cursor/Codex/Gemini)
-│   ├── log_antigravity.py      ← Scan prompt từ Antigravity IDE
-│   ├── log_manual.py           ← Manual log cho ChatGPT / web tools
-│   ├── submit_log.py           ← Submit logs khi git push
-│   ├── setup.sh                ← Script cài đặt môi trường lần đầu
-│   ├── setup_hooks.sh          ← Cài git hooks (Linux/macOS)
-│   ├── setup_hooks.ps1         ← Cài git hooks (Windows PowerShell)
-│   ├── _pyrun.sh               ← Wrapper chạy Python (Unix)
-│   └── _pyrun.cmd              ← Wrapper chạy Python (Windows)
+├── 📁 frontend/                    ← ⚠️ PROTOTYPE CŨ (VinBus SafeWatch) — KHÔNG DÙNG CHO SILENTGUARD
+│   │                                  Next.js UI prototype từ giai đoạn VinBus.
+│   │                                  Giữ lại để tham khảo component/style, không deploy.
+│   │                                  SilentGuard production dùng Mobile App (iOS/Android) thay thế.
+│   ├── app/
+│   ├── components/
+│   ├── package.json
+│   └── ...
 │
-├── eval/                       ← 📊 Đánh giá & benchmark AI
-│   └── results/
-│       └── report.md           ← Kết quả đánh giá model (precision, recall, FPR)
+├── 📁 backend/                     ← ⚠️ PROTOTYPE CŨ (VinBus SafeWatch) — KHÔNG DÙNG CHO SILENTGUARD
+│   │                                  Node.js/Fastify backend từ giai đoạn VinBus.
+│   │                                  Không tích hợp YOLOv8, Supabase, Firebase theo design SilentGuard.
+│   │                                  Backend thật của SilentGuard là src/ (FastAPI Python).
+│   ├── src/
+│   ├── package.json
+│   └── ...
 │
-├── presentation/               ← 🎤 Demo Day
-│   └── README.md               ← Hướng dẫn chuẩn bị slides / demo
+├── 📁 docs/                        ← Tài liệu kỹ thuật chi tiết
+│   ├── api_contract.md             ← API spec đầy đủ (request/response schema)
+│   ├── edge_setup.md               ← Hướng dẫn cài đặt Raspberry Pi + camera RTSP
+│   ├── model_card.md               ← YOLOv8-Pose model card: dataset, metrics, limitations
+│   ├── privacy_policy.md           ← Chính sách quyền riêng tư chi tiết cho user
+│   └── sprint_notes/               ← Ghi chú từng sprint
+│       ├── sprint1.md
+│       ├── sprint2.md
+│       └── ...
 │
-├── .github/                    ← ⚡ CI/CD GitHub
-│   ├── workflows/
-│   │   └── ci.yml              ← Pipeline CI tự động: lint → test → build
-│   └── hooks/                  ← Cấu hình hook cho GitHub Copilot
+├── 📁 scripts/                     ← Scripts tiện ích cho team
+│   ├── setup_dev.sh                ← Cài đặt môi trường dev local (venv, deps, .env)
+│   ├── migrate_db.py               ← Chạy SQL migration lên Supabase
+│   ├── gen_device_key.py           ← Tạo API key cho edge device mới
+│   └── eval_model.py               ← Đánh giá model nhanh trên test video
 │
-├── .agents/                    ← 🤖 Cấu hình Antigravity agent
-│   ├── rules/
-│   │   └── ai-log-hook.md      ← Quy tắc tự động log AI usage
-│   └── workflows/
-│       └── log.md              ← Workflow ghi log khi dùng AI tool
+├── 📁 tests/                       ← Test suite (AI Engineer + Backend Engineer)
+│   ├── 📁 unit/
+│   │   ├── test_fall_classifier.py ← Unit test Fall Classifier (keypoint scenarios)
+│   │   ├── test_severity_engine.py ← Unit test Severity Engine (duration logic)
+│   │   └── test_alert_engine.py    ← Unit test Alert Engine (mức severity → action)
+│   ├── 📁 integration/
+│   │   ├── test_events_api.py      ← Integration test POST /detect, GET /events
+│   │   └── test_review_api.py      ← Integration test PATCH /review
+│   └── conftest.py                 ← pytest fixtures (mock Supabase, mock Firebase)
 │
-├── .ai-log/                    ← 📊 Log sử dụng AI (auto-generated, không commit)
+├── 📁 eval/                        ← Đánh giá model AI (AI Engineer)
+│   ├── 📁 videos/                  ← Video test (đã ẩn danh) — không commit lên git
+│   ├── 📁 annotations/             ← Ground truth labels (JSON)
+│   ├── run_eval.py                 ← Chạy evaluation: precision, recall, F1
+│   ├── confusion_matrix.py         ← Sinh confusion matrix
+│   └── results/                    ← Kết quả eval (CSV + plots)
 │
-├── .claude/                    ← ⚙️ Hook config cho Claude (Anthropic)
-├── .codex/                     ← ⚙️ Hook config cho GitHub Copilot Codex
-├── .cursor/                    ← ⚙️ Hook config cho Cursor IDE
-├── .gemini/                    ← ⚙️ Hook config cho Google Gemini
-│
-├── .venv/                      ← 🐍 Python virtual environment (không commit)
-├── .pytest_cache/              ← Cache pytest (không commit)
-│
-├── main.py                     ← 🚀 Entry point (alias cho src/main.py)
-├── config.py                   ← Cấu hình (alias cấp root nếu cần)
-│
-├── Dockerfile                  ← 🐳 Multi-stage Docker build
-├── docker-compose.yml          ← 🐙 Orchestration: app + db + redis
-├── requirements.txt            ← 📦 Python dependencies
-├── ruff.toml                   ← 🧹 Cấu hình linter / formatter (Ruff)
-├── Makefile                    ← 🛠️ Lệnh tắt: make run / test / lint / format
-│
-├── README.md                   ← 📄 Giới thiệu dự án & quick start
-├── README_boilerplate.md       ← 📝 Template README cho đội
-├── ARCHITECTURE.md             ← 🏛️ Tài liệu kiến trúc chi tiết (Mermaid diagrams)
-├── JOURNAL.md                  ← 📓 Nhật ký học tập theo tuần
-├── WORKLOG.md                  ← 🕐 Log công việc hàng ngày
-├── PROJECT_MAP.md              ← 🗺️ File này — bản đồ toàn bộ dự án
-└── .gitignore / .dockerignore  ← Loại trừ file nhạy cảm khỏi git / docker
+└── Makefile                        ← Lệnh thường dùng (xem phần "Lệnh thường dùng")
 ```
 
 ---
 
-## 🧠 Chi tiết từng phần quan trọng
+## Lưu ý quan trọng về cấu trúc
 
-### `src/` — Source Code Chính
+> ⚠️ **`frontend/` và `backend/`** là code từ dự án VinBus SafeWatch (trước SilentGuard). Hai thư mục này **không được dùng** cho SilentGuard production. Giữ lại chỉ để tham khảo và không xóa để tránh conflict git history của cả cohort.
 
-| File / Thư mục | Vai trò | Khi nào chỉnh sửa |
-|---|---|---|
-| `main.py` | Khởi tạo FastAPI app, CORS, router, lifespan | Thêm middleware, thay đổi cấu hình app |
-| `config.py` | Đọc `.env`, validate settings qua Pydantic | Thêm biến môi trường mới |
-| `agents/graph.py` | Xây dựng LangGraph state graph | Thêm node mới, thay đổi luồng xử lý |
-| `agents/state.py` | Định nghĩa `AgentState` (TypedDict) | Thêm field vào state của agent |
-| `agents/nodes/` | Hàm xử lý từng bước trong graph | Implement logic phân tích / phát hiện sự cố |
-| `agents/tools/` | Công cụ agent gọi được (`@tool`) | Thêm tìm kiếm, tính toán, gọi external API |
-| `api/routes.py` | Định nghĩa endpoint `/chat`, `/status` | Thêm API endpoint mới |
-| `models/schemas.py` | Request/Response Pydantic models | Thêm/sửa kiểu dữ liệu API |
-| `services/llm.py` | Khởi tạo ChatOpenAI client | Đổi model, cấu hình LLM |
+> ✅ **`src/`** là nơi duy nhất chứa code production của SilentGuard AI (FastAPI backend + edge pipeline).
 
 ---
 
-### `tests/` — Test Suite
+## Bảng phân công theo thư mục
 
-| File / Thư mục | Vai trò |
-|---|---|
-| `conftest.py` | Fixtures dùng chung (mock LLM, test client, v.v.) |
-| `test_agents/test_graph.py` | Test LangGraph graph: node logic, conditional routing, state flow |
-| `test_api/test_routes.py` | Test API endpoints: status codes, response schema, error handling |
+| Thư mục / File | AI Engineer | Backend Engineer | Frontend/Mobile |
+|---|:---:|:---:|:---:|
+| `src/edge/` | ✅ Chủ lực | — | — |
+| `src/api/` | — | ✅ Chủ lực | — |
+| `src/alert/` | — | ✅ Chủ lực | — |
+| `src/llm/` | — | ✅ Chủ lực | — |
+| `src/db/` | — | ✅ Chủ lực | — |
+| `tests/unit/test_fall_classifier.py` | ✅ | — | — |
+| `tests/unit/test_severity_engine.py` | ✅ | — | — |
+| `tests/unit/test_alert_engine.py` | — | ✅ | — |
+| `tests/integration/` | hỗ trợ | ✅ Chủ lực | — |
+| `eval/` | ✅ Chủ lực | — | — |
+| `docs/model_card.md` | ✅ | — | — |
+| `docs/api_contract.md` | — | ✅ | — |
+| `docs/edge_setup.md` | ✅ | — | — |
+| Mobile App (repo riêng) | — | hỗ trợ API | ✅ Chủ lực |
+| `scripts/` | hỗ trợ | ✅ Chủ lực | — |
 
-**Chạy test:**
+---
+
+## Workflow phát triển
+
+### Thứ tự ưu tiên (Sprint 2)
+
+```
+1. [AI Engineer]   src/edge/pose_detector.py     ← YOLOv8-Pose load + inference
+2. [AI Engineer]   src/edge/fall_classifier.py   ← Rule-based fall detection
+3. [Backend]       src/main.py + src/api/         ← FastAPI boilerplate + route skeleton
+4. [Backend]       src/db/                        ← Supabase client + events_repo
+5. [AI Engineer]   src/edge/anonymizer.py         ← Face blur + encode clip
+6. [AI Engineer]   src/edge/event_sender.py       ← POST event lên backend
+7. [Backend]       src/alert/engine.py            ← Alert Engine logic
+8. [Backend]       src/alert/fcm_sender.py        ← Firebase FCM push
+9. [Frontend]      Mobile wireframe → Firebase Auth → FCM token registration
+10. [All]          tests/ — viết test song song với code
+```
+
+### Git workflow
+
 ```bash
-make test          # chạy tất cả
-pytest tests/test_api/ -v    # chỉ API tests
-pytest tests/test_agents/ -v # chỉ agent tests
+# Mỗi tính năng → 1 branch
+git checkout -b feat/edge-fall-classifier
+
+# Commit thường xuyên
+git commit -m "feat(edge): add rule-based fall classifier using hip-knee angle"
+
+# PR vào main khi done + có test pass
+# Mentor review trước khi merge
 ```
 
 ---
 
-### `docs/` — Tài liệu
+## Biến môi trường
 
-| File / Thư mục | Nội dung |
-|---|---|
-| `project_summary_report.md` | **PRD đầy đủ**: User stories, AC, API contract, RBAC, wireframes, success metrics |
-| `architecture_diagram.md` | Sơ đồ kiến trúc Mermaid (Frontend → Backend → Agent → DB) |
-| `guide/chapter-01 → 10` | Guidebook 10 chương về toàn bộ kỹ thuật dự án |
-| `guide/troubleshooting.md` | Lỗi thường gặp & cách fix |
-| `guide/cost-management.md` | Tối ưu chi phí OpenAI API & cloud |
+### Backend (`src/.env`)
 
----
+```env
+# Supabase
+SUPABASE_URL=https://xxxx.supabase.co
+SUPABASE_ANON_KEY=eyJ...
+SUPABASE_SERVICE_ROLE_KEY=eyJ...
 
-### `scripts/` — Công cụ & AI Logging
+# Firebase Admin
+FIREBASE_PROJECT_ID=silentguard-ai
+FIREBASE_PRIVATE_KEY_ID=xxxx
+FIREBASE_PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----\n..."
+FIREBASE_CLIENT_EMAIL=firebase-adminsdk@silentguard-ai.iam.gserviceaccount.com
 
-| Script | Công dụng |
-|---|---|
-| `setup.sh` | Cài môi trường lần đầu (venv, dependencies, hooks) |
-| `setup_hooks.sh` / `setup_hooks.ps1` | Cài pre-commit git hooks để tự động log AI |
-| `log_hook.py` | Hook tự động ghi log khi dùng Claude/Cursor/Codex/Gemini |
-| `log_manual.py` | Ghi log thủ công khi dùng ChatGPT, Copilot chat |
-| `submit_log.py` | Gửi AI log khi `git push` |
-| `log_antigravity.py` | Quét prompt từ Antigravity IDE |
+# Claude (Anthropic)
+ANTHROPIC_API_KEY=sk-ant-...
 
----
-
-### `.github/workflows/ci.yml` — CI/CD Pipeline
-
-Tự động chạy khi push / PR:
-1. `ruff check` — lint code
-2. `ruff format --check` — kiểm tra format
-3. `pytest` — chạy toàn bộ test
-4. Docker build (nếu cần)
-
----
-
-### `Makefile` — Lệnh tắt thường dùng
-
-| Lệnh | Tác dụng |
-|---|---|
-| `make run` | Khởi động server dev (`uvicorn --reload` port 8000) |
-| `make test` | Chạy toàn bộ pytest |
-| `make lint` | Kiểm tra lỗi code (ruff check) |
-| `make format` | Tự động format code (ruff format) |
-| `make check` | Chạy lint + format + test cùng lúc |
-| `make clean` | Xóa `__pycache__`, `.pytest_cache`, `.ruff_cache` |
-
----
-
-### `docker-compose.yml` — Full Stack
-
-Khởi động toàn bộ:
-```bash
-docker-compose up --build
+# App config
+ENVIRONMENT=development          # development | production
+ALERT_CLIP_RETENTION_DAYS=30    # Số ngày giữ clip trên Supabase Storage
 ```
-Bao gồm: **app** (FastAPI) + **database** (PostgreSQL) + **cache** (Redis)
 
----
+### Edge Device (`src/edge/.env.edge`)
 
-## 🔄 Luồng dữ liệu AI Agent
+```env
+# Backend
+BACKEND_URL=https://silentguard-api.render.com
+DEVICE_API_KEY=sg_dev_xxxx       # Lấy từ script gen_device_key.py
 
-```
-User Request (HTTP POST /api/v1/chat)
-        │
-        ▼
-   routes.py         ← validate ChatRequest
-        │
-        ▼
-   graph.py          ← ainvoke({ query })
-        │
-        ▼
- [analyze_node]      ← xử lý query, gọi LLM hoặc tools
-        │
-   should_continue() ← routing: có lỗi → END, không lỗi → respond
-        │
-        ▼
- [respond_node]      ← tổng hợp response từ analysis
-        │
-        ▼
-   ChatResponse      ← { response, analysis }
+# Camera
+RTSP_URL=rtsp://192.168.1.100:554/stream
+CAMERA_FPS=15
+CAMERA_RESOLUTION=1280x720
+
+# Model
+YOLO_MODEL_PATH=./models/yolov8n-pose.pt
+CONFIDENCE_THRESHOLD=0.6
+
+# Severity thresholds (giây)
+SEVERITY_LOW_MAX=30
+SEVERITY_MEDIUM_MAX=120
+SEVERITY_HIGH_MAX=300
 ```
 
 ---
 
-## ⚙️ Biến môi trường cần thiết (`.env`)
+## Lệnh thường dùng (Makefile)
 
-| Biến | Mô tả | Mặc định |
-|---|---|---|
-| `OPENAI_API_KEY` | **Bắt buộc** — API key OpenAI | `""` |
-| `MODEL_NAME` | Model OpenAI sử dụng | `gpt-4o-mini` |
-| `APP_ENV` | Môi trường: development/production/test | `development` |
-| `APP_PORT` | Port server | `8000` |
-| `LLM_TEMPERATURE` | Độ sáng tạo LLM (0.0 – 2.0) | `0.7` |
-| `DATABASE_URL` | Chuỗi kết nối DB | `sqlite:///./data/app.db` |
-| `CORS_ORIGINS` | Domain frontend cho phép | `http://localhost:3000` |
+```makefile
+# Cài đặt môi trường
+make setup          # Tạo venv, cài deps, copy .env.example → .env
+
+# Development
+make run            # Chạy FastAPI backend (uvicorn --reload, port 8000)
+make run-edge       # Chạy edge pipeline (cần camera RTSP)
+make docs           # Mở Swagger UI (http://localhost:8000/docs)
+
+# Testing
+make test           # Chạy toàn bộ test suite (pytest)
+make test-unit      # Chỉ unit tests
+make test-int       # Chỉ integration tests
+make coverage       # pytest + coverage report
+
+# Model evaluation
+make eval           # Chạy eval trên video test set
+make eval-report    # Sinh confusion matrix + metrics CSV
+
+# Database
+make migrate        # Chạy SQL migration lên Supabase
+make gen-device-key # Tạo API key cho edge device mới
+
+# Code quality
+make lint           # ruff check src/ tests/
+make format         # ruff format src/ tests/
+make typecheck      # mypy src/
+```
 
 ---
 
-## 📋 Checklist trước khi bắt đầu phát triển
-
-- [ ] Đọc `README.md` — hiểu tổng quan dự án
-- [ ] Đọc `docs/project_summary_report.md` — hiểu PRD và yêu cầu
-- [ ] Chạy `scripts/setup.sh` — cài môi trường
-- [ ] Copy `.env.example` → `.env` và điền `OPENAI_API_KEY`
-- [ ] Chạy `make run` — kiểm tra server hoạt động
-- [ ] Chạy `make test` — đảm bảo toàn bộ test pass
-- [ ] Đọc `docs/guide/chapter-01.md` → `chapter-10.md` khi cần hiểu sâu hơn
-
----
-
-> _Cập nhật file này mỗi khi thêm thư mục / module mới vào dự án._
+> 📄 Xem thêm: [README.md](./README.md) · [ARCHITECTURE.md](./ARCHITECTURE.md)

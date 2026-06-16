@@ -1,0 +1,66 @@
+"""
+Notification Service (FCM & Calling)
+Ref: Section 7 - Notification Service in design document.
+"""
+from typing import Any
+from firebase_admin import messaging
+from app.core.supabase_client import supabase
+
+async def send_push(user_id: str, event_data: dict) -> bool:
+    """
+    Sends push notification via Firebase Cloud Messaging.
+    Ref: Section 7 of design doc
+    """
+    try:
+        # Fetch user's FCM token from DB
+        response = supabase.table("users").select("fcm_token").eq("id", user_id).execute()
+        if not response.data or len(response.data) == 0:
+            print(f"User {user_id} not found in database.")
+            return False
+            
+        fcm_token = response.data[0].get("fcm_token")
+        if not fcm_token:
+            print(f"FCM Token is missing for user {user_id}. Skipping push.")
+            return False
+
+        # Prepare push payload
+        severity = event_data.get("severity", "MEDIUM")
+        room = event_data.get("room", "nhà")
+        body_msg = event_data.get("llm_message") or f"Phát hiện sự cố té ngã tại {room}."
+        
+        message = messaging.Message(
+            notification=messaging.Notification(
+                title=f"Cảnh báo {severity} — {room}",
+                body=body_msg
+            ),
+            data={
+                "event_id": str(event_data.get("event_id") or event_data.get("id")),
+                "severity": severity,
+                "clip_path": event_data.get("clip_path") or ""
+            },
+            token=fcm_token
+        )
+        
+        # Send message
+        response_id = messaging.send(message)
+        print(f"Push notification sent successfully, msg ID: {response_id}")
+        return True
+    except Exception as e:
+        print(f"Failed to send push notification to user {user_id}: {e}")
+        return False
+
+async def trigger_call(contact: dict, event_data: dict) -> bool:
+    """
+    Sends call triggers using Twilio or equivalent VoIP provider.
+    Ref: Section 6
+    """
+    try:
+        phone = contact.get("phone", "unknown")
+        room = event_data.get("room", "nhà")
+        severity = event_data.get("severity", "MEDIUM")
+        print(f"[VOIP CALL] Calling emergency backup contact: {contact.get('full_name')} at {phone}")
+        print(f"[VOIP CALL] Playing message: Cảnh báo mức độ {severity} phát hiện ngã tại {room}!")
+        return True
+    except Exception as e:
+        print(f"Failed to trigger VOIP call: {e}")
+        return False

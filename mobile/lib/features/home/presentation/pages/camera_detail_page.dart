@@ -52,6 +52,12 @@ class _CameraDetailPageState extends State<CameraDetailPage> {
     setState(() => _currentTime = _formatTime(DateTime.now()));
   }
 
+  @override
+  void dispose() {
+    _clockTimer?.cancel();
+    _videoController?.dispose();
+    super.dispose();
+  }
   Future<void> _initVideo() async {
     final controller = VideoPlayerController.asset(_videoAssetPath);
     _videoController = controller;
@@ -64,13 +70,6 @@ class _CameraDetailPageState extends State<CameraDetailPage> {
       await controller.dispose();
       _videoController = null;
     }
-  }
-
-  @override
-  void dispose() {
-    _clockTimer?.cancel();
-    _videoController?.dispose();
-    super.dispose();
   }
 
   @override

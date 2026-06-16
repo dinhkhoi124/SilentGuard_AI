@@ -11,11 +11,11 @@ Tài liệu này hướng dẫn cách kết nối và tích hợp các API của
 
 ---
 
-## 2. Xác Thực Người Dùng (Authentication Flow)
+## 2. Quy trình Đăng nhập & Mời thành viên (Login & Invite Flow)
 
-Mọi API gửi từ Mobile App đến Backend (trừ API endpoint `/health` của hệ thống) bắt buộc phải kèm theo Firebase ID Token.
+Mọi API gửi từ Mobile App đến Backend bắt buộc phải kèm theo Firebase ID Token.
 
-### Bước tích hợp trên Mobile:
+### Các bước tích hợp trên Mobile:
 1. Đăng nhập qua Firebase Auth SDK trên App (Google Login, Email/Password, v.v.).
 2. Lấy ID Token từ Firebase user instance:
    - *Firebase Auth SDK*: `await user.getIdToken(forceRefresh: true)`
@@ -25,18 +25,40 @@ Mọi API gửi từ Mobile App đến Backend (trừ API endpoint `/health` c�
 Authorization: Bearer <FIREBASE_ID_TOKEN>
 ```
 
-> **Lưu ý:** Backend sử dụng cơ chế **Just-in-Time Provisioning**. Khi người dùng đăng nhập lần đầu và gọi API bất kỳ, backend sẽ tự động tạo một tài khoản tương ứng trong bảng `users` từ thông tin Firebase token.
+### Quy trình phân loại người dùng khi Đăng nhập lần đầu (JIT Provisioning):
+Backend hỗ trợ cơ chế **Just-in-Time Provisioning** giúp tự động tạo tài khoản khi gọi API lần đầu. Cụ thể có hai kịch bản:
+
+* **Kịch bản A: Người dùng tự tạo tài khoản và sở hữu hộ gia đình mới (Owner)**
+  - Gọi bất kỳ API nào lần đầu (ví dụ: `GET /api/households/me`) mà **KHÔNG** truyền thêm header đặc biệt nào khác.
+  - Backend sẽ tự động:
+    1. Tạo bản ghi trong bảng `users`.
+    2. Khởi tạo một hộ gia đình (`households`) mới.
+    3. Gán user này làm thành viên với quyền chủ hộ (`role: owner`) trong `household_members`.
+
+* **Kịch bản B: Người dùng tham gia vào hộ gia đình có sẵn thông qua Mã Mời (Member)**
+  - Người dùng nhập mã mời nhận từ thành viên khác trên giao diện.
+  - Khi thực hiện cuộc gọi API đầu tiên, đính kèm thêm header tùy chọn `X-Invite-Code`:
+    ```http
+    X-Invite-Code: <MA_MOI_NHAN_DUOC>
+    ```
+  - Backend sẽ tự động:
+    1. Xác thực mã mời có tồn tại, chưa bị dùng và còn hạn (24 giờ).
+    2. Tạo bản ghi trong bảng `users`.
+    3. Gán user này vào hộ gia đình tương ứng với vai trò thành viên thường (`role: member`) trong `household_members`.
+    4. Đánh dấu mã mời đã được sử dụng.
+  - *Nếu mã mời bị sai/hết hạn/đã dùng*: API sẽ trả về lỗi `400 Bad Request` với mã lỗi `"INVALID_INVITE_CODE"`.
 
 ---
 
 ## 3. Các API Endpoints Chính (Mobile App)
 
 ### 3.1 Đăng nhập hệ thống (`POST /api/users/login`)
-Verify Firebase Token của người dùng, thực hiện JIT Provisioning (khởi tạo tài khoản tự động trong DB nếu chưa có) và trả về thông tin user.
+Verify Firebase Token của người dùng, thực hiện JIT Provisioning (khởi tạo tài khoản tự động trong DB nếu chưa có) và trả về thông tin user. Hỗ trợ truyền mã mời để tham gia hộ gia đình khi đăng ký lần đầu.
 
 - **Headers**:
 ```http
 Authorization: Bearer <FIREBASE_ID_TOKEN>
+X-Invite-Code: <OPTIONAL_MA_MOI>
 ```
 - **Response 200 OK**:
 ```json
@@ -241,6 +263,41 @@ Hệ thống liên hệ khẩn cấp dạng danh sách ưu tiên để escalate 
 - **DELETE**: Xóa liên hệ.
   
 > **Lưu ý:** Thứ tự ưu tiên `priority_order` là một dãy số nguyên liên tục bắt đầu từ 1. Khi xóa một liên hệ, ứng dụng Frontend cần gọi cập nhật lại thứ tự ưu tiên của các liên hệ còn lại để tránh các khoảng hở (ví dụ: đang có `1, 2, 3`, xóa `2` thì cần reorder lại để danh sách thành `1, 2`).
+
+---
+
+### 3.12 Tạo mã mời thành viên mới (`POST /api/households/invite`)
+Sinh mã mời ngẫu nhiên có hiệu lực trong 24 giờ. Chỉ áp dụng cho tài khoản có vai trò `owner`.
+
+- **Headers**:
+```http
+Authorization: Bearer <FIREBASE_ID_TOKEN>
+```
+- **Response 201 Created**:
+```json
+{
+  "code": "random_invite_code_string",
+  "expires_at": "2026-06-17T02:15:10Z"
+}
+```
+
+---
+
+### 3.13 Lấy thông tin hộ gia đình hiện tại (`GET /api/households/me`)
+Lấy thông tin hộ gia đình của user hiện tại cùng với vai trò (`role`) tương ứng của họ.
+
+- **Headers**:
+```http
+Authorization: Bearer <FIREBASE_ID_TOKEN>
+```
+- **Response 200 OK**:
+```json
+{
+  "household_id": "household-uuid",
+  "role": "owner", // Hoặc "member"
+  "elderly_name": "Nguyen Van A"
+}
+```
 
 ---
 

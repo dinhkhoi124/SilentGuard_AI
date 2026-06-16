@@ -1,23 +1,23 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from app.core.security import get_current_user
+from fastapi import APIRouter, Depends, HTTPException, status, Request
+from app.core.security import get_current_user, require_household_role
 from app.core.supabase_client import supabase
-from app.api.settings import get_user_household_id
 from app.services.llm_service import generate_daily_report
 
 router = APIRouter(prefix="/api/reports", tags=["Reports"])
 
 @router.get("/daily")
 async def get_daily_report(
+    request: Request,
     date: str = "2026-06-13",
-    user: dict = Depends(get_current_user)
+    user: dict = Depends(get_current_user),
+    _member: dict = Depends(require_household_role(owner_only=False))
 ):
     """
     GET /api/reports/daily
     Ref: Section 4.10 of design doc
     Fetches the daily report or dynamically generates it using Claude if missing.
     """
-    user_id = user.get("id")
-    household_id = await get_user_household_id(user_id)
+    household_id = request.state.household_id
     try:
         # 1. Try to fetch existing report
         res = supabase.table("daily_reports")\

@@ -15,6 +15,7 @@ from app.api.dashboard import router as dashboard_router
 from app.api.users import router as users_router
 from app.api.settings import router as settings_router
 from app.api.reports import router as reports_router
+from app.api.households import router as households_router
 from app.services.scheduler import periodic_check_job
 
 # Load environment variables
@@ -66,6 +67,7 @@ app.include_router(dashboard_router)
 app.include_router(users_router)
 app.include_router(settings_router)
 app.include_router(reports_router)
+app.include_router(households_router)
 
 @app.get("/health", status_code=status.HTTP_200_OK)
 async def health_check():

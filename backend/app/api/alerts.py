@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from app.core.security import get_current_user
+from app.core.security import get_current_user, require_household_role
 from app.core.supabase_client import supabase
 from app.models.schemas import ReviewRequest, AlertListResponse, AlertItem
 
@@ -11,7 +11,8 @@ async def get_alerts(
     limit: int = 20,
     offset: int = 0,
     household_id: str = None,
-    user: dict = Depends(get_current_user)
+    user: dict = Depends(get_current_user),
+    _member: dict = Depends(require_household_role(owner_only=False))
 ):
     """
     GET /api/alerts
@@ -76,6 +77,15 @@ async def review_alert(
                 )
         
         db_event = event_query.data[0]
+        
+        # Verify user is member of the household for this event
+        member_check = supabase.table("household_members").select("*").eq("household_id", db_event.get("household_id")).eq("user_id", user_id).execute()
+        if not member_check.data:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={"error": {"code": "FORBIDDEN", "message": "Bạn không có quyền truy cập cảnh báo của hộ gia đình này"}}
+            )
+            
         event_uuid = db_event.get("id")
 
         # 1. Insert alert review
@@ -123,6 +133,16 @@ async def get_event_detail(
                 )
         
         event = event_query.data[0]
+        
+        # Verify user is member of the household for this event
+        user_id = user.get("id")
+        member_check = supabase.table("household_members").select("*").eq("household_id", event.get("household_id")).eq("user_id", user_id).execute()
+        if not member_check.data:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={"error": {"code": "FORBIDDEN", "message": "Bạn không có quyền truy cập cảnh báo của hộ gia đình này"}}
+            )
+            
         clip_path = event.get("clip_path")
         
         # Generate presigned download URL from Supabase Storage

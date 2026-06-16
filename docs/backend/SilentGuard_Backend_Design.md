@@ -166,50 +166,56 @@ CREATE TABLE daily_reports (
     created_at      TIMESTAMPTZ DEFAULT now(),
     UNIQUE (household_id, report_date)
 );
+
+-- ============ HOUSEHOLD MEMBERS & INVITES ============
+CREATE TABLE household_members (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    household_id    UUID REFERENCES households(id) ON DELETE CASCADE,
+    user_id         UUID REFERENCES users(id) ON DELETE CASCADE,
+    role            TEXT NOT NULL CHECK (role IN ('owner', 'member')),
+    joined_at       TIMESTAMPTZ DEFAULT now(),
+    UNIQUE (household_id, user_id)
+);
+CREATE INDEX idx_household_members_user ON household_members(user_id);
+CREATE INDEX idx_household_members_household ON household_members(household_id);
+
+CREATE TABLE household_invites (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    household_id    UUID REFERENCES households(id) ON DELETE CASCADE,
+    code            TEXT UNIQUE NOT NULL,
+    created_by      UUID REFERENCES users(id),
+    expires_at      TIMESTAMPTZ NOT NULL,
+    used_at         TIMESTAMPTZ,
+    used_by         UUID REFERENCES users(id)
+);
+CREATE INDEX idx_household_invites_code ON household_invites(code);
+
 ```
 
 ---
 
-## 3. Auth Flow (Firebase Auth ↔ Backend)
+## 3. Auth Flow & Phân quyền (Firebase Auth ↔ Backend)
 
 1. Mobile app đăng nhập bằng Firebase Auth → nhận `idToken` (JWT).
 2. Mọi request gọi API kèm header: `Authorization: Bearer <idToken>`.
-3. Backend dùng `firebase_admin.auth.verify_id_token(token)` → lấy `firebase_uid`.
-4. Backend tìm/khởi tạo record trong bảng `users` theo `firebase_uid` (tạo mới nếu lần đầu login — "just-in-time provisioning").
-5. Gắn `current_user` (UUID nội bộ) vào request context cho các bước xử lý tiếp theo.
+3. Khi thực hiện đăng ký/đăng nhập lần đầu:
+   - Nếu người dùng được mời vào hộ gia đình có sẵn, app cần truyền thêm header tùy chọn `X-Invite-Code: <mã_mời>`.
+   - Backend dùng `firebase_admin.auth.verify_id_token(token)` → lấy `firebase_uid`.
+   - Nếu người dùng mới và có `X-Invite-Code`: Backend sẽ xác thực mã mời, gán người dùng làm `member` của hộ gia đình đó, và đánh dấu mã mời đã dùng.
+   - Nếu người dùng mới và không có `X-Invite-Code`: Backend tự động tạo một `households` mới và gán người dùng này làm `owner`.
+4. Gắn `current_user` (UUID nội bộ) vào request context.
+5. **Kiểm tra quyền truy cập (Authorization)**:
+   - Các API liên quan đến hộ gia đình (alerts, dashboard, settings, reports) áp dụng bộ lọc quyền truy cập thông qua dependency `require_household_role(owner_only=True/False)`.
+   - Router tự động trích xuất `household_id` từ Path, Query parameters hoặc JSON Body, xác thực xem `current_user` có quyền truy cập (vai trò `owner` hoặc `member`) hay không. Nếu không có quyền, trả về lỗi `403 FORBIDDEN` đúng chuẩn.
+   - Chỉ tài khoản có quyền `owner` mới được thực hiện các tác vụ quản trị: cập nhật ngưỡng thời gian (thresholds), tạo mã mời thành viên mới.
 
 ```python
 # app/core/security.py
-import json, os, hashlib
-import firebase_admin
-from firebase_admin import auth as fb_auth, credentials
-from fastapi import Depends, HTTPException, Header
-
-_sa_json = os.environ.get("FIREBASE_SERVICE_ACCOUNT_JSON")
-if _sa_json:
-    cred = credentials.Certificate(json.loads(_sa_json))
-else:
-    cred = credentials.Certificate(os.environ.get("FIREBASE_SERVICE_ACCOUNT_PATH", "./firebase-service-account.json"))
-firebase_admin.initialize_app(cred)
-
-async def get_current_user(authorization: str = Header(...)):
-    if not authorization.startswith("Bearer "):
-        raise HTTPException(401, "Missing bearer token")
-    token = authorization.split(" ", 1)[1]
-    try:
-        decoded = fb_auth.verify_id_token(token)
-    except Exception:
-        raise HTTPException(401, "Invalid Firebase token")
-
-    firebase_uid = decoded["uid"]
-    user = await get_or_create_user(firebase_uid, decoded.get("email"), decoded.get("name"))
-    return user
-
-def verify_device_key(incoming_key: str, stored_hash: str) -> bool:
-    return hashlib.sha256(incoming_key.encode()).hexdigest() == stored_hash
+# (Xem mã nguồn thực tế tại backend/app/core/security.py để biết thêm chi tiết)
 ```
 
 **Edge device auth**: mỗi camera có `device_api_key` riêng, gửi qua header `X-Device-Key`. Backend so khớp hash với DB, không dùng Firebase cho edge.
+
 
 ---
 
@@ -374,7 +380,36 @@ Request: `{ "fcm_token": "..." }` → lưu vào `users.fcm_token` của `current
 
 - `GET /api/reports/daily?date=2026-06-13`
 
-### 4.11 Camera offline alert (internal)
+### 4.11 `POST /api/households/invite` — Tạo mã mời thành viên mới
+
+Quyền: `owner` (Chủ hộ).
+
+Header: `Authorization: Bearer <token>`
+
+Response:
+```json
+{
+  "code": "random_invite_code_string",
+  "expires_at": "2026-06-17T02:15:10Z"
+}
+```
+
+### 4.12 `GET /api/households/me` — Truy vấn thông tin hộ gia đình của user hiện tại
+
+Quyền: `owner` hoặc `member` (Thành viên hộ gia đình).
+
+Header: `Authorization: Bearer <token>`
+
+Response:
+```json
+{
+  "household_id": "household-uuid",
+  "role": "owner",
+  "elderly_name": "Nguyen Van A"
+}
+```
+
+### 4.13 Camera offline alert (internal)
 
 Heartbeat job kiểm tra `cameras.last_heartbeat`. Nếu quá 5 phút → tạo "system event" (severity = `SYSTEM`) và gửi push "Camera X mất kết nối".
 

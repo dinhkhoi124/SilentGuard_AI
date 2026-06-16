@@ -1,36 +1,22 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from app.core.security import get_current_user
+from fastapi import APIRouter, Depends, HTTPException, status, Request
+from app.core.security import get_current_user, require_household_role
 from app.core.supabase_client import supabase
 from app.models.schemas import ThresholdUpdate, ContactCreate, LLMConfigRequest
 from app.services.llm_service import parse_config
 
 router = APIRouter(prefix="/api", tags=["Settings"])
 
-async def get_user_household_id(user_id: str) -> str:
-    """Helper to retrieve user's household ID."""
-    try:
-        h_res = supabase.table("households").select("id").eq("owner_user_id", user_id).execute()
-        if h_res.data:
-            return h_res.data[0]["id"]
-        # Fallback to first household in database for dev
-        any_h = supabase.table("households").select("id").limit(1).execute()
-        if any_h.data:
-            return any_h.data[0]["id"]
-    except Exception as e:
-        print(f"Error fetching household: {e}")
-    raise HTTPException(
-        status_code=status.HTTP_404_NOT_FOUND,
-        detail={"error": {"code": "HOUSEHOLD_NOT_FOUND", "message": "Không tìm thấy hộ gia đình"}}
-    )
-
 @router.get("/settings/thresholds")
-async def get_thresholds(user: dict = Depends(get_current_user)):
+async def get_thresholds(
+    request: Request,
+    user: dict = Depends(get_current_user),
+    _member: dict = Depends(require_household_role(owner_only=False))
+):
     """
     GET /api/settings/thresholds
     Ref: Section 4.8 of design doc
     """
-    user_id = user.get("id")
-    household_id = await get_user_household_id(user_id)
+    household_id = request.state.household_id
     try:
         res = supabase.table("thresholds").select("*").eq("household_id", household_id).execute()
         if res.data:
@@ -52,14 +38,15 @@ async def get_thresholds(user: dict = Depends(get_current_user)):
 @router.put("/settings/thresholds")
 async def update_thresholds(
     req: ThresholdUpdate,
-    user: dict = Depends(get_current_user)
+    request: Request,
+    user: dict = Depends(get_current_user),
+    _owner: dict = Depends(require_household_role(owner_only=True))
 ):
     """
     PUT /api/settings/thresholds
     Ref: Section 4.8 of design doc
     """
-    user_id = user.get("id")
-    household_id = await get_user_household_id(user_id)
+    household_id = request.state.household_id
     try:
         data = {
             "low_max_sec": req.low_max_sec,
@@ -77,13 +64,16 @@ async def update_thresholds(
         )
 
 @router.get("/contacts")
-async def get_contacts(user: dict = Depends(get_current_user)):
+async def get_contacts(
+    request: Request,
+    user: dict = Depends(get_current_user),
+    _member: dict = Depends(require_household_role(owner_only=False))
+):
     """
     GET /api/contacts
     Ref: Section 4.7 of design doc
     """
-    user_id = user.get("id")
-    household_id = await get_user_household_id(user_id)
+    household_id = request.state.household_id
     try:
         res = supabase.table("contacts").select("*").eq("household_id", household_id).order("priority_order").execute()
         return res.data or []
@@ -96,14 +86,15 @@ async def get_contacts(user: dict = Depends(get_current_user)):
 @router.post("/contacts")
 async def create_contact(
     req: ContactCreate,
-    user: dict = Depends(get_current_user)
+    request: Request,
+    user: dict = Depends(get_current_user),
+    _owner: dict = Depends(require_household_role(owner_only=True))
 ):
     """
     POST /api/contacts
     Ref: Section 4.7 of design doc
     """
-    user_id = user.get("id")
-    household_id = await get_user_household_id(user_id)
+    household_id = request.state.household_id
     try:
         contact_data = {
             "household_id": household_id,
@@ -122,6 +113,7 @@ async def create_contact(
 async def update_contact(
     contact_id: str,
     priority_order: int,
+    request: Request,
     user: dict = Depends(get_current_user)
 ):
     """
@@ -129,8 +121,26 @@ async def update_contact(
     Ref: Section 4.7 of design doc
     """
     try:
+        # Fetch contact to check household
+        c_res = supabase.table("contacts").select("*").eq("id", contact_id).execute()
+        if not c_res.data:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Contact not found")
+        
+        household_id = c_res.data[0]["household_id"]
+        
+        # Verify user is owner of this household
+        user_id = user.get("id")
+        member_res = supabase.table("household_members").select("*").eq("household_id", household_id).eq("user_id", user_id).execute()
+        if not member_res.data or member_res.data[0]["role"] != "owner":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={"error": {"code": "FORBIDDEN", "message": "Yêu cầu quyền chủ hộ (owner)"}}
+            )
+            
         supabase.table("contacts").update({"priority_order": priority_order}).eq("id", contact_id).execute()
         return {"status": "ok"}
+    except HTTPException as he:
+        raise he
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -140,6 +150,7 @@ async def update_contact(
 @router.delete("/contacts/{contact_id}")
 async def delete_contact(
     contact_id: str,
+    request: Request,
     user: dict = Depends(get_current_user)
 ):
     """
@@ -154,6 +165,15 @@ async def delete_contact(
         deleted_contact = c_res.data[0]
         household_id = deleted_contact["household_id"]
         deleted_order = deleted_contact["priority_order"]
+        
+        # Verify user is owner of this household
+        user_id = user.get("id")
+        member_res = supabase.table("household_members").select("*").eq("household_id", household_id).eq("user_id", user_id).execute()
+        if not member_res.data or member_res.data[0]["role"] != "owner":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={"error": {"code": "FORBIDDEN", "message": "Yêu cầu quyền chủ hộ (owner)"}}
+            )
         
         # 2. Delete contact
         supabase.table("contacts").delete().eq("id", contact_id).execute()

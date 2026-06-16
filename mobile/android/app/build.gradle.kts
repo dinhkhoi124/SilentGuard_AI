@@ -12,6 +12,9 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+        
+        // 1. Kích hoạt tính năng dịch mã Core Library Desugaring ở đây
+        isCoreLibraryDesugaringEnabled = true
     }
 
     kotlinOptions {
@@ -40,4 +43,9 @@ android {
 
 flutter {
     source = "../.."
+}
+
+// 2. Thêm thư viện hỗ trợ dịch mã Java 8+ ở cuối file này
+dependencies {
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 }

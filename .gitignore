@@ -62,3 +62,7 @@ out/
 #front end
 frontend/.next/
 frontend/node_modules/
+
+# Agents
+.agents/skills
+skills-lock.json

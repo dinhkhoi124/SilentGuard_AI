@@ -110,8 +110,8 @@ class CameraCard extends StatelessWidget {
                                     ],
                                   ),
                                 ),
-                                  const SizedBox(width: 6),
-                                  
+                                const SizedBox(width: 6),
+
                                 _buildThreeDotMenu(context),
                               ],
                             ),
@@ -235,11 +235,7 @@ class CameraCard extends StatelessWidget {
           _showSettingsBottomSheet(context);
         }
       },
-      child: Icon(
-        Icons.more_vert,
-        size: 16,
-        color: Colors.white,
-      ),
+      child: Icon(Icons.more_vert, size: 16, color: Colors.white),
     );
   }
 
@@ -309,26 +305,6 @@ class CameraCard extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-}
-
-class _HudButton extends StatelessWidget {
-  const _HudButton({required this.icon, this.size = 28});
-
-  final IconData icon;
-  final double size;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        color: Colors.black45,
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Icon(icon, size: 16, color: Colors.white),
     );
   }
 }

@@ -4,6 +4,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mobile/core/services/local_notification_service.dart';
 import 'package:mobile/core/utils/app_colors.dart';
 import 'package:mobile/features/home/data/mock_events.dart';
 import 'package:mobile/features/home/domain/entities/camera_device.dart';
@@ -14,6 +15,7 @@ import 'package:mobile/features/home/presentation/widgets/camera_latest_event_ca
 import 'package:mobile/features/home/presentation/widgets/camera_safety_status.dart';
 import 'package:mobile/features/home/presentation/widgets/camera_top_bar.dart';
 import 'package:mobile/features/home/presentation/widgets/camera_video_player.dart';
+import 'package:mobile/injection_container.dart';
 import 'package:video_player/video_player.dart';
 
 class CameraDetailPage extends StatefulWidget {
@@ -81,8 +83,8 @@ class _CameraDetailPageState extends State<CameraDetailPage> {
             SliverToBoxAdapter(
               child: CameraTopBar(
                 device: widget.device,
-                onBack: context.pop,
-                onSettings: () {},
+                onBack: () => context.go('/home'),
+                onSettings: _showCameraOptions,
               ),
             ),
             SliverToBoxAdapter(
@@ -118,6 +120,39 @@ class _CameraDetailPageState extends State<CameraDetailPage> {
             ),
             const SliverToBoxAdapter(child: SizedBox(height: 24)),
           ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showCameraOptions() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: () async {
+                Navigator.of(sheetContext).pop();
+                final scheduled = await sl<LocalNotificationService>()
+                    .scheduleFallAlert(widget.device);
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      scheduled
+                          ? 'Thông báo giả lập sẽ xuất hiện sau 5 giây.'
+                          : 'Cần cấp quyền thông báo để giả lập cảnh báo.',
+                    ),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.notifications_active_outlined),
+              label: const Text('Giả lập cảnh báo té ngã'),
+            ),
+          ),
         ),
       ),
     );

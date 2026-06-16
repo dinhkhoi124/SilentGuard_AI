@@ -15,13 +15,14 @@ import 'package:mobile/features/home/presentation/pages/home_page.dart';
 import 'package:mobile/injection_container.dart';
 
 class AppRouter {
-  AppRouter(this.authNotifier);
+  AppRouter(this.authNotifier, {this.initialLocation = '/home'});
 
   final AuthNotifier authNotifier;
+  final String initialLocation;
 
   late final GoRouter router = GoRouter(
     refreshListenable: authNotifier,
-    initialLocation: '/home',
+    initialLocation: initialLocation,
     // redirect: (context, state) {
     //   // final isAuthenticated = authNotifier.isAuthenticated;
     //   // final onAuthFlow =

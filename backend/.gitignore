@@ -3,4 +3,5 @@ dist/
 *.db
 *.db-journal
 .env
-firefirebase-service-account.json.json
+firebase-service-account.json
+firebase-service-account.json.json

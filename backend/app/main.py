@@ -2,6 +2,8 @@ import os
 from fastapi import FastAPI, status
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
+from contextlib import asynccontextmanager
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from app.core.config import settings
 
@@ -13,14 +15,24 @@ from app.api.dashboard import router as dashboard_router
 from app.api.users import router as users_router
 from app.api.settings import router as settings_router
 from app.api.reports import router as reports_router
+from app.services.scheduler import periodic_check_job
 
 # Load environment variables
 load_dotenv()
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    scheduler = AsyncIOScheduler()
+    scheduler.add_job(periodic_check_job, 'interval', minutes=1)
+    scheduler.start()
+    yield
+    scheduler.shutdown()
+
 app = FastAPI(
     title="SilentGuard AI Backend",
     description="FastAPI Backend for SilentGuard Passive Fall Detection System (MVP V1)",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan
 )
 
 # Parse CORS origins

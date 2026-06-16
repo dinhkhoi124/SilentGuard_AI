@@ -1,13 +1,15 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from app.core.security import verify_device_key_dependency
 from app.core.supabase_client import supabase
 from app.models.schemas import EventDetectRequest
+from app.services.alert_engine import process_event
 
 router = APIRouter(prefix="/api/events", tags=["Events"])
 
 @router.post("/detect", status_code=status.HTTP_201_CREATED)
 async def detect_event(
     req: EventDetectRequest,
+    background_tasks: BackgroundTasks,
     camera: dict = Depends(verify_device_key_dependency)
 ):
     """
@@ -37,7 +39,11 @@ async def detect_event(
     }
 
     try:
-        supabase.table("events").insert(event_data).execute()
+        res = supabase.table("events").insert(event_data).execute()
+        if res.data and len(res.data) > 0:
+            inserted_event = res.data[0]
+        else:
+            inserted_event = event_data
     except Exception as e:
         from app.core.config import settings
         if settings.APP_ENV == "production":
@@ -46,12 +52,12 @@ async def detect_event(
                 detail={"error": {"code": "DATABASE_ERROR", "message": f"Failed to save event to database: {str(e)}"}}
             )
         print(f"Database insertion failed: {e}. Running in dev mock fallback.")
+        inserted_event = event_data
 
     # Step 4: Nếu severity != LOW -> gọi AlertEngine.process(event)
     # Ref: Section 4.1 & Section 6
-    # TODO: Implement AlertEngine.process(event) in Sprint tasks.
     if req.severity != "LOW":
-        pass
+        background_tasks.add_task(process_event, inserted_event)
 
     return {
         "status": "received",

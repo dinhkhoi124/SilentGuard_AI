@@ -301,6 +301,122 @@ Authorization: Bearer <FIREBASE_ID_TOKEN>
 
 ---
 
+### 3.14 Đăng ký camera mới (`POST /api/cameras`)
+Đăng ký camera mới cho hộ gia đình. Chỉ áp dụng cho tài khoản chủ hộ (`owner`).
+
+- **Headers**:
+```http
+Authorization: Bearer <FIREBASE_ID_TOKEN>
+```
+- **Request Body**:
+```json
+{
+  "household_id": "household-uuid",
+  "name": "Camera Phòng Khách",
+  "room": "living-room",
+  "fps": 15
+}
+```
+- **Response 21Created**:
+Trả về thông tin camera cùng mã API Key để điền vào thiết bị biên (Edge Device). **Plaintext key chỉ được hiển thị 1 lần duy nhất này**.
+```json
+{
+  "camera_id": "camera-uuid",
+  "name": "Camera Phòng Khách",
+  "room": "living-room",
+  "device_api_key": "sg_live_xxxxxx...",
+  "warning": "Lưu lại key này ngay — sẽ không hiển thị lại được"
+}
+```
+
+---
+
+### 3.15 Lấy danh sách camera (`GET /api/cameras`)
+Lấy toàn bộ danh sách các camera đang hoạt động trong một hộ gia đình. Thành viên hoặc chủ hộ đều có quyền gọi.
+
+- **Headers**:
+```http
+Authorization: Bearer <FIREBASE_ID_TOKEN>
+```
+- **Query Parameters**:
+  - `household_id`: ID hộ gia đình cần lấy danh sách camera.
+- **Response 200 OK**:
+*(Lưu ý: Không bao giờ trả về trường device_api_key hoặc hash của nó để bảo mật)*
+```json
+[
+  {
+    "id": "camera-uuid",
+    "name": "Camera Phòng Khách",
+    "room": "living-room",
+    "status": "unknown", // "online", "offline", hoặc "unknown"
+    "fps": 15,
+    "last_heartbeat": null,
+    "created_at": "2026-06-16T09:00:00Z"
+  }
+]
+```
+
+---
+
+### 3.16 Đổi mã kết nối camera mới (`PATCH /api/cameras/{camera_id}/rotate-key`)
+Sinh một mã API Key mới cho thiết bị Edge (dùng khi nghi ngờ rò rỉ mã cũ). Chỉ áp dụng cho tài khoản chủ hộ (`owner`).
+
+- **Headers**:
+```http
+Authorization: Bearer <FIREBASE_ID_TOKEN>
+```
+- **Response 200 OK**:
+Trả về mã kết nối plaintext mới duy nhất 1 lần. **Khóa cũ sẽ bị vô hiệu hóa ngay lập tức**.
+```json
+{
+  "camera_id": "camera-uuid",
+  "device_api_key": "sg_live_newkey_xxxxxx...",
+  "warning": "Lưu lại key này ngay — sẽ không hiển thị lại được"
+}
+```
+
+---
+
+### 3.17 Xóa camera (`DELETE /api/cameras/{camera_id}`)
+Gỡ camera khỏi hộ gia đình (sử dụng soft-delete để không làm hỏng khóa ngoại dữ liệu cảnh báo cũ). Chỉ chủ hộ (`owner`) được quyền gọi.
+
+- **Headers**:
+```http
+Authorization: Bearer <FIREBASE_ID_TOKEN>
+```
+- **Response 200 OK**:
+```json
+{
+  "status": "ok"
+}
+```
+
+---
+
+### 3.18 Sửa thông tin camera (`PATCH /api/cameras/{camera_id}`)
+Sửa đổi thông tin cơ bản của camera (không đổi mã key qua đây). Chỉ chủ hộ (`owner`) được quyền gọi.
+
+- **Headers**:
+```http
+Authorization: Bearer <FIREBASE_ID_TOKEN>
+```
+- **Request Body**:
+```json
+{
+  "name": "Camera Phòng Khách VIP",
+  "room": "living-room-vip",
+  "fps": 10
+}
+```
+- **Response 200 OK**:
+```json
+{
+  "status": "ok"
+}
+```
+
+---
+
 ## 4. Định Dạng Lỗi Chuẩn (Error Handling)
 
 Khi API gặp lỗi xử lý, Backend sẽ trả về định dạng JSON chuẩn RFC sau để Frontend có thể dễ dàng hiển thị thông báo lỗi thân thiện cho người dùng:

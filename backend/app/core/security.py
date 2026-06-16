@@ -235,7 +235,7 @@ async def verify_device_key_dependency(x_device_key: str = Header(None, alias="X
     hashed_key = hashlib.sha256(x_device_key.encode()).hexdigest()
     try:
         response = supabase.table("cameras").select("*").eq("device_api_key_hash", hashed_key).execute()
-        if not response.data or len(response.data) == 0:
+        if not response.data or len(response.data) == 0 or response.data[0].get("deleted_at") is not None:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail={"error": {"code": "INVALID_DEVICE_KEY", "message": "Device key không hợp lệ hoặc camera chưa đăng ký"}}

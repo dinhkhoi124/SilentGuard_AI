@@ -409,7 +409,104 @@ Response:
 }
 ```
 
-### 4.13 Camera offline alert (internal)
+### 4.13 `POST /api/cameras` — Đăng ký camera mới
+
+Quyền: `owner` (Chủ hộ).
+
+Header: `Authorization: Bearer <token>`
+
+Request:
+```json
+{
+  "household_id": "household-uuid",
+  "name": "Camera Hành Lang",
+  "room": "hallway",
+  "fps": 15
+}
+```
+
+Response:
+```json
+{
+  "camera_id": "camera-uuid",
+  "name": "Camera Hành Lang",
+  "room": "hallway",
+  "device_api_key": "sg_live_randomstring...",
+  "warning": "Lưu lại key này ngay — sẽ không hiển thị lại được"
+}
+```
+
+### 4.14 `GET /api/cameras?household_id=...` — Lấy danh sách camera trong hộ gia đình
+
+Quyền: `owner` hoặc `member` (Thành viên hộ gia đình).
+
+Header: `Authorization: Bearer <token>`
+
+Response:
+```json
+[
+  {
+    "id": "camera-uuid",
+    "name": "Camera Hành Lang",
+    "room": "hallway",
+    "status": "unknown",
+    "fps": 15,
+    "last_heartbeat": null,
+    "created_at": "2026-06-16T09:00:00Z"
+  }
+]
+```
+*(Lưu ý: Không bao giờ trả về device_api_key hay hash của nó ở endpoint này)*
+
+### 4.15 `PATCH /api/cameras/{camera_id}/rotate-key` — Đổi mã kết nối camera mới
+
+Quyền: `owner` (Chủ hộ).
+
+Header: `Authorization: Bearer <token>`
+
+Response:
+```json
+{
+  "camera_id": "camera-uuid",
+  "device_api_key": "sg_live_newrandomstring...",
+  "warning": "Lưu lại key này ngay — sẽ không hiển thị lại được"
+}
+```
+*(Lưu ý: Sau khi rotate, khóa cũ sẽ bị vô hiệu hóa lập tức, trả về 401 Unauthorized khi gửi sự kiện)*
+
+### 4.16 `DELETE /api/cameras/{camera_id}` — Xóa camera (Soft delete)
+
+Quyền: `owner` (Chủ hộ).
+
+Header: `Authorization: Bearer <token>`
+
+Response:
+```json
+{ "status": "ok" }
+```
+*(Lưu ý: Đánh dấu deleted_at = now() để giữ lịch sử sự kiện cũ không bị lỗi khóa ngoại)*
+
+### 4.17 `PATCH /api/cameras/{camera_id}` — Sửa thông tin camera
+
+Quyền: `owner` (Chủ hộ).
+
+Header: `Authorization: Bearer <token>`
+
+Request:
+```json
+{
+  "name": "Camera Phòng Ngủ Mới",
+  "room": "bedroom",
+  "fps": 10
+}
+```
+
+Response:
+```json
+{ "status": "ok" }
+```
+
+### 4.18 Camera offline alert (internal)
 
 Heartbeat job kiểm tra `cameras.last_heartbeat`. Nếu quá 5 phút → tạo "system event" (severity = `SYSTEM`) và gửi push "Camera X mất kết nối".
 

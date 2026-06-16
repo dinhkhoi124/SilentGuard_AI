@@ -5,9 +5,11 @@
       {
         "hooks": [
           {
+            "type": "command",
             "name": "log-prompt",
             "command": "bash scripts/_pyrun.sh scripts/log_hook.py --tool=codex",
-            "timeout": 10
+            "timeout": 10,
+            "statusMessage": "Logging Codex prompt"
           }
         ]
       }
@@ -16,9 +18,11 @@
       {
         "hooks": [
           {
+            "type": "command",
             "name": "log-stop",
             "command": "bash scripts/_pyrun.sh scripts/log_hook.py --tool=codex",
-            "timeout": 10
+            "timeout": 10,
+            "statusMessage": "Logging Codex session stop"
           }
         ]
       }

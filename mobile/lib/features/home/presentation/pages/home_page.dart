@@ -1,10 +1,14 @@
 // lib/features/home/presentation/pages/home_page.dart
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:mobile/core/config/app_config.dart';
 import 'package:mobile/core/utils/app_colors.dart';
+import 'package:mobile/features/account/presentation/pages/account_page.dart';
 import 'package:mobile/features/home/domain/entities/camera_device.dart';
 import 'package:mobile/features/home/presentation/bloc/home_bloc.dart';
 import 'package:mobile/features/home/presentation/bloc/home_event.dart';
@@ -15,8 +19,17 @@ import 'package:mobile/features/home/presentation/widgets/empty_devices.dart';
 import 'package:mobile/features/home/presentation/widgets/room_filter_chips.dart';
 import 'package:mobile/features/home/presentation/widgets/weather_card.dart';
 
-class HomePage extends StatelessWidget {
+class HomePage extends StatefulWidget {
   const HomePage({super.key});
+
+  @override
+  State<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+  int _selectedTab = 0;
+
+  static const _tabTitles = ['Nhà của tôi', 'Tự động', 'Báo cáo', 'Tài khoản'];
 
   @override
   Widget build(BuildContext context) {
@@ -29,18 +42,18 @@ class HomePage extends StatelessWidget {
           automaticallyImplyLeading: false,
           toolbarHeight: 72,
           titleSpacing: 20,
-          title: const Row(
+          title: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                'Nhà của tôi',
-                style: TextStyle(
+                _tabTitles[_selectedTab],
+                style: const TextStyle(
                   color: AppColors.darkText,
                   fontSize: 22,
                   fontWeight: FontWeight.w700,
                 ),
               ),
-              SizedBox(width: 7),
+              const SizedBox(width: 7),
             ],
           ),
           actions: [
@@ -60,27 +73,116 @@ class HomePage extends StatelessWidget {
             const SizedBox(width: 14),
           ],
         ),
-        body: BlocConsumer<HomeBloc, HomeState>(
-          listenWhen: (previous, current) =>
-              current is HomeLoaded && current.openPairingFlow,
-          listener: (context, state) {
-            context.push<bool>('/add-device').then((paired) {
-              if (!context.mounted || paired != true) return;
-              context.read<HomeBloc>().add(const HomeStarted());
-            });
-          },
-          builder: (context, state) {
-            return switch (state) {
-              HomeInitial() || HomeLoading() => const Center(
-                child: CircularProgressIndicator(color: AppColors.primary),
-              ),
-              HomeError(:final message) => _ErrorView(message: message),
-              HomeLoaded() => _LoadedHome(state: state),
-            };
-          },
+        body: IndexedStack(
+          index: _selectedTab,
+          children: const [
+            _HomeTab(),
+            _ComingSoonTab(
+              icon: Iconsax.task_square,
+              title: 'Tự động hóa',
+              message: 'Các kịch bản thông minh sẽ sớm xuất hiện tại đây.',
+            ),
+            _ComingSoonTab(
+              icon: Iconsax.chart,
+              title: 'Báo cáo',
+              message: 'Theo dõi dữ liệu nhà thông minh trong phiên bản tới.',
+            ),
+            AccountPage(),
+          ],
         ),
-        floatingActionButton: const _HomeFabs(),
-        bottomNavigationBar: const BottomNavBar(),
+        floatingActionButton: _selectedTab == 0 ? const _HomeFabs() : null,
+        bottomNavigationBar: BottomNavBar(
+          selectedIndex: _selectedTab,
+          onSelected: (index) => setState(() => _selectedTab = index),
+        ),
+      ),
+    );
+  }
+}
+
+class _HomeTab extends StatelessWidget {
+  const _HomeTab();
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocConsumer<HomeBloc, HomeState>(
+      listenWhen: (previous, current) =>
+          current is HomeLoaded && current.openPairingFlow,
+      listener: (context, state) {
+        context.push<bool>('/add-device').then((paired) {
+          if (!context.mounted || paired != true) return;
+          context.read<HomeBloc>().add(const HomeStarted());
+        });
+      },
+      builder: (context, state) {
+        return switch (state) {
+          HomeInitial() || HomeLoading() => const Center(
+            child: CircularProgressIndicator(color: AppColors.primary),
+          ),
+          HomeError(:final message) => _ErrorView(message: message),
+          HomeLoaded() => _LoadedHome(state: state),
+        };
+      },
+    );
+  }
+}
+
+class _ComingSoonTab extends StatelessWidget {
+  const _ComingSoonTab({
+    required this.icon,
+    required this.title,
+    required this.message,
+  });
+
+  final IconData icon;
+  final String title;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      top: false,
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  color: AppColors.lightBlue,
+                  borderRadius: BorderRadius.circular(22),
+                ),
+                child: SizedBox(
+                  width: 72,
+                  height: 72,
+                  child: Icon(icon, color: AppColors.primary, size: 32),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                title,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: AppColors.darkText,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                message,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: AppColors.mutedText,
+                  fontSize: 14,
+                  height: 1.45,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -118,9 +220,7 @@ class _LoadedHome extends StatelessWidget {
                   child: state.devices.isEmpty
                       ? _EmptyDeviceSection(
                           key: const ValueKey('empty'),
-                          onAddDevice: () => context.read<HomeBloc>().add(
-                            const AddDeviceTapped(),
-                          ),
+                          onAddDevice: () => _handleAddDevicePressed(context),
                         )
                       : _InlineDeviceGrid(
                           key: const ValueKey('grid'),
@@ -207,8 +307,7 @@ class _InlineDeviceGrid extends StatelessWidget {
         ),
         const SizedBox(height: 16),
         ElevatedButton.icon(
-          onPressed: () =>
-              context.read<HomeBloc>().add(const AddDeviceTapped()),
+          onPressed: () => _handleAddDevicePressed(context),
           icon: const Icon(Iconsax.add, size: 18),
           label: const Text('Thêm thiết bị'),
           style: ElevatedButton.styleFrom(
@@ -325,8 +424,7 @@ class _HomeFabs extends StatelessWidget {
         const SizedBox(height: 10),
         FloatingActionButton(
           heroTag: 'add-device',
-          onPressed: () =>
-              context.read<HomeBloc>().add(const AddDeviceTapped()),
+          onPressed: () => _handleAddDevicePressed(context),
           tooltip: 'Thêm thiết bị',
           backgroundColor: AppColors.primary,
           foregroundColor: Colors.white,
@@ -357,7 +455,7 @@ class _ErrorView extends StatelessWidget {
             const SizedBox(height: 18),
             FilledButton(
               onPressed: () =>
-                  context.read<HomeBloc>().add(const HomeStarted()),
+                  context.read<HomeBloc>().add(const HomeRetryRequested()),
               child: const Text('Thử lại'),
             ),
           ],
@@ -365,4 +463,19 @@ class _ErrorView extends StatelessWidget {
       ),
     );
   }
+}
+
+void _handleAddDevicePressed(BuildContext context) {
+  if (AppConfig.useMockData) {
+    context.read<HomeBloc>().add(const AddDeviceTapped());
+    return;
+  }
+
+  unawaited(_openPairingFlow(context));
+}
+
+Future<void> _openPairingFlow(BuildContext context) async {
+  final paired = await context.push<bool>('/add-device');
+  if (!context.mounted || paired != true) return;
+  context.read<HomeBloc>().add(const HomeStarted());
 }

@@ -2,10 +2,12 @@
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:mobile/core/router/app_router.dart';
 import 'package:mobile/core/router/auth_notifier.dart';
 import 'package:mobile/core/services/local_notification_service.dart';
 import 'package:mobile/core/theme/app_theme.dart';
+import 'package:mobile/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:mobile/firebase_options.dart';
 import 'package:mobile/injection_container.dart' as di;
 
@@ -39,11 +41,14 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     final router = appRouter ?? AppRouter(di.sl<AuthNotifier>());
 
-    return MaterialApp.router(
-      title: 'WatchNest',
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.light,
-      routerConfig: router.router,
+    return BlocProvider(
+      create: (_) => di.sl<AuthBloc>(),
+      child: MaterialApp.router(
+        title: 'WatchNest',
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.light,
+        routerConfig: router.router,
+      ),
     );
   }
 }

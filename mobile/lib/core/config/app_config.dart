@@ -2,12 +2,14 @@ abstract final class AppConfig {
   static const bool useMockData = bool.fromEnvironment('USE_MOCK_DATA');
 
   static const String apiBaseUrl = String.fromEnvironment(
-    'API_BASE_URL',
-    defaultValue: 'http://10.0.2.2:8000/api',
+    'https://c2-app-128-production.up.railway.app',
+    defaultValue: '',
   );
 
-  static const String googleServerClientId = String.fromEnvironment(
-    '804956207376-l4fp0vs97r8vjg1bcvru7ffub6bjctgn.apps.googleusercontent.com',
+  static const String googleSignInServerClientId = String.fromEnvironment(
+    'GOOGLE_SIGN_IN_SERVER_CLIENT_ID',
+    defaultValue:
+        '804956207376-l4fp0vs97r8vjg1bcvru7ffub6bjctgn.apps.googleusercontent.com',
   );
 
   static const String backendAuthToken = String.fromEnvironment(

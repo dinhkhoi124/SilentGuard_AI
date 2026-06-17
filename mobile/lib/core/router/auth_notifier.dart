@@ -1,6 +1,7 @@
 // lib/core/router/auth_notifier.dart
 
 import 'dart:async';
+import 'dart:developer' as developer;
 
 import 'package:flutter/foundation.dart';
 import 'package:mobile/features/auth/domain/repositories/auth_repository.dart';
@@ -8,13 +9,47 @@ import 'package:mobile/features/auth/domain/repositories/auth_repository.dart';
 class AuthNotifier extends ChangeNotifier {
   AuthNotifier(this._authRepository) {
     _isAuthenticated = _authRepository.currentUser != null;
-    _subscription = _authRepository.authStateChanges().listen((user) {
-      final nextAuthenticated = user != null;
-      if (_isAuthenticated == nextAuthenticated) return;
+    developer.log(
+      '[GoogleAuth] AuthNotifier created: '
+      'instance=${identityHashCode(this)}, '
+      'initialAuthenticated=$_isAuthenticated.',
+      name: 'AuthNotifier',
+    );
+    _subscription = _authRepository.authStateChanges().listen(
+      (user) {
+        final nextAuthenticated = user != null;
+        developer.log(
+          '[GoogleAuth] authStateChanges emitted: '
+          'userPresent=${user != null}, uid=${user?.uid}, '
+          'previousAuthenticated=$_isAuthenticated, '
+          'nextAuthenticated=$nextAuthenticated.',
+          name: 'AuthNotifier',
+        );
+        if (_isAuthenticated == nextAuthenticated) {
+          developer.log(
+            '[GoogleAuth] AuthNotifier auth boolean unchanged; '
+            'notifyListeners() skipped.',
+            name: 'AuthNotifier',
+          );
+          return;
+        }
 
-      _isAuthenticated = nextAuthenticated;
-      notifyListeners();
-    });
+        _isAuthenticated = nextAuthenticated;
+        developer.log(
+          '[GoogleAuth] AuthNotifier calling notifyListeners().',
+          name: 'AuthNotifier',
+        );
+        notifyListeners();
+      },
+      onError: (Object error, StackTrace stackTrace) {
+        developer.log(
+          '[GoogleAuth] authStateChanges stream error.',
+          name: 'AuthNotifier',
+          error: error,
+          stackTrace: stackTrace,
+        );
+      },
+    );
   }
 
   final AuthRepository _authRepository;

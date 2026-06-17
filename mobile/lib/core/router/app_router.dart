@@ -1,10 +1,11 @@
 // lib/core/router/app_router.dart
 
+import 'dart:developer' as developer;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mobile/core/router/auth_notifier.dart';
-import 'package:mobile/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:mobile/features/auth/presentation/pages/signin_page.dart';
 import 'package:mobile/features/auth/presentation/pages/signup_page.dart';
 import 'package:mobile/features/auth/presentation/pages/welcome_page.dart';
@@ -35,6 +36,13 @@ class AppRouter {
           state.matchedLocation == '/welcome' ||
           state.matchedLocation == '/signup' ||
           state.matchedLocation == '/signin';
+      developer.log(
+        '[GoogleAuth] GoRouter.redirect: '
+        'authNotifier=${identityHashCode(authNotifier)}, '
+        'matchedLocation=${state.matchedLocation}, '
+        'isAuthenticated=$isAuthenticated, onAuthFlow=$onAuthFlow.',
+        name: 'AppRouter',
+      );
 
       if (isAuthenticated && onAuthFlow) return '/home';
       if (!isAuthenticated && !onAuthFlow) return '/welcome';
@@ -45,20 +53,8 @@ class AppRouter {
         path: '/welcome',
         builder: (context, state) => const WelcomePage(),
       ),
-      GoRoute(
-        path: '/signup',
-        builder: (context, state) => BlocProvider(
-          create: (_) => sl<AuthBloc>(),
-          child: const SignUpPage(),
-        ),
-      ),
-      GoRoute(
-        path: '/signin',
-        builder: (context, state) => BlocProvider(
-          create: (_) => sl<AuthBloc>(),
-          child: const SignInPage(),
-        ),
-      ),
+      GoRoute(path: '/signup', builder: (context, state) => const SignUpPage()),
+      GoRoute(path: '/signin', builder: (context, state) => const SignInPage()),
       GoRoute(
         path: '/home',
         builder: (context, state) => BlocProvider(

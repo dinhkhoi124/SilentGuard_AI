@@ -13,6 +13,10 @@ final class HomeStarted extends HomeEvent {
   const HomeStarted();
 }
 
+final class HomeRetryRequested extends HomeEvent {
+  const HomeRetryRequested();
+}
+
 final class RoomFilterChanged extends HomeEvent {
   const RoomFilterChanged(this.roomName);
 

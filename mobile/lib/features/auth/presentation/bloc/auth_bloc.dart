@@ -1,5 +1,7 @@
 // lib/features/auth/presentation/bloc/auth_bloc.dart
 
+import 'dart:developer' as developer;
+
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:mobile/features/auth/domain/failures/auth_failure.dart'
     as auth_failures;
@@ -71,20 +73,58 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     AuthGoogleSignInRequested event,
     Emitter<AuthState> emit,
   ) async {
+    developer.log(
+      '[GoogleAuth] AuthBloc received AuthGoogleSignInRequested.',
+      name: 'AuthBloc',
+    );
     emit(const AuthLoading());
+    developer.log(
+      '[GoogleAuth] AuthBloc emitted AuthLoading.',
+      name: 'AuthBloc',
+    );
     final result = await _authRepository.signInWithGoogle();
+    developer.log(
+      '[GoogleAuth] AuthRepository.signInWithGoogle() completed.',
+      name: 'AuthBloc',
+    );
     result.fold(
       (failure) {
+        developer.log(
+          '[GoogleAuth] AuthBloc received failure: '
+          '${failure.runtimeType}, message="${failure.message}".',
+          name: 'AuthBloc',
+        );
         if (failure is auth_failures.GoogleSignInCancelledFailure) {
+          developer.log(
+            '[GoogleAuth] AuthBloc emitting AuthInitial after cancellation.',
+            name: 'AuthBloc',
+          );
           emit(const AuthInitial());
         } else {
+          developer.log(
+            '[GoogleAuth] AuthBloc emitting AuthFailure.',
+            name: 'AuthBloc',
+          );
           emit(AuthFailure(failure.message));
         }
       },
       (user) {
+        developer.log(
+          '[GoogleAuth] AuthBloc received success branch: '
+          'userPresent=${user != null}, uid=${user?.uid}, email=${user?.email}.',
+          name: 'AuthBloc',
+        );
         if (user == null) {
+          developer.log(
+            '[GoogleAuth] AuthBloc emitting AuthInitial for null user.',
+            name: 'AuthBloc',
+          );
           emit(const AuthInitial());
         } else {
+          developer.log(
+            '[GoogleAuth] AuthBloc emitting AuthSuccess.',
+            name: 'AuthBloc',
+          );
           emit(AuthSuccess(user));
         }
       },

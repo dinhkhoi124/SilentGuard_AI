@@ -16,7 +16,8 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     required this.getCameraDevices,
     required this.deleteCameraDevice,
   }) : super(const HomeInitial()) {
-    on<HomeStarted>(_onStarted);
+    on<HomeStarted>((event, emit) => _loadHome(emit));
+    on<HomeRetryRequested>((event, emit) => _loadHome(emit));
     on<RoomFilterChanged>(_onRoomFilterChanged);
     on<AddDeviceTapped>(_onAddDeviceTapped);
     on<HomeDeviceDeleted>(_onDeviceDeleted);
@@ -29,7 +30,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
   final DeleteCameraDevice deleteCameraDevice;
   List<CameraDevice> _activeDevices = [];
 
-  Future<void> _onStarted(HomeStarted event, Emitter<HomeState> emit) async {
+  Future<void> _loadHome(Emitter<HomeState> emit) async {
     emit(const HomeLoading());
     final weatherResult = await getWeather();
 

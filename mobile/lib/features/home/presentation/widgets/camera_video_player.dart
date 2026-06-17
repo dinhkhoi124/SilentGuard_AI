@@ -1,6 +1,7 @@
 // lib/features/home/presentation/widgets/camera_video_player.dart
 
 import 'dart:async';
+import 'dart:developer' as developer;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_vlc_player/flutter_vlc_player.dart';
@@ -190,7 +191,13 @@ class _CameraLivePreviewState extends State<CameraLivePreview> {
       if (mounted && identical(_assetController, controller)) {
         setState(() => _assetReady = true);
       }
-    } catch (_) {
+    } catch (error, stackTrace) {
+      developer.log(
+        'Không thể khởi tạo video mẫu.',
+        name: 'CameraLivePreview',
+        error: error,
+        stackTrace: stackTrace,
+      );
       if (identical(_assetController, controller)) {
         _assetController = null;
       }

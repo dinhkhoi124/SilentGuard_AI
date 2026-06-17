@@ -1,12 +1,14 @@
 // lib/injection_container.dart
 
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:get_it/get_it.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:http/http.dart' as http;
 import 'package:mobile/core/network/api_client.dart';
 import 'package:mobile/core/network/auth_interceptor.dart';
 import 'package:mobile/core/router/auth_notifier.dart';
+import 'package:mobile/core/services/fcm_service.dart';
 import 'package:mobile/core/services/local_notification_service.dart';
 import 'package:mobile/features/auth/data/datasources/firebase_auth_datasource.dart';
 import 'package:mobile/features/auth/data/repositories/auth_repository_impl.dart';
@@ -28,6 +30,10 @@ import 'package:mobile/features/home/domain/usecases/get_camera_devices.dart';
 import 'package:mobile/features/home/domain/usecases/get_devices.dart';
 import 'package:mobile/features/home/domain/usecases/get_weather.dart';
 import 'package:mobile/features/home/presentation/bloc/home_bloc.dart';
+import 'package:mobile/features/notifications/presentation/cubit/notifications_cubit.dart';
+import 'package:mobile/features/session/data/datasources/session_remote_datasource.dart';
+import 'package:mobile/features/session/data/repositories/session_repository_impl.dart';
+import 'package:mobile/features/session/domain/repositories/session_repository.dart';
 
 final sl = GetIt.instance;
 
@@ -36,6 +42,7 @@ Future<void> init() async {
 
   sl
     ..registerLazySingleton(() => FirebaseAuth.instance)
+    ..registerLazySingleton(() => FirebaseMessaging.instance)
     ..registerLazySingleton<http.Client>(
       () => FirebaseAuthHttpClient(firebaseAuth: sl()),
     )
@@ -44,10 +51,28 @@ Future<void> init() async {
     ..registerLazySingleton<FirebaseAuthDataSource>(
       () => FirebaseAuthDataSourceImpl(firebaseAuth: sl(), googleSignIn: sl()),
     )
-    ..registerLazySingleton<AuthRepository>(() => AuthRepositoryImpl(sl()))
-    ..registerLazySingleton(() => AuthNotifier(sl()))
+    ..registerLazySingleton<SessionRemoteDataSource>(
+      () => SessionRemoteDataSourceImpl(sl()),
+    )
+    ..registerLazySingleton<SessionRepository>(
+      () => SessionRepositoryImpl(sl()),
+    )
+    ..registerLazySingleton<AuthRepository>(
+      () => AuthRepositoryImpl(dataSource: sl(), sessionRepository: sl()),
+    )
+    ..registerLazySingleton(() => AuthNotifier(sl(), sl(), sl()))
     ..registerLazySingleton(LocalNotificationService.new)
-    ..registerFactory(() => AuthBloc(authRepository: sl()))
+    ..registerLazySingleton(
+      () => FcmService(apiClient: sl(), firebaseAuth: sl(), messaging: sl()),
+    )
+    ..registerLazySingleton(NotificationsCubit.new)
+    ..registerFactory(
+      () => AuthBloc(
+        authRepository: sl(),
+        sessionRepository: sl(),
+        fcmService: sl(),
+      ),
+    )
     ..registerFactory(
       () => HomeBloc(
         getWeather: sl(),
@@ -70,7 +95,8 @@ Future<void> init() async {
       () => OnvifMediaDataSourceImpl(),
     )
     ..registerLazySingleton<DeviceRemoteDataSource>(
-      () => DeviceRemoteDataSourceImpl(sl()),
+      () =>
+          DeviceRemoteDataSourceImpl(apiClient: sl(), sessionRepository: sl()),
     )
     ..registerLazySingleton<DeviceRepository>(
       () => DeviceRepositoryImpl(

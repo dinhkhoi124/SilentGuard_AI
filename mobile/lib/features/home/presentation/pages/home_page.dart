@@ -18,6 +18,9 @@ import 'package:mobile/features/home/presentation/widgets/camera_card.dart';
 import 'package:mobile/features/home/presentation/widgets/empty_devices.dart';
 import 'package:mobile/features/home/presentation/widgets/room_filter_chips.dart';
 import 'package:mobile/features/home/presentation/widgets/weather_card.dart';
+import 'package:mobile/features/notifications/domain/entities/notification_alert.dart';
+import 'package:mobile/features/notifications/presentation/cubit/notifications_cubit.dart';
+import 'package:mobile/features/notifications/presentation/cubit/notifications_state.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -33,70 +36,107 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (didPop, result) {},
-      child: Scaffold(
-        resizeToAvoidBottomInset: false,
-        appBar: AppBar(
-          automaticallyImplyLeading: false,
-          toolbarHeight: 72,
-          titleSpacing: 20,
-          title: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                _tabTitles[_selectedTab],
-                style: const TextStyle(
-                  color: AppColors.darkText,
-                  fontSize: 22,
-                  fontWeight: FontWeight.w700,
+    return BlocListener<NotificationsCubit, NotificationsState>(
+      listenWhen: (previous, current) =>
+          previous.revision != current.revision &&
+          current.latestDelivery == NotificationDelivery.foreground &&
+          current.latestAlert != null,
+      listener: (context, state) {
+        final alert = state.latestAlert;
+        if (alert == null) return;
+        _showForegroundAlert(context, alert);
+      },
+      child: PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (didPop, result) {},
+        child: Scaffold(
+          resizeToAvoidBottomInset: false,
+          appBar: AppBar(
+            automaticallyImplyLeading: false,
+            toolbarHeight: 72,
+            titleSpacing: 20,
+            title: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  _tabTitles[_selectedTab],
+                  style: const TextStyle(
+                    color: AppColors.darkText,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
+                const SizedBox(width: 7),
+              ],
+            ),
+            actions: [
+              _TopBarButton(
+                icon: Iconsax.cpu,
+                tooltip: 'Trợ lý AI',
+                onPressed: () {},
               ),
-              const SizedBox(width: 7),
+              const SizedBox(width: 4),
+              _TopBarButton(
+                icon: Iconsax.notification,
+                tooltip: 'Thông báo',
+                hasBadge: context.select(
+                  (NotificationsCubit cubit) => cubit.state.hasUnread,
+                ),
+                onPressed: () {
+                  context.read<NotificationsCubit>().markAllRead();
+                  context.read<HomeBloc>().add(const NotificationTapped());
+                },
+              ),
+              const SizedBox(width: 14),
             ],
           ),
-          actions: [
-            _TopBarButton(
-              icon: Iconsax.cpu,
-              tooltip: 'Trợ lý AI',
-              onPressed: () {},
-            ),
-            const SizedBox(width: 4),
-            _TopBarButton(
-              icon: Iconsax.notification,
-              tooltip: 'Thông báo',
-              hasBadge: true,
-              onPressed: () =>
-                  context.read<HomeBloc>().add(const NotificationTapped()),
-            ),
-            const SizedBox(width: 14),
-          ],
-        ),
-        body: IndexedStack(
-          index: _selectedTab,
-          children: const [
-            _HomeTab(),
-            _ComingSoonTab(
-              icon: Iconsax.task_square,
-              title: 'Tự động hóa',
-              message: 'Các kịch bản thông minh sẽ sớm xuất hiện tại đây.',
-            ),
-            _ComingSoonTab(
-              icon: Iconsax.chart,
-              title: 'Báo cáo',
-              message: 'Theo dõi dữ liệu nhà thông minh trong phiên bản tới.',
-            ),
-            AccountPage(),
-          ],
-        ),
-        floatingActionButton: _selectedTab == 0 ? const _HomeFabs() : null,
-        bottomNavigationBar: BottomNavBar(
-          selectedIndex: _selectedTab,
-          onSelected: (index) => setState(() => _selectedTab = index),
+          body: IndexedStack(
+            index: _selectedTab,
+            children: const [
+              _HomeTab(),
+              _ComingSoonTab(
+                icon: Iconsax.task_square,
+                title: 'Tự động hóa',
+                message: 'Các kịch bản thông minh sẽ sớm xuất hiện tại đây.',
+              ),
+              _ComingSoonTab(
+                icon: Iconsax.chart,
+                title: 'Báo cáo',
+                message: 'Theo dõi dữ liệu nhà thông minh trong phiên bản tới.',
+              ),
+              AccountPage(),
+            ],
+          ),
+          floatingActionButton: _selectedTab == 0 ? const _HomeFabs() : null,
+          bottomNavigationBar: BottomNavBar(
+            selectedIndex: _selectedTab,
+            onSelected: (index) => setState(() => _selectedTab = index),
+          ),
         ),
       ),
     );
+  }
+
+  void _showForegroundAlert(BuildContext context, NotificationAlert alert) {
+    final cameraId = alert.cameraId;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text('${alert.displayTitle}: ${alert.displayBody}'),
+          backgroundColor: AppColors.darkText,
+          action: cameraId == null || cameraId.isEmpty
+              ? null
+              : SnackBarAction(
+                  label: 'Xem',
+                  textColor: Colors.white,
+                  onPressed: () {
+                    context.read<NotificationsCubit>().markAllRead();
+                    context.go('/camera/${Uri.encodeComponent(cameraId)}');
+                  },
+                ),
+        ),
+      );
   }
 }
 

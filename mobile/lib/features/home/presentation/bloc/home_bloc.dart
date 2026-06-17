@@ -1,5 +1,8 @@
 // lib/features/home/presentation/bloc/home_bloc.dart
 
+import 'dart:developer' as developer;
+
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:mobile/core/config/app_config.dart';
 import 'package:mobile/features/home/data/mock_devices.dart';
@@ -28,10 +31,12 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
   final GetWeather getWeather;
   final GetCameraDevices getCameraDevices;
   final DeleteCameraDevice deleteCameraDevice;
+  static bool _debugTokenLogged = false;
   List<CameraDevice> _activeDevices = [];
 
   Future<void> _loadHome(Emitter<HomeState> emit) async {
     emit(const HomeLoading());
+    await _logDebugTokenOnce();
     final weatherResult = await getWeather();
 
     await weatherResult.fold((failure) async => emit(HomeError(failure)), (
@@ -49,6 +54,15 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
         );
       });
     });
+  }
+
+  Future<void> _logDebugTokenOnce() async {
+    if (_debugTokenLogged) return;
+    _debugTokenLogged = true;
+
+    // TODO: remove debug token print before shipping.
+    final token = await FirebaseAuth.instance.currentUser?.getIdToken();
+    developer.log('[DEBUG_TOKEN] $token', name: 'DebugToken');
   }
 
   void _onRoomFilterChanged(RoomFilterChanged event, Emitter<HomeState> emit) {

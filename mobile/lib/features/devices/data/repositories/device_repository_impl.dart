@@ -1,0 +1,197 @@
+import 'dart:async';
+import 'dart:developer' as developer;
+import 'dart:io';
+
+import 'package:dartz/dartz.dart';
+import 'package:http/http.dart' as http;
+import 'package:mobile/core/config/app_config.dart';
+import 'package:mobile/core/network/api_client.dart';
+import 'package:mobile/features/devices/data/datasources/device_permission_data_source.dart';
+import 'package:mobile/features/devices/data/datasources/device_remote_data_source.dart';
+import 'package:mobile/features/devices/data/datasources/gallery_image_data_source.dart';
+import 'package:mobile/features/devices/data/datasources/onvif_discovery_data_source.dart';
+import 'package:mobile/features/devices/data/datasources/onvif_media_data_source.dart';
+import 'package:mobile/features/devices/data/datasources/qr_code_data_source.dart';
+import 'package:mobile/features/devices/domain/entities/device_credentials.dart';
+import 'package:mobile/features/devices/domain/entities/onvif_discovery_result.dart';
+import 'package:mobile/features/devices/domain/entities/paired_device.dart';
+import 'package:mobile/features/devices/domain/entities/resolved_device.dart';
+import 'package:mobile/features/devices/domain/repositories/device_repository.dart';
+
+class DeviceRepositoryImpl implements DeviceRepository {
+  const DeviceRepositoryImpl({
+    required DeviceRemoteDataSource remoteDataSource,
+    required OnvifDiscoveryDataSource discoveryDataSource,
+    required OnvifMediaDataSource mediaDataSource,
+    required QrCodeDataSource qrCodeDataSource,
+    required GalleryImageDataSource galleryImageDataSource,
+    required DevicePermissionDataSource permissionDataSource,
+  }) : _remoteDataSource = remoteDataSource,
+       _discoveryDataSource = discoveryDataSource,
+       _mediaDataSource = mediaDataSource,
+       _qrCodeDataSource = qrCodeDataSource,
+       _galleryImageDataSource = galleryImageDataSource,
+       _permissionDataSource = permissionDataSource;
+
+  final DeviceRemoteDataSource _remoteDataSource;
+  final OnvifDiscoveryDataSource _discoveryDataSource;
+  final OnvifMediaDataSource _mediaDataSource;
+  final QrCodeDataSource _qrCodeDataSource;
+  final GalleryImageDataSource _galleryImageDataSource;
+  final DevicePermissionDataSource _permissionDataSource;
+
+  @override
+  DeviceCredentials? get defaultOnvifCredentials {
+    final username = AppConfig.defaultOnvifUsername.trim();
+    final password = AppConfig.defaultOnvifPassword;
+    if (username.isEmpty && password.isEmpty) return null;
+    return DeviceCredentials(username: username, password: password);
+  }
+
+  @override
+  Future<Either<String, bool>> requestCameraPermission() {
+    return _guard(_permissionDataSource.requestCamera);
+  }
+
+  @override
+  Future<Either<String, bool>> requestPhotoLibraryPermission() {
+    return _guard(_permissionDataSource.requestPhotoLibrary);
+  }
+
+  @override
+  Future<Either<String, void>> openAppSettings() {
+    return _guard(_permissionDataSource.openSettings);
+  }
+
+  @override
+  Future<Either<String, String?>> pickQrImagePath() {
+    return _guard(_galleryImageDataSource.pickQrImagePath);
+  }
+
+  @override
+  Future<Either<String, String>> decodeQrImageFile(String path) {
+    return _guard(() => _qrCodeDataSource.decodeImageFile(path));
+  }
+
+  @override
+  Future<Either<String, ResolvedDevice>> resolveDeviceQr(String qrRaw) {
+    return _guard(() => _remoteDataSource.resolveDeviceQr(qrRaw));
+  }
+
+  @override
+  Future<Either<String, List<OnvifDiscoveryResult>>> discoverOnvifDevices() {
+    return _guard(_discoveryDataSource.discover);
+  }
+
+  @override
+  Future<Either<String, OnvifDiscoveryResult>> matchDiscoveredDevice({
+    required List<OnvifDiscoveryResult> devices,
+    required String serialNumber,
+  }) async {
+    final normalized = serialNumber.trim();
+    if (normalized.isEmpty) {
+      return const Left('Máy chủ chưa xác nhận số serial của thiết bị.');
+    }
+
+    for (final device in devices) {
+      if (device.matchesSerial(normalized)) return Right(device);
+    }
+
+    return Left(
+      'Không tìm thấy camera có serial $normalized trên mạng nội bộ.',
+    );
+  }
+
+  @override
+  Future<Either<String, String>> getRtspStreamUri({
+    required OnvifDiscoveryResult device,
+    DeviceCredentials? credentials,
+  }) {
+    return _guard(
+      () => _mediaDataSource.getStreamUri(
+        device,
+        credentials: credentials ?? defaultOnvifCredentials,
+      ),
+    );
+  }
+
+  @override
+  Future<Either<String, PairedDevice>> savePairedDevice({
+    required ResolvedDevice resolvedDevice,
+    required String ipAddress,
+    required String rtspUrl,
+  }) {
+    return _guard(
+      () => _remoteDataSource.savePairedDevice(
+        resolvedDevice: resolvedDevice,
+        ipAddress: ipAddress,
+        rtspUrl: rtspUrl,
+      ),
+    );
+  }
+
+  @override
+  Future<Either<String, List<PairedDevice>>> getPairedDevices() {
+    return _guard(_remoteDataSource.getPairedDevices);
+  }
+
+  @override
+  Future<Either<String, void>> deletePairedDevice(String deviceId) {
+    return _guard(() => _remoteDataSource.deletePairedDevice(deviceId));
+  }
+
+  Future<Either<String, T>> _guard<T>(Future<T> Function() task) async {
+    try {
+      return Right(await task());
+    } on ApiException catch (error, stackTrace) {
+      _logFailure(error, stackTrace);
+      return Left(_messageForApiException(error));
+    } on QrCodeException catch (error, stackTrace) {
+      _logFailure(error, stackTrace);
+      return Left(error.message);
+    } on OnvifMediaException catch (error, stackTrace) {
+      _logFailure(error, stackTrace);
+      return Left(error.message);
+    } on TimeoutException catch (error, stackTrace) {
+      _logFailure(error, stackTrace);
+      return const Left('Không thể kết nối mạng. Kết nối quá thời gian chờ.');
+    } on SocketException catch (error, stackTrace) {
+      _logFailure(error, stackTrace);
+      return const Left(
+        'Không thể kết nối mạng. Vui lòng kiểm tra WiFi và địa chỉ máy chủ.',
+      );
+    } on http.ClientException catch (error, stackTrace) {
+      _logFailure(error, stackTrace);
+      return const Left(
+        'Không thể kết nối mạng. Vui lòng kiểm tra WiFi và địa chỉ máy chủ.',
+      );
+    } catch (error, stackTrace) {
+      _logFailure(error, stackTrace);
+      return const Left('Lỗi không xác định. Vui lòng thử lại.');
+    }
+  }
+
+  String _messageForApiException(ApiException error) {
+    return switch (error.kind) {
+      ApiExceptionKind.configuration => error.message,
+      ApiExceptionKind.unauthorized =>
+        'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.',
+      ApiExceptionKind.forbidden =>
+        'Tài khoản không có quyền truy cập dữ liệu này.',
+      ApiExceptionKind.notFound => 'Không tìm thấy dữ liệu trên máy chủ.',
+      ApiExceptionKind.badRequest => error.message,
+      ApiExceptionKind.invalidResponse => 'Phản hồi máy chủ không hợp lệ.',
+      ApiExceptionKind.server => 'Máy chủ đang gặp lỗi. Vui lòng thử lại sau.',
+      ApiExceptionKind.unknown => 'Lỗi không xác định. Vui lòng thử lại.',
+    };
+  }
+
+  void _logFailure(Object error, StackTrace stackTrace) {
+    developer.log(
+      'Device repository request failed.',
+      name: 'DeviceRepository',
+      error: error,
+      stackTrace: stackTrace,
+    );
+  }
+}

@@ -16,7 +16,7 @@ class ApiClient {
 
   static const _missingBaseUrlMessage =
       'Chưa cấu hình địa chỉ máy chủ. Hãy chạy app với '
-      '--dart-define=API_BASE_URL=http://<LAN_IP>:8000/api '
+      '--dart-define=API_BASE_URL=https://<backend-domain> '
       'hoặc dùng URL backend đã triển khai.';
 
   Future<Map<String, dynamic>> getObject(String path) async {
@@ -47,11 +47,16 @@ class ApiClient {
   }
 
   Future<Map<String, dynamic>> postObject(
-    String path,
-    Map<String, dynamic> body,
-  ) async {
+    String path, [
+    Map<String, dynamic>? body,
+    Map<String, String>? extraHeaders,
+  ]) async {
     final response = await _client
-        .post(_uri(path), headers: _headers(), body: jsonEncode(body))
+        .post(
+          _uri(path),
+          headers: _headers(extraHeaders),
+          body: body == null ? null : jsonEncode(body),
+        )
         .timeout(AppConfig.networkTimeout);
     final decoded = _decode(response);
     if (decoded is Map<String, dynamic>) return decoded;
@@ -84,12 +89,20 @@ class ApiClient {
       );
     }
 
-    final normalizedPath = path.startsWith('/') ? path : '/$path';
+    var normalizedPath = path.startsWith('/') ? path : '/$path';
+    if (baseUri.path.replaceAll(RegExp(r'/+$'), '').endsWith('/api') &&
+        normalizedPath.startsWith('/api/')) {
+      normalizedPath = normalizedPath.substring('/api'.length);
+    }
     return Uri.parse('$_baseUrl$normalizedPath');
   }
 
-  Map<String, String> _headers() {
-    return {'Accept': 'application/json', 'Content-Type': 'application/json'};
+  Map<String, String> _headers([Map<String, String>? extraHeaders]) {
+    return {
+      'Accept': 'application/json',
+      'Content-Type': 'application/json',
+      if (extraHeaders != null) ...extraHeaders,
+    };
   }
 
   Object? _decode(http.Response response, {bool allowEmpty = false}) {
@@ -131,11 +144,16 @@ class ApiClient {
 
   String _extractError(Object? body, int statusCode) {
     if (body is Map<String, dynamic>) {
+      final error = body['error'];
+      if (error is Map<String, dynamic> && error['message'] is String) {
+        return error['message'] as String;
+      }
       final detail = body['detail'];
       if (detail is Map<String, dynamic>) {
-        final error = detail['error'];
-        if (error is Map<String, dynamic> && error['message'] is String) {
-          return error['message'] as String;
+        final detailError = detail['error'];
+        if (detailError is Map<String, dynamic> &&
+            detailError['message'] is String) {
+          return detailError['message'] as String;
         }
         if (detail['message'] is String) return detail['message'] as String;
       }

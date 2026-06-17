@@ -69,7 +69,7 @@ class _SignUpPageState extends State<SignUpPage> {
         }
       },
       builder: (context, state) {
-        final isLoading = state is AuthLoading;
+        final isLoading = state is AuthLoading || state is AuthProvisioning;
 
         return Scaffold(
           backgroundColor: AppColors.surface,

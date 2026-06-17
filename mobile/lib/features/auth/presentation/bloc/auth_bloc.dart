@@ -1,18 +1,27 @@
 // lib/features/auth/presentation/bloc/auth_bloc.dart
 
+import 'dart:async';
 import 'dart:developer' as developer;
 
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:mobile/core/services/fcm_service.dart';
+import 'package:mobile/features/auth/domain/entities/app_user.dart';
 import 'package:mobile/features/auth/domain/failures/auth_failure.dart'
     as auth_failures;
 import 'package:mobile/features/auth/domain/repositories/auth_repository.dart';
 import 'package:mobile/features/auth/presentation/bloc/auth_event.dart';
 import 'package:mobile/features/auth/presentation/bloc/auth_state.dart';
+import 'package:mobile/features/session/domain/repositories/session_repository.dart';
 
 class AuthBloc extends Bloc<AuthEvent, AuthState> {
-  AuthBloc({required AuthRepository authRepository})
-    : _authRepository = authRepository,
-      super(const AuthInitial()) {
+  AuthBloc({
+    required AuthRepository authRepository,
+    required SessionRepository sessionRepository,
+    required FcmService fcmService,
+  }) : _authRepository = authRepository,
+       _sessionRepository = sessionRepository,
+       _fcmService = fcmService,
+       super(const AuthInitial()) {
     on<AuthSignUpRequested>(_onSignUpRequested);
     on<AuthSignInRequested>(_onSignInRequested);
     on<AuthGoogleSignInRequested>(_onGoogleSignInRequested);
@@ -20,6 +29,8 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   }
 
   final AuthRepository _authRepository;
+  final SessionRepository _sessionRepository;
+  final FcmService _fcmService;
 
   Future<void> _onSignUpRequested(
     AuthSignUpRequested event,
@@ -39,9 +50,9 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       email: event.email,
       password: event.password,
     );
-    result.fold(
-      (failure) => emit(AuthFailure(failure.message)),
-      (user) => emit(AuthSuccess(user)),
+    await result.fold(
+      (failure) async => emit(AuthFailure(failure.message)),
+      (user) => _provisionAndEmitSuccess(user, emit),
     );
   }
 
@@ -63,9 +74,9 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       email: event.email,
       password: event.password,
     );
-    result.fold(
-      (failure) => emit(AuthFailure(failure.message)),
-      (user) => emit(AuthSuccess(user)),
+    await result.fold(
+      (failure) async => emit(AuthFailure(failure.message)),
+      (user) => _provisionAndEmitSuccess(user, emit),
     );
   }
 
@@ -87,8 +98,8 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       '[GoogleAuth] AuthRepository.signInWithGoogle() completed.',
       name: 'AuthBloc',
     );
-    result.fold(
-      (failure) {
+    await result.fold(
+      (failure) async {
         developer.log(
           '[GoogleAuth] AuthBloc received failure: '
           '${failure.runtimeType}, message="${failure.message}".',
@@ -108,7 +119,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
           emit(AuthFailure(failure.message));
         }
       },
-      (user) {
+      (user) async {
         developer.log(
           '[GoogleAuth] AuthBloc received success branch: '
           'userPresent=${user != null}, uid=${user?.uid}, email=${user?.email}.',
@@ -122,10 +133,10 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
           emit(const AuthInitial());
         } else {
           developer.log(
-            '[GoogleAuth] AuthBloc emitting AuthSuccess.',
+            '[GoogleAuth] AuthBloc provisioning backend session.',
             name: 'AuthBloc',
           );
-          emit(AuthSuccess(user));
+          await _provisionAndEmitSuccess(user, emit);
         }
       },
     );
@@ -141,6 +152,36 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       (failure) => emit(AuthFailure(failure.message)),
       (_) => emit(const AuthSignedOut()),
     );
+  }
+
+  Future<void> _provisionAndEmitSuccess(
+    AppUser user,
+    Emitter<AuthState> emit,
+  ) async {
+    emit(const AuthProvisioning());
+    final sessionResult = await _sessionRepository.provisionSession();
+    sessionResult.fold((failure) => emit(AuthFailure(failure.message)), (_) {
+      unawaited(_registerFcmTokenSilently());
+      developer.log(
+        '[GoogleAuth] AuthBloc emitting AuthSuccess after backend provisioning.',
+        name: 'AuthBloc',
+      );
+      emit(AuthSuccess(user));
+    });
+  }
+
+  Future<void> _registerFcmTokenSilently() async {
+    try {
+      await _fcmService.registerToken();
+    } catch (error, stackTrace) {
+      developer.log(
+        'FCM token registration failed after backend provisioning. '
+        'Login will continue.',
+        name: 'AuthBloc',
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
   }
 
   String? _validateEmailAndPassword({

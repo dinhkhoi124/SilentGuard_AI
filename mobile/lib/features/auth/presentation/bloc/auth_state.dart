@@ -18,6 +18,15 @@ final class AuthLoading extends AuthState {
   const AuthLoading();
 }
 
+final class AuthProvisioning extends AuthState {
+  const AuthProvisioning([this.message = 'Đang thiết lập tài khoản...']);
+
+  final String message;
+
+  @override
+  List<Object?> get props => [message];
+}
+
 final class AuthSuccess extends AuthState {
   const AuthSuccess(this.user);
 

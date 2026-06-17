@@ -415,6 +415,52 @@ Authorization: Bearer <FIREBASE_ID_TOKEN>
 }
 ```
 
+### 3.19 Lấy presigned URL để upload clip (`POST /api/cameras/upload-url`)
+Lấy địa chỉ URL dùng một lần để tải lên clip sự kiện (video phát hiện té ngã đã làm mờ). Thiết bị camera sử dụng header `X-Device-Key` để xác thực.
+
+- **Headers**:
+```http
+X-Device-Key: <plain-text-device-api-key>
+```
+- **Request Body**:
+```json
+{
+  "filename": "EVT-20260613-001_blur.mp4",
+  "content_type": "video/mp4"
+}
+```
+- **Response 200 OK**:
+```json
+{
+  "upload_url": "https://xxxx.supabase.co/storage/v1/object/sign/clips/...?token=...",
+  "clip_path": "clips/household-uuid/EVT-20260613-001_blur.mp4",
+  "expires_in": 300
+}
+```
+
+---
+
+### 3.20 Gửi báo hiệu trạng thái hoạt động (Heartbeat) (`POST /api/cameras/{camera_id}/heartbeat`)
+Gửi tín hiệu báo camera còn hoạt động, cập nhật trạng thái `online` và cập nhật chỉ số fps thực tế. Thiết bị camera sử dụng header `X-Device-Key` để xác thực. `camera_id` trên path phải khớp với ID camera được xác thực bởi key, nếu không khớp sẽ trả về lỗi `403 Forbidden`.
+
+- **Headers**:
+```http
+X-Device-Key: <plain-text-device-api-key>
+```
+- **Request Body (Tùy chọn)**:
+```json
+{
+  "fps": 15
+}
+```
+- **Response 200 OK**:
+```json
+{
+  "status": "ok",
+  "last_heartbeat": "2026-06-17T03:12:35+07:00"
+}
+```
+
 ---
 
 ## 4. Định Dạng Lỗi Chuẩn (Error Handling)

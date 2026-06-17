@@ -16,14 +16,15 @@ async def check_camera_heartbeats() -> None:
     """
     Check cameras where last_heartbeat is older than 5 minutes.
     Marks them as offline and dispatches a SYSTEM alert event.
-    Ref: Section 9 & Section 4.11
+    Ref: Section 9 & Section 4.19
     """
     five_minutes_ago = (datetime.now(timezone.utc) - timedelta(minutes=5)).isoformat()
     try:
-        # Get active cameras with stale heartbeat
+        # Get active cameras with stale heartbeat (deleted_at IS NULL, status = 'online', last_heartbeat < 5 mins ago)
         response = supabase.table("cameras")\
             .select("*")\
             .eq("status", "online")\
+            .is_("deleted_at", "null")\
             .lt("last_heartbeat", five_minutes_ago)\
             .execute()
         
@@ -51,10 +52,34 @@ async def check_camera_heartbeats() -> None:
             }
             supabase.table("events").insert(system_event).execute()
             
-            # 3. Push SYSTEM alert to all family members
-            contacts = await get_contacts_sorted(household_id)
-            for contact in contacts:
-                await send_push(contact.get("user_id"), system_event)
+            # 3. Push SYSTEM alert to the owner of the household
+            owner_notified = False
+            try:
+                # First check households table for owner_user_id
+                hh_res = supabase.table("households").select("owner_user_id").eq("id", household_id).execute()
+                if hh_res.data and hh_res.data[0].get("owner_user_id"):
+                    owner_user_id = hh_res.data[0]["owner_user_id"]
+                    await send_push(owner_user_id, system_event)
+                    owner_notified = True
+                else:
+                    # Fallback to household_members table check for owner role
+                    members_res = supabase.table("household_members")\
+                        .select("user_id")\
+                        .eq("household_id", household_id)\
+                        .eq("role", "owner")\
+                        .execute()
+                    for m in (members_res.data or []):
+                        if m.get("user_id"):
+                            await send_push(m["user_id"], system_event)
+                            owner_notified = True
+            except Exception as e:
+                print(f"Failed to find or notify household owner for camera offline alert: {e}")
+
+            # Backup fallback if no owner was notified
+            if not owner_notified:
+                contacts = await get_contacts_sorted(household_id)
+                for contact in contacts:
+                    await send_push(contact.get("user_id"), system_event)
                 
     except Exception as e:
         print(f"Error checking camera heartbeats: {e}")

@@ -225,6 +225,9 @@ async def update_camera_details(
             detail={"error": {"code": "DATABASE_ERROR", "message": f"Failed to update camera: {str(e)}"}}
         )
 
+class CameraHeartbeatRequest(BaseModel):
+    fps: Optional[int] = None
+
 @router.post("/upload-url", response_model=UploadUrlResponse, status_code=status.HTTP_200_OK)
 async def get_upload_url(
     req: UploadUrlRequest,
@@ -235,13 +238,21 @@ async def get_upload_url(
     Ref: Section 4.0 of Design Document
     Generates a presigned URL for the edge device to upload a video clip.
     """
+    # Whitelist validation
+    whitelist = {"video/mp4", "video/quicktime", "video/webm"}
+    if req.content_type not in whitelist:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"error": {"code": "VALIDATION_ERROR", "message": f"Invalid content_type: {req.content_type}. Whitelisted: video/mp4, video/quicktime, video/webm"}}
+        )
+
     household_id = camera.get("household_id", "household-uuid")
-    clip_path = f"{household_id}/{req.filename}"
+    storage_path = f"{household_id}/{req.filename}"
     
     try:
         # Generate signed upload URL from Supabase Storage client
-        res = supabase.storage.from_("clips").create_signed_upload_url(clip_path)
-        upload_url = res.get("url")
+        res = supabase.storage.from_("clips").create_signed_upload_url(storage_path)
+        upload_url = res.get("signed_url")
     except Exception as e:
         from app.core.config import settings
         if settings.APP_ENV == "production":
@@ -251,10 +262,48 @@ async def get_upload_url(
             )
         print(f"Failed to generate signed upload URL from Supabase Storage: {e}")
         # Dev fallback
-        upload_url = f"https://sceygoxizfbbhqwatqhx.supabase.co/storage/v1/object/upload/sign/clips/{clip_path}?token=mock"
+        upload_url = f"https://sceygoxizfbbhqwatqhx.supabase.co/storage/v1/object/upload/sign/clips/{storage_path}?token=mock"
 
     return UploadUrlResponse(
         upload_url=upload_url,
-        clip_path=f"clips/{clip_path}",
+        clip_path=f"clips/{storage_path}",
         expires_in=300
     )
+
+@router.post("/{camera_id}/heartbeat", status_code=status.HTTP_200_OK)
+async def camera_heartbeat(
+    camera_id: str,
+    req: Optional[CameraHeartbeatRequest] = None,
+    camera: dict = Depends(verify_device_key_dependency)
+):
+    """
+    POST /api/cameras/{camera_id}/heartbeat
+    Ref: Section 4.18 of Design Document
+    Updates the last_heartbeat timestamp and online status of the camera.
+    """
+    if camera_id != camera.get("id"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"error": {"code": "FORBIDDEN", "message": "Camera ID mismatch with key"}}
+        )
+
+    timestamp = datetime.now(timezone.utc).isoformat()
+    update_data = {
+        "last_heartbeat": timestamp,
+        "status": "online"
+    }
+    if req and req.fps is not None:
+        update_data["fps"] = req.fps
+
+    try:
+        supabase.table("cameras").update(update_data).eq("id", camera_id).execute()
+        return {
+            "status": "ok",
+            "last_heartbeat": timestamp
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={"error": {"code": "DATABASE_ERROR", "message": f"Failed to update camera heartbeat: {str(e)}"}}
+        )
+

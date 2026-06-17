@@ -506,7 +506,33 @@ Response:
 { "status": "ok" }
 ```
 
-### 4.18 Camera offline alert (internal)
+### 4.18 `POST /api/cameras/{camera_id}/heartbeat` — Báo nhận dạng còn sống (Heartbeat)
+
+Header: `X-Device-Key: <device_api_key>`
+
+Request path: `camera_id` (UUID)
+
+Request body (tùy chọn):
+```json
+{
+  "fps": 15
+}
+```
+
+Logic:
+1. Xác thực `device_api_key` → lấy camera object tương ứng.
+2. Kiểm tra `camera_id` trong path khớp với ID của camera vừa xác thực. Nếu lệch, trả `403 FORBIDDEN`.
+3. Update `cameras.last_heartbeat = now()`, `status = 'online'`, và cập nhật `fps` nếu có truyền trong body.
+
+Response:
+```json
+{
+  "status": "ok",
+  "last_heartbeat": "2026-06-17T03:12:35+07:00"
+}
+```
+
+### 4.19 Camera offline alert (internal)
 
 Heartbeat job kiểm tra `cameras.last_heartbeat`. Nếu quá 5 phút → tạo "system event" (severity = `SYSTEM`) và gửi push "Camera X mất kết nối".
 

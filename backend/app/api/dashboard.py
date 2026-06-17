@@ -1,23 +1,28 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from datetime import datetime, timezone, time
-from app.core.security import get_current_user
+from app.core.security import get_current_user, require_household_role
 from app.core.supabase_client import supabase
 from app.models.schemas import DashboardSummaryResponse
 
 router = APIRouter(prefix="/api/dashboard", tags=["Dashboard"])
 
 @router.get("/summary", response_model=DashboardSummaryResponse)
-async def get_dashboard_summary(user: dict = Depends(get_current_user)):
+async def get_dashboard_summary(
+    request: Request,
+    user: dict = Depends(get_current_user),
+    member_info: dict = Depends(require_household_role(owner_only=False))
+):
     """
     GET /api/dashboard/summary
     Ref: Section 4.4 of design doc
     """
+    household_id = request.state.household_id
     try:
         # Define time window for today (UTC)
         today_start = datetime.combine(datetime.now(timezone.utc).date(), time.min).isoformat()
         
         # 1. Fetch alerts for today
-        events_res = supabase.table("events").select("*").gt("created_at", today_start).execute()
+        events_res = supabase.table("events").select("*").eq("household_id", household_id).gt("created_at", today_start).execute()
         events = events_res.data or []
         
         total = len(events)
@@ -31,7 +36,7 @@ async def get_dashboard_summary(user: dict = Depends(get_current_user)):
                 by_severity[sev] += 1
                 
         # 2. Fetch cameras status
-        cameras_res = supabase.table("cameras").select("*").execute()
+        cameras_res = supabase.table("cameras").select("*").eq("household_id", household_id).execute()
         cameras = []
         for cam in (cameras_res.data or []):
             cameras.append({
@@ -52,6 +57,7 @@ async def get_dashboard_summary(user: dict = Depends(get_current_user)):
             cameras=cameras
         )
     except Exception as e:
+        print(f"Error in get_dashboard_summary: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={"error": {"code": "DATABASE_ERROR", "message": f"Failed to compute dashboard stats: {str(e)}"}}

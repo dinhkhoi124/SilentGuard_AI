@@ -166,50 +166,56 @@ CREATE TABLE daily_reports (
     created_at      TIMESTAMPTZ DEFAULT now(),
     UNIQUE (household_id, report_date)
 );
+
+-- ============ HOUSEHOLD MEMBERS & INVITES ============
+CREATE TABLE household_members (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    household_id    UUID REFERENCES households(id) ON DELETE CASCADE,
+    user_id         UUID REFERENCES users(id) ON DELETE CASCADE,
+    role            TEXT NOT NULL CHECK (role IN ('owner', 'member')),
+    joined_at       TIMESTAMPTZ DEFAULT now(),
+    UNIQUE (household_id, user_id)
+);
+CREATE INDEX idx_household_members_user ON household_members(user_id);
+CREATE INDEX idx_household_members_household ON household_members(household_id);
+
+CREATE TABLE household_invites (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    household_id    UUID REFERENCES households(id) ON DELETE CASCADE,
+    code            TEXT UNIQUE NOT NULL,
+    created_by      UUID REFERENCES users(id),
+    expires_at      TIMESTAMPTZ NOT NULL,
+    used_at         TIMESTAMPTZ,
+    used_by         UUID REFERENCES users(id)
+);
+CREATE INDEX idx_household_invites_code ON household_invites(code);
+
 ```
 
 ---
 
-## 3. Auth Flow (Firebase Auth ↔ Backend)
+## 3. Auth Flow & Phân quyền (Firebase Auth ↔ Backend)
 
 1. Mobile app đăng nhập bằng Firebase Auth → nhận `idToken` (JWT).
 2. Mọi request gọi API kèm header: `Authorization: Bearer <idToken>`.
-3. Backend dùng `firebase_admin.auth.verify_id_token(token)` → lấy `firebase_uid`.
-4. Backend tìm/khởi tạo record trong bảng `users` theo `firebase_uid` (tạo mới nếu lần đầu login — "just-in-time provisioning").
-5. Gắn `current_user` (UUID nội bộ) vào request context cho các bước xử lý tiếp theo.
+3. Khi thực hiện đăng ký/đăng nhập lần đầu:
+   - Nếu người dùng được mời vào hộ gia đình có sẵn, app cần truyền thêm header tùy chọn `X-Invite-Code: <mã_mời>`.
+   - Backend dùng `firebase_admin.auth.verify_id_token(token)` → lấy `firebase_uid`.
+   - Nếu người dùng mới và có `X-Invite-Code`: Backend sẽ xác thực mã mời, gán người dùng làm `member` của hộ gia đình đó, và đánh dấu mã mời đã dùng.
+   - Nếu người dùng mới và không có `X-Invite-Code`: Backend tự động tạo một `households` mới và gán người dùng này làm `owner`.
+4. Gắn `current_user` (UUID nội bộ) vào request context.
+5. **Kiểm tra quyền truy cập (Authorization)**:
+   - Các API liên quan đến hộ gia đình (alerts, dashboard, settings, reports) áp dụng bộ lọc quyền truy cập thông qua dependency `require_household_role(owner_only=True/False)`.
+   - Router tự động trích xuất `household_id` từ Path, Query parameters hoặc JSON Body, xác thực xem `current_user` có quyền truy cập (vai trò `owner` hoặc `member`) hay không. Nếu không có quyền, trả về lỗi `403 FORBIDDEN` đúng chuẩn.
+   - Chỉ tài khoản có quyền `owner` mới được thực hiện các tác vụ quản trị: cập nhật ngưỡng thời gian (thresholds), tạo mã mời thành viên mới.
 
 ```python
 # app/core/security.py
-import json, os, hashlib
-import firebase_admin
-from firebase_admin import auth as fb_auth, credentials
-from fastapi import Depends, HTTPException, Header
-
-_sa_json = os.environ.get("FIREBASE_SERVICE_ACCOUNT_JSON")
-if _sa_json:
-    cred = credentials.Certificate(json.loads(_sa_json))
-else:
-    cred = credentials.Certificate(os.environ.get("FIREBASE_SERVICE_ACCOUNT_PATH", "./firebase-service-account.json"))
-firebase_admin.initialize_app(cred)
-
-async def get_current_user(authorization: str = Header(...)):
-    if not authorization.startswith("Bearer "):
-        raise HTTPException(401, "Missing bearer token")
-    token = authorization.split(" ", 1)[1]
-    try:
-        decoded = fb_auth.verify_id_token(token)
-    except Exception:
-        raise HTTPException(401, "Invalid Firebase token")
-
-    firebase_uid = decoded["uid"]
-    user = await get_or_create_user(firebase_uid, decoded.get("email"), decoded.get("name"))
-    return user
-
-def verify_device_key(incoming_key: str, stored_hash: str) -> bool:
-    return hashlib.sha256(incoming_key.encode()).hexdigest() == stored_hash
+# (Xem mã nguồn thực tế tại backend/app/core/security.py để biết thêm chi tiết)
 ```
 
 **Edge device auth**: mỗi camera có `device_api_key` riêng, gửi qua header `X-Device-Key`. Backend so khớp hash với DB, không dùng Firebase cho edge.
+
 
 ---
 
@@ -330,37 +336,199 @@ Response:
 
 ### 4.5 `GET /api/events/{event_id}` — Alert detail
 
-Trả về đầy đủ 1 event + `clip_url` (signed URL từ Supabase Storage, hết hạn sau X phút).
+Trả về đầy đủ 1 event + `clip_url` (signed URL từ Supabase Storage, hết hạn sau 5 phút).
 
-### 4.6 `POST /api/users/device-token`
+Response 200 OK:
+```json
+{
+  "id": "event-uuid",
+  "event_id": "EVT-20260613-001",
+  "household_id": "household-uuid",
+  "camera_id": "camera-uuid",
+  "event_type": "fall",
+  "severity": "HIGH",
+  "confidence": 0.89,
+  "timestamp": "2026-06-13T02:15:10Z",
+  "duration_sec": 145,
+  "room": "bedroom",
+  "clip_path": "clips/household-uuid/EVT-20260613-001_blur.mp4",
+  "clip_url": "https://xxxx.supabase.co/storage/v1/object/sign/clips/...?token=...",
+  "llm_message": "Ba bạn vừa ngã trong phòng ngủ lúc 2 giờ sáng...",
+  "status": "pending",
+  "escalate_after": "2026-06-13T02:20:10Z",
+  "model_ver": "v1.0.0",
+  "created_at": "2026-06-13T02:15:12Z"
+}
+```
 
-Request: `{ "fcm_token": "..." }` → lưu vào `users.fcm_token` của `current_user`.
+### 4.6 User authentication and device tokens
+
+#### 4.6.1 `POST /api/users/login`
+Verify Firebase Token của người dùng, thực hiện JIT Provisioning (khởi tạo tài khoản tự động trong DB nếu chưa có) và trả về thông tin user.
+
+- **Headers**:
+  - `Authorization: Bearer <idToken>` (Bắt buộc)
+  - `X-Invite-Code: <mã_mời>` (Tùy chọn, khi đăng ký lần đầu và được mời)
+- **Request Body**: Không có body.
+- **Response 200 OK**:
+  ```json
+  {
+    "status": "success",
+    "user": {
+      "id": "uuid-nội-bộ-của-user",
+      "firebase_uid": "firebase-uid-chuẩn",
+      "full_name": "Tên Người Dùng",
+      "email": "user@example.com",
+      "phone": "0123456789",
+      "fcm_token": "fcm-token-string",
+      "role": "family",
+      "created_at": "2026-06-17T03:12:35Z"
+    }
+  }
+  ```
+
+#### 4.6.2 `POST /api/users/logout`
+Đăng xuất tài khoản, tự động hủy liên kết (clear) token FCM ở DB để tránh nhận thông báo đẩy sau khi đăng xuất.
+
+- **Headers**:
+  - `Authorization: Bearer <idToken>` (Bắt buộc)
+- **Response 200 OK**:
+  ```json
+  {
+    "status": "ok",
+    "message": "Logged out successfully. FCM token cleared."
+  }
+  ```
+
+#### 4.6.3 `POST /api/users/device-token`
+Đăng ký/cập nhật FCM token nhận Push Notification.
+
+- **Headers**:
+  - `Authorization: Bearer <idToken>` (Bắt buộc)
+- **Request Body**:
+  ```json
+  {
+    "fcm_token": "fMEIyxxxxxxxxxxxxxxxx..."
+  }
+  ```
+- **Response 200 OK**:
+  ```json
+  {
+    "updated": true
+  }
+  ```
 
 ### 4.7 Contacts management
 
-- `GET /api/contacts`
-- `POST /api/contacts` — `{ "user_id": "...", "priority_order": 2 }`
-- `PATCH /api/contacts/{id}` — đổi `priority_order`
-- `DELETE /api/contacts/{id}`
+Quyền truy cập danh bạ khẩn cấp:
+- **`GET /api/contacts?household_id=...`**
+  - **Quyền**: Thành viên (`member`) trở lên.
+  - **Query Parameters**: `household_id` (Bắt buộc)
+  - **Response 200 OK**:
+    ```json
+    [
+      {
+        "id": "contact-uuid",
+        "household_id": "household-uuid",
+        "user_id": "user-uuid",
+        "priority_order": 1,
+        "created_at": "2026-06-17T03:12:35Z"
+      }
+    ]
+    ```
 
-> Lưu ý: `priority_order` là số nguyên tuyệt đối. Khi xóa contact ở giữa danh sách, app layer cần reorder lại các contact còn lại để tránh gap (`1, 3` → `1, 2`).
+- **`POST /api/contacts`**
+  - **Quyền**: Chỉ chủ hộ (`owner`).
+  - **Request Body**:
+    ```json
+    {
+      "household_id": "household-uuid",
+      "user_id": "user-uuid",
+      "priority_order": 2
+    }
+    ```
+  - **Ràng buộc**: `user_id` bắt buộc phải tồn tại trong bảng `users` và đã là thành viên trong hộ gia đình `household_id` đó.
+  - **Response 200 OK**:
+    ```json
+    {
+      "status": "ok"
+    }
+    ```
+  - **Response 400 Bad Request**:
+    ```json
+    {
+      "detail": {
+        "error": {
+          "code": "VALIDATION_ERROR",
+          "message": "User is not a member of this household"
+        }
+      }
+    }
+    ```
+
+- **`PATCH /api/contacts/{contact_id}`**
+  - **Quyền**: Chỉ chủ hộ (`owner`).
+  - **Query Parameters**: `priority_order` (Bắt buộc, kiểu `int`)
+  - **Cơ chế**: Tự động sắp xếp lại thứ tự ưu tiên của các contact khác trong hộ gia đình để tránh trùng số hay đứt đoạn.
+  - **Response 200 OK**:
+    ```json
+    {
+      "status": "ok"
+    }
+    ```
+
+- **`DELETE /api/contacts/{contact_id}`**
+  - **Quyền**: Chỉ chủ hộ (`owner`).
+  - **Cơ chế**: Xóa liên hệ và tự động cập nhật giảm thứ tự ưu tiên của các liên hệ còn lại để lấp khoảng trống (ví dụ: `[1, 3] -> [1, 2]`).
+  - **Response 200 OK**:
+    ```json
+    {
+      "status": "ok"
+    }
+    ```
 
 ### 4.8 Thresholds / Settings
 
-- `GET /api/settings/thresholds`
-- `PUT /api/settings/thresholds`
+Quản lý các ngưỡng cảnh báo thời gian bất động và khung giờ tắt âm:
+- **`GET /api/settings/thresholds?household_id=...`**
+  - **Quyền**: Thành viên (`member`) trở lên.
+  - **Query Parameters**: `household_id` (Bắt buộc)
+  - **Response 200 OK**:
+    ```json
+    {
+      "household_id": "8c271fac-1165-4142-a7ed-2468f873454b",
+      "low_max_sec": 30,
+      "medium_max_sec": 120,
+      "high_max_sec": 300,
+      "dedup_window_sec": 60,
+      "suppress_windows": [
+        { "start": "13:00", "end": "15:00", "max_still_sec": 3600 }
+      ]
+    }
+    ```
 
-```json
-{
-  "low_max_sec": 30,
-  "medium_max_sec": 120,
-  "high_max_sec": 300,
-  "dedup_window_sec": 60,
-  "suppress_windows": [
-    { "start": "13:00", "end": "15:00", "max_still_sec": 3600 }
-  ]
-}
-```
+- **`PUT /api/settings/thresholds`**
+  - **Quyền**: Chỉ chủ hộ (`owner`).
+  - **Request Body**:
+    ```json
+    {
+      "household_id": "8c271fac-1165-4142-a7ed-2468f873454b",
+      "low_max_sec": 30,
+      "medium_max_sec": 120,
+      "high_max_sec": 300,
+      "dedup_window_sec": 60,
+      "suppress_windows": [
+        { "start": "13:00", "end": "15:00", "max_still_sec": 3600 }
+      ]
+    }
+    ```
+  - **Ràng buộc**: Từng phần tử trong danh sách `suppress_windows` phải có thuộc tính `start` và `end` đúng định dạng `HH:MM` (24 giờ). Vi phạm định dạng sẽ trả về lỗi `422 Unprocessable Entity`.
+  - **Response 200 OK**:
+    ```json
+    {
+      "status": "ok"
+    }
+    ```
 
 ### 4.9 LLM Config via chat
 
@@ -374,7 +542,159 @@ Request: `{ "fcm_token": "..." }` → lưu vào `users.fcm_token` của `current
 
 - `GET /api/reports/daily?date=2026-06-13`
 
-### 4.11 Camera offline alert (internal)
+### 4.11 `POST /api/households/invite` — Tạo mã mời thành viên mới
+
+Quyền: `owner` (Chủ hộ).
+
+Header: `Authorization: Bearer <token>`
+
+Response:
+```json
+{
+  "code": "random_invite_code_string",
+  "expires_at": "2026-06-17T02:15:10Z"
+}
+```
+
+### 4.12 `GET /api/households/me` — Truy vấn thông tin hộ gia đình của user hiện tại
+
+Quyền: `owner` hoặc `member` (Thành viên hộ gia đình).
+
+Header: `Authorization: Bearer <token>`
+
+Response:
+```json
+{
+  "household_id": "household-uuid",
+  "role": "owner",
+  "elderly_name": "Nguyen Van A"
+}
+```
+
+### 4.13 `POST /api/cameras` — Đăng ký camera mới
+
+Quyền: `owner` (Chủ hộ).
+
+Header: `Authorization: Bearer <token>`
+
+Request:
+```json
+{
+  "household_id": "household-uuid",
+  "name": "Camera Hành Lang",
+  "room": "hallway",
+  "fps": 15
+}
+```
+
+Response:
+```json
+{
+  "camera_id": "camera-uuid",
+  "name": "Camera Hành Lang",
+  "room": "hallway",
+  "device_api_key": "sg_live_randomstring...",
+  "warning": "Lưu lại key này ngay — sẽ không hiển thị lại được"
+}
+```
+
+### 4.14 `GET /api/cameras?household_id=...` — Lấy danh sách camera trong hộ gia đình
+
+Quyền: `owner` hoặc `member` (Thành viên hộ gia đình).
+
+Header: `Authorization: Bearer <token>`
+
+Response:
+```json
+[
+  {
+    "id": "camera-uuid",
+    "name": "Camera Hành Lang",
+    "room": "hallway",
+    "status": "unknown",
+    "fps": 15,
+    "last_heartbeat": null,
+    "created_at": "2026-06-16T09:00:00Z"
+  }
+]
+```
+*(Lưu ý: Không bao giờ trả về device_api_key hay hash của nó ở endpoint này)*
+
+### 4.15 `PATCH /api/cameras/{camera_id}/rotate-key` — Đổi mã kết nối camera mới
+
+Quyền: `owner` (Chủ hộ).
+
+Header: `Authorization: Bearer <token>`
+
+Response:
+```json
+{
+  "camera_id": "camera-uuid",
+  "device_api_key": "sg_live_newrandomstring...",
+  "warning": "Lưu lại key này ngay — sẽ không hiển thị lại được"
+}
+```
+*(Lưu ý: Sau khi rotate, khóa cũ sẽ bị vô hiệu hóa lập tức, trả về 401 Unauthorized khi gửi sự kiện)*
+
+### 4.16 `DELETE /api/cameras/{camera_id}` — Xóa camera (Soft delete)
+
+Quyền: `owner` (Chủ hộ).
+
+Header: `Authorization: Bearer <token>`
+
+Response:
+```json
+{ "status": "ok" }
+```
+*(Lưu ý: Đánh dấu deleted_at = now() để giữ lịch sử sự kiện cũ không bị lỗi khóa ngoại)*
+
+### 4.17 `PATCH /api/cameras/{camera_id}` — Sửa thông tin camera
+
+Quyền: `owner` (Chủ hộ).
+
+Header: `Authorization: Bearer <token>`
+
+Request:
+```json
+{
+  "name": "Camera Phòng Ngủ Mới",
+  "room": "bedroom",
+  "fps": 10
+}
+```
+
+Response:
+```json
+{ "status": "ok" }
+```
+
+### 4.18 `POST /api/cameras/{camera_id}/heartbeat` — Báo nhận dạng còn sống (Heartbeat)
+
+Header: `X-Device-Key: <device_api_key>`
+
+Request path: `camera_id` (UUID)
+
+Request body (tùy chọn):
+```json
+{
+  "fps": 15
+}
+```
+
+Logic:
+1. Xác thực `device_api_key` → lấy camera object tương ứng.
+2. Kiểm tra `camera_id` trong path khớp với ID của camera vừa xác thực. Nếu lệch, trả `403 FORBIDDEN`.
+3. Update `cameras.last_heartbeat = now()`, `status = 'online'`, và cập nhật `fps` nếu có truyền trong body.
+
+Response:
+```json
+{
+  "status": "ok",
+  "last_heartbeat": "2026-06-17T03:12:35+07:00"
+}
+```
+
+### 4.19 Camera offline alert (internal)
 
 Heartbeat job kiểm tra `cameras.last_heartbeat`. Nếu quá 5 phút → tạo "system event" (severity = `SYSTEM`) và gửi push "Camera X mất kết nối".
 

@@ -15,7 +15,7 @@ async def process_event(event_data: dict) -> None:
     household_id = event_data.get("household_id")
     event_type = event_data.get("event_type", "fall")
     timestamp_str = event_data.get("timestamp")
-    duration_sec = event_data.get("duration_sec", 0)
+    duration_sec = event_data.get("duration_sec") or 0
     
     # Parse timestamp
     try:

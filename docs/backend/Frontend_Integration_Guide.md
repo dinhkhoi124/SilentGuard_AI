@@ -11,11 +11,11 @@ Tài liệu này hướng dẫn cách kết nối và tích hợp các API của
 
 ---
 
-## 2. Xác Thực Người Dùng (Authentication Flow)
+## 2. Quy trình Đăng nhập & Mời thành viên (Login & Invite Flow)
 
-Mọi API gửi từ Mobile App đến Backend (trừ API endpoint `/health` của hệ thống) bắt buộc phải kèm theo Firebase ID Token.
+Mọi API gửi từ Mobile App đến Backend bắt buộc phải kèm theo Firebase ID Token.
 
-### Bước tích hợp trên Mobile:
+### Các bước tích hợp trên Mobile:
 1. Đăng nhập qua Firebase Auth SDK trên App (Google Login, Email/Password, v.v.).
 2. Lấy ID Token từ Firebase user instance:
    - *Firebase Auth SDK*: `await user.getIdToken(forceRefresh: true)`
@@ -25,18 +25,40 @@ Mọi API gửi từ Mobile App đến Backend (trừ API endpoint `/health` c�
 Authorization: Bearer <FIREBASE_ID_TOKEN>
 ```
 
-> **Lưu ý:** Backend sử dụng cơ chế **Just-in-Time Provisioning**. Khi người dùng đăng nhập lần đầu và gọi API bất kỳ, backend sẽ tự động tạo một tài khoản tương ứng trong bảng `users` từ thông tin Firebase token.
+### Quy trình phân loại người dùng khi Đăng nhập lần đầu (JIT Provisioning):
+Backend hỗ trợ cơ chế **Just-in-Time Provisioning** giúp tự động tạo tài khoản khi gọi API lần đầu. Cụ thể có hai kịch bản:
+
+* **Kịch bản A: Người dùng tự tạo tài khoản và sở hữu hộ gia đình mới (Owner)**
+  - Gọi bất kỳ API nào lần đầu (ví dụ: `GET /api/households/me`) mà **KHÔNG** truyền thêm header đặc biệt nào khác.
+  - Backend sẽ tự động:
+    1. Tạo bản ghi trong bảng `users`.
+    2. Khởi tạo một hộ gia đình (`households`) mới.
+    3. Gán user này làm thành viên với quyền chủ hộ (`role: owner`) trong `household_members`.
+
+* **Kịch bản B: Người dùng tham gia vào hộ gia đình có sẵn thông qua Mã Mời (Member)**
+  - Người dùng nhập mã mời nhận từ thành viên khác trên giao diện.
+  - Khi thực hiện cuộc gọi API đầu tiên, đính kèm thêm header tùy chọn `X-Invite-Code`:
+    ```http
+    X-Invite-Code: <MA_MOI_NHAN_DUOC>
+    ```
+  - Backend sẽ tự động:
+    1. Xác thực mã mời có tồn tại, chưa bị dùng và còn hạn (24 giờ).
+    2. Tạo bản ghi trong bảng `users`.
+    3. Gán user này vào hộ gia đình tương ứng với vai trò thành viên thường (`role: member`) trong `household_members`.
+    4. Đánh dấu mã mời đã được sử dụng.
+  - *Nếu mã mời bị sai/hết hạn/đã dùng*: API sẽ trả về lỗi `400 Bad Request` với mã lỗi `"INVALID_INVITE_CODE"`.
 
 ---
 
 ## 3. Các API Endpoints Chính (Mobile App)
 
 ### 3.1 Đăng nhập hệ thống (`POST /api/users/login`)
-Verify Firebase Token của người dùng, thực hiện JIT Provisioning (khởi tạo tài khoản tự động trong DB nếu chưa có) và trả về thông tin user.
+Verify Firebase Token của người dùng, thực hiện JIT Provisioning (khởi tạo tài khoản tự động trong DB nếu chưa có) và trả về thông tin user. Hỗ trợ truyền mã mời để tham gia hộ gia đình khi đăng ký lần đầu.
 
 - **Headers**:
 ```http
 Authorization: Bearer <FIREBASE_ID_TOKEN>
+X-Invite-Code: <OPTIONAL_MA_MOI>
 ```
 - **Response 200 OK**:
 ```json
@@ -202,21 +224,56 @@ Thống kê nhanh các chỉ số hiển thị trên trang chủ App.
 ---
 
 ### 3.9 Cấu hình ngưỡng cảnh báo (`GET/PUT /api/settings/thresholds`)
-- **GET**: Lấy cấu hình hiện tại.
-- **PUT**: Cập nhật cấu hình mới.
 
-- **Request / Response Body**:
-```json
-{
-  "low_max_sec": 30,      // Ngưỡng tối đa báo động nhẹ (giây)
-  "medium_max_sec": 120,   // Ngưỡng tối đa báo động vừa (giây)
-  "high_max_sec": 300,    // Ngưỡng tối đa báo động cao (giây)
-  "dedup_window_sec": 60,  // Thời gian chặn trùng lặp giữa các camera
-  "suppress_windows": [
-    { "start": "13:00", "end": "15:00", "max_still_sec": 3600 } // Khoảng thời gian cụ đi ngủ trưa
-  ]
-}
-```
+- **GET /api/settings/thresholds**
+  - **Quyền**: Thành viên (`member`) trở lên.
+  - **Query Parameters**:
+    - `household_id` (Bắt buộc): ID hộ gia đình.
+  - **Response 200 OK**:
+    ```json
+    {
+      "household_id": "8c271fac-1165-4142-a7ed-2468f873454b",
+      "low_max_sec": 30,
+      "medium_max_sec": 120,
+      "high_max_sec": 300,
+      "dedup_window_sec": 60,
+      "suppress_windows": [
+        { "start": "13:00", "end": "15:00", "max_still_sec": 3600 }
+      ]
+    }
+    ```
+
+- **PUT /api/settings/thresholds**
+  - **Quyền**: Chỉ chủ hộ (`owner`).
+  - **Request Body**:
+    ```json
+    {
+      "household_id": "8c271fac-1165-4142-a7ed-2468f873454b",
+      "low_max_sec": 30,
+      "medium_max_sec": 120,
+      "high_max_sec": 300,
+      "dedup_window_sec": 60,
+      "suppress_windows": [
+        { "start": "13:00", "end": "15:00", "max_still_sec": 3600 }
+      ]
+    }
+    ```
+  - **Ràng buộc validation**:
+    - Trường `suppress_windows` chứa các khung giờ tắt âm. Thuộc tính `start` và `end` phải tuân thủ đúng định dạng `HH:MM` (24 giờ).
+    - Nếu sai định dạng, API trả về mã lỗi `422 Unprocessable Entity`.
+  - **Response 200 OK**:
+    ```json
+    {
+      "household_id": "8c271fac-1165-4142-a7ed-2468f873454b",
+      "low_max_sec": 30,
+      "medium_max_sec": 120,
+      "high_max_sec": 300,
+      "dedup_window_sec": 60,
+      "suppress_windows": [
+        { "start": "13:00", "end": "15:00", "max_still_sec": 3600 }
+      ]
+    }
+    ```
 
 ---
 
@@ -236,11 +293,279 @@ Dành cho tính năng ra lệnh bằng giọng nói/tin nhắn cấu hình.
 ### 3.11 Quản lý danh bạ liên hệ khẩn cấp (`GET/POST/PATCH/DELETE /api/contacts`)
 Hệ thống liên hệ khẩn cấp dạng danh sách ưu tiên để escalate cuộc gọi/thông báo khi người dùng chính không phản hồi.
 
-- **POST**: Thêm liên hệ mới.
-- **PATCH**: Đổi thứ tự ưu tiên (`priority_order`).
-- **DELETE**: Xóa liên hệ.
-  
-> **Lưu ý:** Thứ tự ưu tiên `priority_order` là một dãy số nguyên liên tục bắt đầu từ 1. Khi xóa một liên hệ, ứng dụng Frontend cần gọi cập nhật lại thứ tự ưu tiên của các liên hệ còn lại để tránh các khoảng hở (ví dụ: đang có `1, 2, 3`, xóa `2` thì cần reorder lại để danh sách thành `1, 2`).
+- **GET /api/contacts**
+  - **Quyền**: Thành viên (`member`) trở lên.
+  - **Query Parameters**:
+    - `household_id` (Bắt buộc): ID hộ gia đình.
+  - **Response 200 OK**: Trả về danh sách sắp xếp theo `priority_order` tăng dần:
+    ```json
+    [
+      {
+        "id": "contact-uuid-1",
+        "household_id": "household-uuid",
+        "user_id": "user-uuid-1",
+        "priority_order": 1,
+        "created_at": "2026-06-17T03:12:35Z"
+      },
+      {
+        "id": "contact-uuid-2",
+        "household_id": "household-uuid",
+        "user_id": "user-uuid-2",
+        "priority_order": 2,
+        "created_at": "2026-06-17T03:12:36Z"
+      }
+    ]
+    ```
+
+- **POST /api/contacts**
+  - **Quyền**: Chỉ chủ hộ (`owner`).
+  - **Request Body**:
+    ```json
+    {
+      "household_id": "household-uuid",
+      "user_id": "user-uuid-to-add",
+      "priority_order": 3
+    }
+    ```
+  - **Ràng buộc**:
+    - `user_id` bắt buộc phải tồn tại trong hệ thống và đã là thành viên (`household_member`) của hộ gia đình `household_id` tương ứng (không thêm liên hệ cho người ngoài hộ gia đình).
+    - Nếu vi phạm (ví dụ thêm một user không thuộc hộ gia đình), hệ thống trả về lỗi `400 Bad Request` dạng:
+      ```json
+      {
+        "detail": "User is not a member of the household"
+      }
+      ```
+  - **Response 200 OK**:
+    ```json
+    {
+      "id": "new-contact-uuid",
+      "household_id": "household-uuid",
+      "user_id": "user-uuid-to-add",
+      "priority_order": 3,
+      "created_at": "2026-06-17T08:00:00Z"
+    }
+    ```
+
+- **PATCH /api/contacts/{contact_id}**
+  - **Quyền**: Chỉ chủ hộ (`owner`).
+  - **Query Parameters**:
+    - `priority_order` (Bắt buộc, kiểu `int`): Thứ tự ưu tiên mới muốn đổi sang (ví dụ: `?priority_order=1`).
+  - **Cơ chế hoạt động**: 
+    - Khi thay đổi thứ tự ưu tiên của một liên hệ, backend sẽ tự động cập nhật và sắp xếp lại thứ tự ưu tiên (`priority_order`) của các liên hệ khác trong cùng hộ gia đình để đảm bảo tính liên tục (từ 1 đến N), không có khoảng trống (gap) và không bị trùng lặp.
+  - **Response 200 OK**:
+    ```json
+    {
+      "status": "ok"
+    }
+    ```
+
+- **DELETE /api/contacts/{contact_id}**
+  - **Quyền**: Chỉ chủ hộ (`owner`).
+  - **Cơ chế hoạt động**:
+    - Khi xóa một liên hệ, backend sẽ tự động cập nhật giảm thứ tự ưu tiên của các liên hệ còn lại để lấp khoảng trống (ví dụ: đang có priority `[1, 2, 3]`, xóa liên hệ thứ `2` thì liên hệ thứ `3` sẽ tự động chuyển thành thứ `2`).
+  - **Response 200 OK**:
+    ```json
+    {
+      "status": "ok"
+    }
+    ```
+
+---
+
+### 3.12 Tạo mã mời thành viên mới (`POST /api/households/invite`)
+Sinh mã mời ngẫu nhiên có hiệu lực trong 24 giờ. Chỉ áp dụng cho tài khoản có vai trò `owner`.
+
+- **Headers**:
+```http
+Authorization: Bearer <FIREBASE_ID_TOKEN>
+```
+- **Response 201 Created**:
+```json
+{
+  "code": "random_invite_code_string",
+  "expires_at": "2026-06-17T02:15:10Z"
+}
+```
+
+---
+
+### 3.13 Lấy thông tin hộ gia đình hiện tại (`GET /api/households/me`)
+Lấy thông tin hộ gia đình của user hiện tại cùng với vai trò (`role`) tương ứng của họ.
+
+- **Headers**:
+```http
+Authorization: Bearer <FIREBASE_ID_TOKEN>
+```
+- **Response 200 OK**:
+```json
+{
+  "household_id": "household-uuid",
+  "role": "owner", // Hoặc "member"
+  "elderly_name": "Nguyen Van A"
+}
+```
+
+---
+
+### 3.14 Đăng ký camera mới (`POST /api/cameras`)
+Đăng ký camera mới cho hộ gia đình. Chỉ áp dụng cho tài khoản chủ hộ (`owner`).
+
+- **Headers**:
+```http
+Authorization: Bearer <FIREBASE_ID_TOKEN>
+```
+- **Request Body**:
+```json
+{
+  "household_id": "household-uuid",
+  "name": "Camera Phòng Khách",
+  "room": "living-room",
+  "fps": 15
+}
+```
+- **Response 21Created**:
+Trả về thông tin camera cùng mã API Key để điền vào thiết bị biên (Edge Device). **Plaintext key chỉ được hiển thị 1 lần duy nhất này**.
+```json
+{
+  "camera_id": "camera-uuid",
+  "name": "Camera Phòng Khách",
+  "room": "living-room",
+  "device_api_key": "sg_live_xxxxxx...",
+  "warning": "Lưu lại key này ngay — sẽ không hiển thị lại được"
+}
+```
+
+---
+
+### 3.15 Lấy danh sách camera (`GET /api/cameras`)
+Lấy toàn bộ danh sách các camera đang hoạt động trong một hộ gia đình. Thành viên hoặc chủ hộ đều có quyền gọi.
+
+- **Headers**:
+```http
+Authorization: Bearer <FIREBASE_ID_TOKEN>
+```
+- **Query Parameters**:
+  - `household_id`: ID hộ gia đình cần lấy danh sách camera.
+- **Response 200 OK**:
+*(Lưu ý: Không bao giờ trả về trường device_api_key hoặc hash của nó để bảo mật)*
+```json
+[
+  {
+    "id": "camera-uuid",
+    "name": "Camera Phòng Khách",
+    "room": "living-room",
+    "status": "unknown", // "online", "offline", hoặc "unknown"
+    "fps": 15,
+    "last_heartbeat": null,
+    "created_at": "2026-06-16T09:00:00Z"
+  }
+]
+```
+
+---
+
+### 3.16 Đổi mã kết nối camera mới (`PATCH /api/cameras/{camera_id}/rotate-key`)
+Sinh một mã API Key mới cho thiết bị Edge (dùng khi nghi ngờ rò rỉ mã cũ). Chỉ áp dụng cho tài khoản chủ hộ (`owner`).
+
+- **Headers**:
+```http
+Authorization: Bearer <FIREBASE_ID_TOKEN>
+```
+- **Response 200 OK**:
+Trả về mã kết nối plaintext mới duy nhất 1 lần. **Khóa cũ sẽ bị vô hiệu hóa ngay lập tức**.
+```json
+{
+  "camera_id": "camera-uuid",
+  "device_api_key": "sg_live_newkey_xxxxxx...",
+  "warning": "Lưu lại key này ngay — sẽ không hiển thị lại được"
+}
+```
+
+---
+
+### 3.17 Xóa camera (`DELETE /api/cameras/{camera_id}`)
+Gỡ camera khỏi hộ gia đình (sử dụng soft-delete để không làm hỏng khóa ngoại dữ liệu cảnh báo cũ). Chỉ chủ hộ (`owner`) được quyền gọi.
+
+- **Headers**:
+```http
+Authorization: Bearer <FIREBASE_ID_TOKEN>
+```
+- **Response 200 OK**:
+```json
+{
+  "status": "ok"
+}
+```
+
+---
+
+### 3.18 Sửa thông tin camera (`PATCH /api/cameras/{camera_id}`)
+Sửa đổi thông tin cơ bản của camera (không đổi mã key qua đây). Chỉ chủ hộ (`owner`) được quyền gọi.
+
+- **Headers**:
+```http
+Authorization: Bearer <FIREBASE_ID_TOKEN>
+```
+- **Request Body**:
+```json
+{
+  "name": "Camera Phòng Khách VIP",
+  "room": "living-room-vip",
+  "fps": 10
+}
+```
+- **Response 200 OK**:
+```json
+{
+  "status": "ok"
+}
+```
+
+### 3.19 Lấy presigned URL để upload clip (`POST /api/cameras/upload-url`)
+Lấy địa chỉ URL dùng một lần để tải lên clip sự kiện (video phát hiện té ngã đã làm mờ). Thiết bị camera sử dụng header `X-Device-Key` để xác thực.
+
+- **Headers**:
+```http
+X-Device-Key: <plain-text-device-api-key>
+```
+- **Request Body**:
+```json
+{
+  "filename": "EVT-20260613-001_blur.mp4",
+  "content_type": "video/mp4"
+}
+```
+- **Response 200 OK**:
+```json
+{
+  "upload_url": "https://xxxx.supabase.co/storage/v1/object/sign/clips/...?token=...",
+  "clip_path": "clips/household-uuid/EVT-20260613-001_blur.mp4",
+  "expires_in": 300
+}
+```
+
+---
+
+### 3.20 Gửi báo hiệu trạng thái hoạt động (Heartbeat) (`POST /api/cameras/{camera_id}/heartbeat`)
+Gửi tín hiệu báo camera còn hoạt động, cập nhật trạng thái `online` và cập nhật chỉ số fps thực tế. Thiết bị camera sử dụng header `X-Device-Key` để xác thực. `camera_id` trên path phải khớp với ID camera được xác thực bởi key, nếu không khớp sẽ trả về lỗi `403 Forbidden`.
+
+- **Headers**:
+```http
+X-Device-Key: <plain-text-device-api-key>
+```
+- **Request Body (Tùy chọn)**:
+```json
+{
+  "fps": 15
+}
+```
+- **Response 200 OK**:
+```json
+{
+  "status": "ok",
+  "last_heartbeat": "2026-06-17T03:12:35+07:00"
+}
+```
 
 ---
 

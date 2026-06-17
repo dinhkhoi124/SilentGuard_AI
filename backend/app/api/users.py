@@ -33,6 +33,7 @@ async def logout_user(user: dict = Depends(get_current_user)):
             "message": "Logged out successfully. FCM token cleared."
         }
     except Exception as e:
+        print(f"Error in logout_user: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={"error": {"code": "DATABASE_ERROR", "message": f"Failed to clear FCM token on logout: {str(e)}"}}
@@ -52,6 +53,7 @@ async def register_device_token(
         supabase.table("users").update({"fcm_token": req.fcm_token}).eq("id", user_id).execute()
         return {"updated": True}
     except Exception as e:
+        print(f"Error in register_device_token: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={"error": {"code": "DATABASE_ERROR", "message": f"Failed to register FCM token: {str(e)}"}}

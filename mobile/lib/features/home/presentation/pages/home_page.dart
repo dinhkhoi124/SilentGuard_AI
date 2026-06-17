@@ -2,6 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:mobile/core/utils/app_colors.dart';
 import 'package:mobile/features/home/domain/entities/camera_device.dart';
@@ -59,7 +60,15 @@ class HomePage extends StatelessWidget {
             const SizedBox(width: 14),
           ],
         ),
-        body: BlocBuilder<HomeBloc, HomeState>(
+        body: BlocConsumer<HomeBloc, HomeState>(
+          listenWhen: (previous, current) =>
+              current is HomeLoaded && current.openPairingFlow,
+          listener: (context, state) {
+            context.push<bool>('/add-device').then((paired) {
+              if (!context.mounted || paired != true) return;
+              context.read<HomeBloc>().add(const HomeStarted());
+            });
+          },
           builder: (context, state) {
             return switch (state) {
               HomeInitial() || HomeLoading() => const Center(

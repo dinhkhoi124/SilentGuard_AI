@@ -1,20 +1,23 @@
 // lib/features/home/presentation/widgets/camera_video_player.dart
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_vlc_player/flutter_vlc_player.dart';
 import 'package:mobile/core/utils/app_colors.dart';
 import 'package:video_player/video_player.dart';
 
 class CameraVideoPlayer extends StatelessWidget {
   const CameraVideoPlayer({
     super.key,
-    required this.videoReady,
-    this.controller,
     required this.currentTime,
+    this.rtspUrl,
+    this.useMockAsset = false,
   });
 
-  final bool videoReady;
-  final VideoPlayerController? controller;
   final String currentTime;
+  final String? rtspUrl;
+  final bool useMockAsset;
 
   @override
   Widget build(BuildContext context) {
@@ -27,10 +30,7 @@ class CameraVideoPlayer extends StatelessWidget {
           child: Stack(
             fit: StackFit.expand,
             children: [
-              if (videoReady && controller != null)
-                VideoPlayer(controller!)
-              else
-                const ColoredBox(color: Colors.black),
+              CameraLivePreview(rtspUrl: rtspUrl, useMockAsset: useMockAsset),
               Positioned(
                 top: 10,
                 left: 10,
@@ -42,7 +42,7 @@ class CameraVideoPlayer extends StatelessWidget {
                         _StatusDot(),
                         SizedBox(width: 5),
                         Text(
-                          'LIVE',
+                          'TRỰC TIẾP',
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.bold,
@@ -122,6 +122,118 @@ class CameraVideoPlayer extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+class CameraLivePreview extends StatefulWidget {
+  const CameraLivePreview({super.key, this.rtspUrl, this.useMockAsset = false});
+
+  final String? rtspUrl;
+  final bool useMockAsset;
+
+  @override
+  State<CameraLivePreview> createState() => _CameraLivePreviewState();
+}
+
+class _CameraLivePreviewState extends State<CameraLivePreview> {
+  static const _videoAssetPath = 'assets/videos/videoplayback.mp4';
+
+  VideoPlayerController? _assetController;
+  VlcPlayerController? _vlcController;
+  bool _assetReady = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _initController();
+  }
+
+  @override
+  void didUpdateWidget(covariant CameraLivePreview oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.rtspUrl != widget.rtspUrl ||
+        oldWidget.useMockAsset != widget.useMockAsset) {
+      _disposeControllers();
+      _initController();
+    }
+  }
+
+  @override
+  void dispose() {
+    _disposeControllers();
+    super.dispose();
+  }
+
+  void _initController() {
+    final rtspUrl = widget.rtspUrl?.trim();
+    if (widget.useMockAsset) {
+      _initMockAsset();
+      return;
+    }
+
+    if (rtspUrl == null || rtspUrl.isEmpty) return;
+    _vlcController = VlcPlayerController.network(
+      rtspUrl,
+      autoInitialize: true,
+      autoPlay: true,
+      hwAcc: HwAcc.auto,
+    );
+  }
+
+  Future<void> _initMockAsset() async {
+    final controller = VideoPlayerController.asset(_videoAssetPath);
+    _assetController = controller;
+    try {
+      await controller.initialize();
+      await controller.setLooping(true);
+      await controller.play();
+      if (mounted && identical(_assetController, controller)) {
+        setState(() => _assetReady = true);
+      }
+    } catch (_) {
+      if (identical(_assetController, controller)) {
+        _assetController = null;
+      }
+      unawaited(controller.dispose());
+    }
+  }
+
+  void _disposeControllers() {
+    final assetController = _assetController;
+    final vlcController = _vlcController;
+    _assetController = null;
+    _vlcController = null;
+    _assetReady = false;
+
+    if (assetController != null) unawaited(assetController.dispose());
+    if (vlcController != null) unawaited(vlcController.dispose());
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final vlcController = _vlcController;
+    final assetController = _assetController;
+
+    if (widget.useMockAsset && _assetReady && assetController != null) {
+      return FittedBox(
+        fit: BoxFit.cover,
+        child: SizedBox(
+          width: assetController.value.size.width,
+          height: assetController.value.size.height,
+          child: VideoPlayer(assetController),
+        ),
+      );
+    }
+
+    if (!widget.useMockAsset && vlcController != null) {
+      return VlcPlayer(
+        controller: vlcController,
+        aspectRatio: 16 / 9,
+        placeholder: const ColoredBox(color: Colors.black),
+      );
+    }
+
+    return const ColoredBox(color: Colors.black);
   }
 }
 

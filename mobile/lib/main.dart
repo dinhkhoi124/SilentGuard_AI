@@ -1,14 +1,17 @@
 // lib/main.dart
 
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:mobile/core/router/app_router.dart';
 import 'package:mobile/core/router/auth_notifier.dart';
 import 'package:mobile/core/services/local_notification_service.dart';
 import 'package:mobile/core/theme/app_theme.dart';
+import 'package:mobile/firebase_options.dart';
 import 'package:mobile/injection_container.dart' as di;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   await di.init();
 
   late final AppRouter appRouter;

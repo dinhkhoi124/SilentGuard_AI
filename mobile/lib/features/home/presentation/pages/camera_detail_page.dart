@@ -4,10 +4,12 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mobile/core/config/app_config.dart';
 import 'package:mobile/core/services/local_notification_service.dart';
 import 'package:mobile/core/utils/app_colors.dart';
 import 'package:mobile/features/home/data/mock_events.dart';
 import 'package:mobile/features/home/domain/entities/camera_device.dart';
+import 'package:mobile/features/home/domain/entities/camera_event.dart';
 import 'package:mobile/features/home/presentation/widgets/camera_action_buttons.dart';
 import 'package:mobile/features/home/presentation/widgets/camera_event_history_header.dart';
 import 'package:mobile/features/home/presentation/widgets/camera_event_tile.dart';
@@ -16,7 +18,6 @@ import 'package:mobile/features/home/presentation/widgets/camera_safety_status.d
 import 'package:mobile/features/home/presentation/widgets/camera_top_bar.dart';
 import 'package:mobile/features/home/presentation/widgets/camera_video_player.dart';
 import 'package:mobile/injection_container.dart';
-import 'package:video_player/video_player.dart';
 
 class CameraDetailPage extends StatefulWidget {
   const CameraDetailPage({super.key, required this.device});
@@ -28,12 +29,8 @@ class CameraDetailPage extends StatefulWidget {
 }
 
 class _CameraDetailPageState extends State<CameraDetailPage> {
-  static const _videoAssetPath = 'assets/videos/videoplayback.mp4';
-
-  VideoPlayerController? _videoController;
   Timer? _clockTimer;
   String _currentTime = '';
-  bool _videoReady = false;
 
   @override
   void initState() {
@@ -41,9 +38,6 @@ class _CameraDetailPageState extends State<CameraDetailPage> {
     _updateTime();
     _clockTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) _updateTime();
-    });
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _initVideo();
     });
   }
 
@@ -55,25 +49,15 @@ class _CameraDetailPageState extends State<CameraDetailPage> {
   @override
   void dispose() {
     _clockTimer?.cancel();
-    _videoController?.dispose();
     super.dispose();
-  }
-  Future<void> _initVideo() async {
-    final controller = VideoPlayerController.asset(_videoAssetPath);
-    _videoController = controller;
-    try {
-      await controller.initialize();
-      await controller.setLooping(true);
-      await controller.play();
-      if (mounted) setState(() => _videoReady = true);
-    } catch (_) {
-      await controller.dispose();
-      _videoController = null;
-    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final events = AppConfig.useMockData
+        ? mockCameraEvents
+        : const <CameraEvent>[];
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
@@ -88,8 +72,8 @@ class _CameraDetailPageState extends State<CameraDetailPage> {
             ),
             SliverToBoxAdapter(
               child: CameraVideoPlayer(
-                videoReady: _videoReady,
-                controller: _videoController,
+                rtspUrl: widget.device.rtspUrl,
+                useMockAsset: AppConfig.useMockData,
                 currentTime: _currentTime,
               ),
             ),
@@ -101,20 +85,23 @@ class _CameraDetailPageState extends State<CameraDetailPage> {
               ),
             ),
             const SliverToBoxAdapter(child: SizedBox(height: 10)),
-            SliverToBoxAdapter(
-              child: CameraLatestEventCard(
-                device: widget.device,
-                latestEvent: mockCameraEvents.first,
-              ),
-            ),
+            if (events.isNotEmpty)
+              SliverToBoxAdapter(
+                child: CameraLatestEventCard(
+                  device: widget.device,
+                  latestEvent: events.first,
+                ),
+              )
+            else
+              const SliverToBoxAdapter(child: _NoCameraEventsPanel()),
             const SliverToBoxAdapter(child: SizedBox(height: 10)),
             const SliverToBoxAdapter(child: CameraActionButtons()),
             const SliverToBoxAdapter(child: SizedBox(height: 16)),
             const SliverToBoxAdapter(child: CameraEventHistoryHeader()),
             SliverList(
               delegate: SliverChildBuilderDelegate(
-                (_, index) => CameraEventTile(event: mockCameraEvents[index]),
-                childCount: mockCameraEvents.length,
+                (_, index) => CameraEventTile(event: events[index]),
+                childCount: events.length,
               ),
             ),
             const SliverToBoxAdapter(child: SizedBox(height: 24)),
@@ -247,6 +234,68 @@ class _SheetHandle extends StatelessWidget {
           borderRadius: BorderRadius.circular(99),
         ),
         child: const SizedBox(width: 40, height: 5),
+      ),
+    );
+  }
+}
+
+class _NoCameraEventsPanel extends StatelessWidget {
+  const _NoCameraEventsPanel();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: const Padding(
+          padding: EdgeInsets.all(18),
+          child: Row(
+            children: [
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  color: AppColors.lightBlue,
+                  borderRadius: BorderRadius.all(Radius.circular(14)),
+                ),
+                child: SizedBox.square(
+                  dimension: 42,
+                  child: Icon(
+                    Icons.event_available_outlined,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ),
+              SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Chưa có sự kiện',
+                      style: TextStyle(
+                        color: AppColors.darkText,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      'Sự kiện mới từ camera sẽ xuất hiện tại đây.',
+                      style: TextStyle(
+                        color: AppColors.mutedText,
+                        fontSize: 13,
+                        height: 1.35,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

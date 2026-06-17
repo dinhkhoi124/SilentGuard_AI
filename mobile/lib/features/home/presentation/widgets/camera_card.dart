@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mobile/core/utils/app_colors.dart';
 import 'package:mobile/features/home/domain/entities/camera_device.dart';
+import 'package:mobile/features/home/presentation/widgets/camera_video_player.dart';
 
 class CameraCard extends StatelessWidget {
   const CameraCard({
@@ -20,7 +21,7 @@ class CameraCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () => context.push('/camera/${device.id}'),
+      onTap: () => context.push('/camera/${device.id}', extra: device),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(18),
         child: DecoratedBox(
@@ -44,7 +45,7 @@ class CameraCard extends StatelessWidget {
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
-                    const ColoredBox(color: Colors.black),
+                    CameraLivePreview(rtspUrl: device.rtspUrl),
                     Positioned(
                       top: 0,
                       left: 0,

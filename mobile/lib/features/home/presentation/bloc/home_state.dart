@@ -24,26 +24,30 @@ final class HomeLoaded extends HomeState {
     required this.weather,
     required this.devices,
     required this.selectedRoom,
+    this.openPairingFlow = false,
   });
 
   final WeatherInfo weather;
   final List<CameraDevice> devices;
   final String selectedRoom;
+  final bool openPairingFlow;
 
   HomeLoaded copyWith({
     WeatherInfo? weather,
     List<CameraDevice>? devices,
     String? selectedRoom,
+    bool? openPairingFlow,
   }) {
     return HomeLoaded(
       weather: weather ?? this.weather,
       devices: devices ?? this.devices,
       selectedRoom: selectedRoom ?? this.selectedRoom,
+      openPairingFlow: openPairingFlow ?? this.openPairingFlow,
     );
   }
 
   @override
-  List<Object?> get props => [weather, devices, selectedRoom];
+  List<Object?> get props => [weather, devices, selectedRoom, openPairingFlow];
 }
 
 final class HomeError extends HomeState {

@@ -1,14 +1,21 @@
 // lib/features/home/presentation/bloc/home_bloc.dart
 
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:mobile/core/config/app_config.dart';
 import 'package:mobile/features/home/data/mock_devices.dart';
 import 'package:mobile/features/home/domain/entities/camera_device.dart';
+import 'package:mobile/features/home/domain/usecases/delete_camera_device.dart';
+import 'package:mobile/features/home/domain/usecases/get_camera_devices.dart';
 import 'package:mobile/features/home/domain/usecases/get_weather.dart';
 import 'package:mobile/features/home/presentation/bloc/home_event.dart';
 import 'package:mobile/features/home/presentation/bloc/home_state.dart';
 
 class HomeBloc extends Bloc<HomeEvent, HomeState> {
-  HomeBloc({required this.getWeather}) : super(const HomeInitial()) {
+  HomeBloc({
+    required this.getWeather,
+    required this.getCameraDevices,
+    required this.deleteCameraDevice,
+  }) : super(const HomeInitial()) {
     on<HomeStarted>(_onStarted);
     on<RoomFilterChanged>(_onRoomFilterChanged);
     on<AddDeviceTapped>(_onAddDeviceTapped);
@@ -18,21 +25,28 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
   }
 
   final GetWeather getWeather;
+  final GetCameraDevices getCameraDevices;
+  final DeleteCameraDevice deleteCameraDevice;
   List<CameraDevice> _activeDevices = [];
 
   Future<void> _onStarted(HomeStarted event, Emitter<HomeState> emit) async {
     emit(const HomeLoading());
     final weatherResult = await getWeather();
 
-    weatherResult.fold((failure) => emit(HomeError(failure)), (weather) {
-      _activeDevices = [];
-      emit(
-        HomeLoaded(
-          weather: weather,
-          devices: const [],
-          selectedRoom: 'All Rooms',
-        ),
-      );
+    await weatherResult.fold((failure) async => emit(HomeError(failure)), (
+      weather,
+    ) async {
+      final deviceResult = await getCameraDevices();
+      deviceResult.fold((failure) => emit(HomeError(failure)), (devices) {
+        _activeDevices = List.of(devices);
+        emit(
+          HomeLoaded(
+            weather: weather,
+            devices: List.unmodifiable(_activeDevices),
+            selectedRoom: 'All Rooms',
+          ),
+        );
+      });
     });
   }
 
@@ -46,6 +60,12 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     final currentState = state;
     if (currentState is! HomeLoaded) return;
 
+    if (!AppConfig.useMockData) {
+      emit(currentState.copyWith(openPairingFlow: true));
+      emit(currentState.copyWith(openPairingFlow: false));
+      return;
+    }
+
     final activeIds = _activeDevices.map((device) => device.id).toSet();
     final available = mockCameraDevices.where(
       (device) => !activeIds.contains(device.id),
@@ -56,9 +76,23 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     emit(currentState.copyWith(devices: List.unmodifiable(_activeDevices)));
   }
 
-  void _onDeviceDeleted(HomeDeviceDeleted event, Emitter<HomeState> emit) {
+  Future<void> _onDeviceDeleted(
+    HomeDeviceDeleted event,
+    Emitter<HomeState> emit,
+  ) async {
     final currentState = state;
     if (currentState is! HomeLoaded) return;
+
+    if (!AppConfig.useMockData) {
+      final result = await deleteCameraDevice(event.deviceId);
+      var failed = false;
+      result.fold((failure) {
+        failed = true;
+        emit(HomeError(failure));
+      }, (_) {});
+      if (failed) return;
+    }
+
     _activeDevices = _activeDevices
         .where((device) => device.id != event.deviceId)
         .toList();

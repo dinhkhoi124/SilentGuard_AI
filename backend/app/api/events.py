@@ -39,7 +39,7 @@ async def detect_event(
     }
 
     try:
-        res = supabase.table("events").insert(event_data).execute()
+        res = supabase.table("events").insert(event_data).select().execute()
         if res.data and len(res.data) > 0:
             inserted_event = res.data[0]
         else:

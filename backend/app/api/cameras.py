@@ -45,7 +45,7 @@ async def create_camera(
     }
     
     try:
-        res = supabase.table("cameras").insert(camera_data).execute()
+        res = supabase.table("cameras").insert(camera_data).select().execute()
         if not res.data:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

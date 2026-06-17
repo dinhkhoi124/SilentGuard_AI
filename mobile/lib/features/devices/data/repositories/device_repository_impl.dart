@@ -4,16 +4,11 @@ import 'dart:io';
 
 import 'package:dartz/dartz.dart';
 import 'package:http/http.dart' as http;
-import 'package:mobile/core/config/app_config.dart';
 import 'package:mobile/core/network/api_client.dart';
 import 'package:mobile/features/devices/data/datasources/device_permission_data_source.dart';
 import 'package:mobile/features/devices/data/datasources/device_remote_data_source.dart';
 import 'package:mobile/features/devices/data/datasources/gallery_image_data_source.dart';
-import 'package:mobile/features/devices/data/datasources/onvif_discovery_data_source.dart';
-import 'package:mobile/features/devices/data/datasources/onvif_media_data_source.dart';
 import 'package:mobile/features/devices/data/datasources/qr_code_data_source.dart';
-import 'package:mobile/features/devices/domain/entities/device_credentials.dart';
-import 'package:mobile/features/devices/domain/entities/onvif_discovery_result.dart';
 import 'package:mobile/features/devices/domain/entities/paired_device.dart';
 import 'package:mobile/features/devices/domain/entities/resolved_device.dart';
 import 'package:mobile/features/devices/domain/repositories/device_repository.dart';
@@ -21,32 +16,18 @@ import 'package:mobile/features/devices/domain/repositories/device_repository.da
 class DeviceRepositoryImpl implements DeviceRepository {
   const DeviceRepositoryImpl({
     required DeviceRemoteDataSource remoteDataSource,
-    required OnvifDiscoveryDataSource discoveryDataSource,
-    required OnvifMediaDataSource mediaDataSource,
     required QrCodeDataSource qrCodeDataSource,
     required GalleryImageDataSource galleryImageDataSource,
     required DevicePermissionDataSource permissionDataSource,
   }) : _remoteDataSource = remoteDataSource,
-       _discoveryDataSource = discoveryDataSource,
-       _mediaDataSource = mediaDataSource,
        _qrCodeDataSource = qrCodeDataSource,
        _galleryImageDataSource = galleryImageDataSource,
        _permissionDataSource = permissionDataSource;
 
   final DeviceRemoteDataSource _remoteDataSource;
-  final OnvifDiscoveryDataSource _discoveryDataSource;
-  final OnvifMediaDataSource _mediaDataSource;
   final QrCodeDataSource _qrCodeDataSource;
   final GalleryImageDataSource _galleryImageDataSource;
   final DevicePermissionDataSource _permissionDataSource;
-
-  @override
-  DeviceCredentials? get defaultOnvifCredentials {
-    final username = AppConfig.defaultOnvifUsername.trim();
-    final password = AppConfig.defaultOnvifPassword;
-    if (username.isEmpty && password.isEmpty) return null;
-    return DeviceCredentials(username: username, password: password);
-  }
 
   @override
   Future<Either<String, bool>> requestCameraPermission() {
@@ -76,43 +57,6 @@ class DeviceRepositoryImpl implements DeviceRepository {
   @override
   Future<Either<String, ResolvedDevice>> resolveDeviceQr(String qrRaw) {
     return _guard(() => _remoteDataSource.resolveDeviceQr(qrRaw));
-  }
-
-  @override
-  Future<Either<String, List<OnvifDiscoveryResult>>> discoverOnvifDevices() {
-    return _guard(_discoveryDataSource.discover);
-  }
-
-  @override
-  Future<Either<String, OnvifDiscoveryResult>> matchDiscoveredDevice({
-    required List<OnvifDiscoveryResult> devices,
-    required String serialNumber,
-  }) async {
-    final normalized = serialNumber.trim();
-    if (normalized.isEmpty) {
-      return const Left('Máy chủ chưa xác nhận số serial của thiết bị.');
-    }
-
-    for (final device in devices) {
-      if (device.matchesSerial(normalized)) return Right(device);
-    }
-
-    return Left(
-      'Không tìm thấy camera có serial $normalized trên mạng nội bộ.',
-    );
-  }
-
-  @override
-  Future<Either<String, String>> getRtspStreamUri({
-    required OnvifDiscoveryResult device,
-    DeviceCredentials? credentials,
-  }) {
-    return _guard(
-      () => _mediaDataSource.getStreamUri(
-        device,
-        credentials: credentials ?? defaultOnvifCredentials,
-      ),
-    );
   }
 
   @override
@@ -147,9 +91,6 @@ class DeviceRepositoryImpl implements DeviceRepository {
       _logFailure(error, stackTrace);
       return Left(_messageForApiException(error));
     } on QrCodeException catch (error, stackTrace) {
-      _logFailure(error, stackTrace);
-      return Left(error.message);
-    } on OnvifMediaException catch (error, stackTrace) {
       _logFailure(error, stackTrace);
       return Left(error.message);
     } on TimeoutException catch (error, stackTrace) {

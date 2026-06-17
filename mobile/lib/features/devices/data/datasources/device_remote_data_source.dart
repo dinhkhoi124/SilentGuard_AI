@@ -51,6 +51,15 @@ class DeviceRemoteDataSourceImpl implements DeviceRemoteDataSource {
       // Fallback below supports simple QR payloads containing only a serial.
     }
 
+    final serialNumber = _extractSerialNumberFromQrPayload(trimmedQr);
+    if (serialNumber != null) {
+      return ResolvedDevice(
+        deviceId: serialNumber,
+        displayName: 'Camera $serialNumber',
+        serialNumber: serialNumber,
+      );
+    }
+
     return ResolvedDevice(
       deviceId: trimmedQr,
       displayName: 'Camera $trimmedQr',
@@ -115,5 +124,15 @@ class DeviceRemoteDataSourceImpl implements DeviceRemoteDataSource {
       if (value is Map) return Map<String, dynamic>.from(value);
     }
     return response;
+  }
+
+  String? _extractSerialNumberFromQrPayload(String payload) {
+    final match = RegExp(
+      r'''(?:^|[{\s,])SN\s*[:=]\s*["']?([^,"'}\s]+)''',
+      caseSensitive: false,
+    ).firstMatch(payload);
+    final serialNumber = match?.group(1)?.trim();
+    if (serialNumber == null || serialNumber.isEmpty) return null;
+    return serialNumber;
   }
 }

@@ -47,29 +47,24 @@ class DevicePairingPage extends StatelessWidget {
                 message: 'Smartify đang gửi mã QR đến máy chủ AI.',
                 activeStep: 1,
               ),
-              DevicePairingDiscovering(:final resolvedDevice) => _ProgressView(
-                title: 'Đang tìm camera trong mạng LAN',
+              DevicePairingCheckingImou(:final resolvedDevice) => _ProgressView(
+                title: 'Đang kiểm tra Imou Cloud',
                 message:
-                    'Thiết bị ${resolvedDevice.displayName} đã được xác minh.',
+                    'Thiết bị ${resolvedDevice.displayName} đã được xác minh bởi Smartify.',
                 activeStep: 2,
               ),
-              DevicePairingMatching(:final discoveredDevices) => _ProgressView(
-                title: 'Đang khớp serial',
-                message:
-                    'Đã tìm thấy ${discoveredDevices.length} camera ONVIF.',
+              DevicePairingObtainingStream(:final imouStatus) => _ProgressView(
+                title: 'Đang lấy luồng Imou',
+                message: imouStatus.isOnline
+                    ? 'Camera ${imouStatus.deviceName ?? imouStatus.serialNumber} đang online.'
+                    : 'Camera đang offline — vẫn tiếp tục thêm thiết bị.',
                 activeStep: 3,
               ),
-              DevicePairingObtainingStream(:final discoveryResult) =>
-                _ProgressView(
-                  title: 'Đang lấy luồng RTSP',
-                  message: 'Camera nội bộ: ${discoveryResult.ipAddress}',
-                  activeStep: 4,
-                ),
               DevicePairingPersisting(:final resolvedDevice) => _ProgressView(
                 title: 'Đang lưu thiết bị',
                 message:
                     'Đang lưu ${resolvedDevice.displayName} vào máy chủ AI.',
-                activeStep: 5,
+                activeStep: 4,
               ),
               DevicePairingPermissionDenied(:final message) => _MessageView(
                 icon: Icons.gpp_bad_outlined,
@@ -88,15 +83,16 @@ class DevicePairingPage extends StatelessWidget {
                   const DevicePairingGalleryQrRequested(),
                 ),
               ),
-              DevicePairingCredentialsRequired() => const _CredentialsView(),
-              DevicePairingSuccess(:final device) => _MessageView(
-                icon: Icons.check_circle_outline,
-                title: 'Đã thêm camera',
-                message:
-                    '${device.name} đã sẵn sàng phát luồng trực tiếp trong Smartify.',
-                primaryLabel: 'Hoàn tất',
-                onPrimary: () => context.pop(true),
-              ),
+              DevicePairingSuccess(:final device, :final warningMessage) =>
+                _MessageView(
+                  icon: Icons.check_circle_outline,
+                  title: 'Đã thêm camera',
+                  message:
+                      warningMessage ??
+                      '${device.name} đã sẵn sàng phát luồng trực tiếp trong Smartify.',
+                  primaryLabel: 'Hoàn tất',
+                  onPrimary: () => context.pop(true),
+                ),
               DevicePairingError(:final message) => _MessageView(
                 icon: Icons.warning_amber_rounded,
                 title: 'Không thể thêm thiết bị',
@@ -214,109 +210,6 @@ class _ScannerViewState extends State<_ScannerView> {
   }
 }
 
-class _CredentialsView extends StatefulWidget {
-  const _CredentialsView();
-
-  @override
-  State<_CredentialsView> createState() => _CredentialsViewState();
-}
-
-class _CredentialsViewState extends State<_CredentialsView> {
-  final _usernameController = TextEditingController();
-  final _passwordController = TextEditingController();
-  bool _obscurePassword = true;
-
-  @override
-  void dispose() {
-    _usernameController.dispose();
-    _passwordController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final state = context.watch<DevicePairingBloc>().state;
-    final message = state is DevicePairingCredentialsRequired
-        ? state.message
-        : 'Camera yêu cầu thông tin đăng nhập ONVIF.';
-
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
-      children: [
-        const _StatusIcon(
-          icon: Icons.vpn_key_outlined,
-          color: AppColors.primary,
-        ),
-        const SizedBox(height: 22),
-        const Text(
-          'Nhập tài khoản ONVIF',
-          style: TextStyle(
-            color: AppColors.darkText,
-            fontSize: 22,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          message,
-          style: const TextStyle(
-            color: AppColors.mutedText,
-            fontSize: 14,
-            height: 1.45,
-          ),
-        ),
-        const SizedBox(height: 24),
-        const _FieldLabel('Tài khoản'),
-        const SizedBox(height: 8),
-        TextField(
-          controller: _usernameController,
-          textInputAction: TextInputAction.next,
-          decoration: const InputDecoration(
-            hintText: 'Nhập tài khoản camera',
-            prefixIcon: Icon(Icons.person_outline),
-          ),
-        ),
-        const SizedBox(height: 18),
-        const _FieldLabel('Mật khẩu'),
-        const SizedBox(height: 8),
-        TextField(
-          controller: _passwordController,
-          obscureText: _obscurePassword,
-          textInputAction: TextInputAction.done,
-          onSubmitted: (_) => _submit(context),
-          decoration: InputDecoration(
-            hintText: 'Nhập mật khẩu camera',
-            prefixIcon: const Icon(Icons.lock_outline),
-            suffixIcon: IconButton(
-              onPressed: () =>
-                  setState(() => _obscurePassword = !_obscurePassword),
-              icon: Icon(
-                _obscurePassword ? Icons.visibility_off : Icons.visibility,
-              ),
-              tooltip: _obscurePassword ? 'Hiện mật khẩu' : 'Ẩn mật khẩu',
-            ),
-          ),
-        ),
-        const SizedBox(height: 24),
-        FilledButton.icon(
-          onPressed: () => _submit(context),
-          icon: const Icon(Icons.arrow_forward_rounded, size: 18),
-          label: const Text('Tiếp tục'),
-        ),
-      ],
-    );
-  }
-
-  void _submit(BuildContext context) {
-    context.read<DevicePairingBloc>().add(
-      DevicePairingCredentialsSubmitted(
-        username: _usernameController.text,
-        password: _passwordController.text,
-      ),
-    );
-  }
-}
-
 class _ProgressView extends StatelessWidget {
   const _ProgressView({
     required this.title,
@@ -331,9 +224,8 @@ class _ProgressView extends StatelessWidget {
   static const _steps = [
     'Quyền truy cập',
     'Xác minh QR',
-    'Tìm ONVIF',
-    'Khớp serial',
-    'Lấy RTSP',
+    'Kiểm tra Imou',
+    'Lấy luồng',
     'Lưu thiết bị',
   ];
 
@@ -550,24 +442,6 @@ class _ScanFrame extends StatelessWidget {
             border: Border.all(color: Colors.white, width: 2),
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _FieldLabel extends StatelessWidget {
-  const _FieldLabel(this.label);
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      label,
-      style: const TextStyle(
-        color: AppColors.darkText,
-        fontSize: 14,
-        fontWeight: FontWeight.w700,
       ),
     );
   }

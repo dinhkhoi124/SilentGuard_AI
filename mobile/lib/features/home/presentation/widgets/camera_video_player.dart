@@ -4,7 +4,8 @@ import 'dart:async';
 import 'dart:developer' as developer;
 
 import 'package:flutter/material.dart';
-import 'package:flutter_vlc_player/flutter_vlc_player.dart';
+import 'package:media_kit/media_kit.dart';
+import 'package:media_kit_video/media_kit_video.dart' as media_kit_video;
 import 'package:mobile/core/utils/app_colors.dart';
 import 'package:video_player/video_player.dart';
 
@@ -140,7 +141,8 @@ class _CameraLivePreviewState extends State<CameraLivePreview> {
   static const _videoAssetPath = 'assets/videos/videoplayback.mp4';
 
   VideoPlayerController? _assetController;
-  VlcPlayerController? _vlcController;
+  Player? _player;
+  media_kit_video.VideoController? _videoController;
   bool _assetReady = false;
 
   @override
@@ -166,18 +168,59 @@ class _CameraLivePreviewState extends State<CameraLivePreview> {
   }
 
   void _initController() {
-    final rtspUrl = widget.rtspUrl?.trim();
+    final streamUrl = widget.rtspUrl?.trim();
     if (widget.useMockAsset) {
       _initMockAsset();
       return;
     }
 
-    if (rtspUrl == null || rtspUrl.isEmpty) return;
-    _vlcController = VlcPlayerController.network(
-      rtspUrl,
-      autoInitialize: true,
-      autoPlay: true,
-      hwAcc: HwAcc.auto,
+    if (streamUrl == null || streamUrl.isEmpty) return;
+    final player = Player();
+    _player = player;
+    _videoController = media_kit_video.VideoController(player);
+    _listenToPlayerLogs(player);
+    unawaited(
+      _openStreamWhenReady(player, streamUrl).catchError((
+        Object error,
+        StackTrace stackTrace,
+      ) {
+        developer.log(
+          'Không thể mở luồng camera bằng media_kit.',
+          name: 'CameraLivePreview',
+          error: error,
+          stackTrace: stackTrace,
+        );
+      }),
+    );
+  }
+
+  Future<void> _openStreamWhenReady(Player player, String streamUrl) async {
+    await WidgetsBinding.instance.endOfFrame;
+    if (!mounted || !identical(_player, player)) return;
+    await player.stop();
+    await player.open(Media(streamUrl), play: true);
+  }
+
+  void _listenToPlayerLogs(Player player) {
+    unawaited(
+      player.stream.error.forEach((error) {
+        developer.log('media_kit error: $error', name: 'CameraLivePreview');
+      }),
+    );
+    unawaited(
+      player.stream.log.forEach((record) {
+        developer.log(record.toString(), name: 'CameraLivePreview.media_kit');
+      }),
+    );
+    unawaited(
+      player.stream.width.forEach((width) {
+        developer.log('video width: $width', name: 'CameraLivePreview');
+      }),
+    );
+    unawaited(
+      player.stream.height.forEach((height) {
+        developer.log('video height: $height', name: 'CameraLivePreview');
+      }),
     );
   }
 
@@ -207,18 +250,19 @@ class _CameraLivePreviewState extends State<CameraLivePreview> {
 
   void _disposeControllers() {
     final assetController = _assetController;
-    final vlcController = _vlcController;
+    final player = _player;
     _assetController = null;
-    _vlcController = null;
+    _player = null;
+    _videoController = null;
     _assetReady = false;
 
     if (assetController != null) unawaited(assetController.dispose());
-    if (vlcController != null) unawaited(vlcController.dispose());
+    if (player != null) unawaited(player.dispose());
   }
 
   @override
   Widget build(BuildContext context) {
-    final vlcController = _vlcController;
+    final videoController = _videoController;
     final assetController = _assetController;
 
     if (widget.useMockAsset && _assetReady && assetController != null) {
@@ -232,11 +276,10 @@ class _CameraLivePreviewState extends State<CameraLivePreview> {
       );
     }
 
-    if (!widget.useMockAsset && vlcController != null) {
-      return VlcPlayer(
-        controller: vlcController,
-        aspectRatio: 16 / 9,
-        placeholder: const ColoredBox(color: Colors.black),
+    if (!widget.useMockAsset && videoController != null) {
+      return media_kit_video.Video(
+        controller: videoController,
+        fit: BoxFit.cover,
       );
     }
 

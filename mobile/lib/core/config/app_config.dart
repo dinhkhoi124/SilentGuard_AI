@@ -16,6 +16,21 @@ abstract final class AppConfig {
     'BACKEND_AUTH_TOKEN',
   );
 
+  static const String imouApiBaseUrl = String.fromEnvironment(
+    'IMOU_API_BASE_URL',
+    defaultValue: 'https://openapi-sg.easy4ip.com/openapi',
+  );
+
+  static const String imouAppId = String.fromEnvironment(
+    'IMOU_APP_ID',
+    defaultValue: 'lc29325014155044ad',
+  );
+
+  static const String imouAppSecret = String.fromEnvironment(
+    'IMOU_APP_SECRET',
+    defaultValue: '201c43cf082041a48e5bd69be23cf4',
+  );
+
   static const String defaultOnvifUsername = String.fromEnvironment(
     'ONVIF_USERNAME',
   );

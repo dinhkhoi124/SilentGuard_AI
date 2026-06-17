@@ -17,11 +17,12 @@ import 'package:mobile/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:mobile/features/devices/data/datasources/device_permission_data_source.dart';
 import 'package:mobile/features/devices/data/datasources/device_remote_data_source.dart';
 import 'package:mobile/features/devices/data/datasources/gallery_image_data_source.dart';
-import 'package:mobile/features/devices/data/datasources/onvif_discovery_data_source.dart';
-import 'package:mobile/features/devices/data/datasources/onvif_media_data_source.dart';
+import 'package:mobile/features/devices/data/datasources/imou_cloud_datasource.dart';
 import 'package:mobile/features/devices/data/datasources/qr_code_data_source.dart';
 import 'package:mobile/features/devices/data/repositories/device_repository_impl.dart';
+import 'package:mobile/features/devices/data/repositories/imou_stream_repository_impl.dart';
 import 'package:mobile/features/devices/domain/repositories/device_repository.dart';
+import 'package:mobile/features/devices/domain/repositories/imou_stream_repository.dart';
 import 'package:mobile/features/devices/presentation/bloc/device_pairing_bloc.dart';
 import 'package:mobile/features/home/data/repositories/home_repository_impl.dart';
 import 'package:mobile/features/home/domain/repositories/home_repository.dart';
@@ -80,7 +81,10 @@ Future<void> init() async {
         deleteCameraDevice: sl(),
       ),
     )
-    ..registerFactory(() => DevicePairingBloc(deviceRepository: sl()))
+    ..registerFactory(
+      () =>
+          DevicePairingBloc(deviceRepository: sl(), imouStreamRepository: sl()),
+    )
     ..registerLazySingleton<DevicePermissionDataSource>(
       DevicePermissionDataSourceImpl.new,
     )
@@ -88,11 +92,11 @@ Future<void> init() async {
       () => GalleryImageDataSourceImpl(),
     )
     ..registerLazySingleton<QrCodeDataSource>(MobileScannerQrCodeDataSource.new)
-    ..registerLazySingleton<OnvifDiscoveryDataSource>(
-      WsDiscoveryOnvifDataSource.new,
+    ..registerLazySingleton<ImouCloudDataSource>(
+      () => ImouCloudDataSourceImpl(),
     )
-    ..registerLazySingleton<OnvifMediaDataSource>(
-      () => OnvifMediaDataSourceImpl(),
+    ..registerLazySingleton<ImouStreamRepository>(
+      () => ImouStreamRepositoryImpl(sl()),
     )
     ..registerLazySingleton<DeviceRemoteDataSource>(
       () =>
@@ -101,8 +105,6 @@ Future<void> init() async {
     ..registerLazySingleton<DeviceRepository>(
       () => DeviceRepositoryImpl(
         remoteDataSource: sl(),
-        discoveryDataSource: sl(),
-        mediaDataSource: sl(),
         qrCodeDataSource: sl(),
         galleryImageDataSource: sl(),
         permissionDataSource: sl(),

@@ -1,5 +1,5 @@
 import 'package:equatable/equatable.dart';
-import 'package:mobile/features/devices/domain/entities/onvif_discovery_result.dart';
+import 'package:mobile/features/devices/domain/entities/imou_device_status.dart';
 import 'package:mobile/features/devices/domain/entities/paired_device.dart';
 import 'package:mobile/features/devices/domain/entities/resolved_device.dart';
 
@@ -31,8 +31,8 @@ final class DevicePairingResolving extends DevicePairingState {
   const DevicePairingResolving();
 }
 
-final class DevicePairingDiscovering extends DevicePairingState {
-  const DevicePairingDiscovering({required this.resolvedDevice});
+final class DevicePairingCheckingImou extends DevicePairingState {
+  const DevicePairingCheckingImou({required this.resolvedDevice});
 
   final ResolvedDevice resolvedDevice;
 
@@ -40,69 +40,40 @@ final class DevicePairingDiscovering extends DevicePairingState {
   List<Object?> get props => [resolvedDevice];
 }
 
-final class DevicePairingMatching extends DevicePairingState {
-  const DevicePairingMatching({
-    required this.resolvedDevice,
-    required this.discoveredDevices,
-  });
-
-  final ResolvedDevice resolvedDevice;
-  final List<OnvifDiscoveryResult> discoveredDevices;
-
-  @override
-  List<Object?> get props => [resolvedDevice, discoveredDevices];
-}
-
 final class DevicePairingObtainingStream extends DevicePairingState {
   const DevicePairingObtainingStream({
     required this.resolvedDevice,
-    required this.discoveryResult,
+    required this.imouStatus,
   });
 
   final ResolvedDevice resolvedDevice;
-  final OnvifDiscoveryResult discoveryResult;
+  final ImouDeviceStatus imouStatus;
 
   @override
-  List<Object?> get props => [resolvedDevice, discoveryResult];
-}
-
-final class DevicePairingCredentialsRequired extends DevicePairingState {
-  const DevicePairingCredentialsRequired({
-    required this.resolvedDevice,
-    required this.discoveryResult,
-    required this.message,
-  });
-
-  final ResolvedDevice resolvedDevice;
-  final OnvifDiscoveryResult discoveryResult;
-  final String message;
-
-  @override
-  List<Object?> get props => [resolvedDevice, discoveryResult, message];
+  List<Object?> get props => [resolvedDevice, imouStatus];
 }
 
 final class DevicePairingPersisting extends DevicePairingState {
   const DevicePairingPersisting({
     required this.resolvedDevice,
-    required this.discoveryResult,
-    required this.rtspUrl,
+    required this.streamUrl,
   });
 
   final ResolvedDevice resolvedDevice;
-  final OnvifDiscoveryResult discoveryResult;
-  final String rtspUrl;
+  final String streamUrl;
 
   @override
-  List<Object?> get props => [resolvedDevice, discoveryResult, rtspUrl];
+  List<Object?> get props => [resolvedDevice, streamUrl];
 }
 
 final class DevicePairingSuccess extends DevicePairingState {
-  const DevicePairingSuccess(this.device);
+  const DevicePairingSuccess(this.device, {this.warningMessage});
 
   final PairedDevice device;
+  final String? warningMessage;
 
   @override
-  List<Object?> get props => [device];
+  List<Object?> get props => [device, warningMessage];
 }
 
 final class DevicePairingError extends DevicePairingState {

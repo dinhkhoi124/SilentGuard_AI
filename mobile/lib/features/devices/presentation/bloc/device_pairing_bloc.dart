@@ -1,25 +1,29 @@
 import 'package:dartz/dartz.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:mobile/features/devices/domain/entities/device_credentials.dart';
-import 'package:mobile/features/devices/domain/entities/onvif_discovery_result.dart';
 import 'package:mobile/features/devices/domain/entities/resolved_device.dart';
+import 'package:mobile/features/devices/domain/failures/imou_stream_failure.dart';
 import 'package:mobile/features/devices/domain/repositories/device_repository.dart';
+import 'package:mobile/features/devices/domain/repositories/imou_stream_repository.dart';
 import 'package:mobile/features/devices/presentation/bloc/device_pairing_event.dart';
 import 'package:mobile/features/devices/presentation/bloc/device_pairing_state.dart';
 
 class DevicePairingBloc extends Bloc<DevicePairingEvent, DevicePairingState> {
-  DevicePairingBloc({required DeviceRepository deviceRepository})
-    : _deviceRepository = deviceRepository,
-      super(const DevicePairingInitial()) {
+  DevicePairingBloc({
+    required DeviceRepository deviceRepository,
+    required ImouStreamRepository imouStreamRepository,
+  }) : _deviceRepository = deviceRepository,
+       _imouStreamRepository = imouStreamRepository,
+       super(const DevicePairingInitial()) {
     on<DevicePairingStarted>(_onStarted);
     on<DevicePairingRetryRequested>(_onRetryRequested);
     on<DevicePairingOpenSettingsRequested>(_onOpenSettingsRequested);
     on<DevicePairingGalleryQrRequested>(_onGalleryQrRequested);
     on<DevicePairingLiveQrDetected>(_onLiveQrDetected);
-    on<DevicePairingCredentialsSubmitted>(_onCredentialsSubmitted);
   }
 
   final DeviceRepository _deviceRepository;
+  final ImouStreamRepository _imouStreamRepository;
 
   Future<void> _onStarted(
     DevicePairingStarted event,
@@ -104,139 +108,66 @@ class DevicePairingBloc extends Bloc<DevicePairingEvent, DevicePairingState> {
     await _pairDevice(rawQr: event.rawQr, emit: emit);
   }
 
-  Future<void> _onCredentialsSubmitted(
-    DevicePairingCredentialsSubmitted event,
-    Emitter<DevicePairingState> emit,
-  ) async {
-    final currentState = state;
-    if (currentState is! DevicePairingCredentialsRequired) return;
-
-    final credentials = DeviceCredentials(
-      username: event.username.trim(),
-      password: event.password,
-    );
-    if (credentials.username.isEmpty) {
-      emit(
-        DevicePairingCredentialsRequired(
-          resolvedDevice: currentState.resolvedDevice,
-          discoveryResult: currentState.discoveryResult,
-          message: 'Vui lòng nhập tài khoản ONVIF của camera.',
-        ),
-      );
-      return;
-    }
-
-    await _obtainStreamAndPersist(
-      resolvedDevice: currentState.resolvedDevice,
-      discoveryResult: currentState.discoveryResult,
-      credentials: credentials,
-      emit: emit,
-    );
-  }
-
   Future<void> _pairDevice({
     required String rawQr,
     required Emitter<DevicePairingState> emit,
   }) async {
-    emit(const DevicePairingResolving());
-    final resolvedResult = await _deviceRepository.resolveDeviceQr(rawQr);
-    final resolvedDevice = _valueOrError(
-      resolvedResult,
-      (failure) => emit(DevicePairingError(failure)),
-    );
-    if (resolvedDevice == null) return;
-
-    emit(DevicePairingDiscovering(resolvedDevice: resolvedDevice));
-    final discoveryResult = await _deviceRepository.discoverOnvifDevices();
-    final discoveredDevices = _valueOrError(
-      discoveryResult,
-      (failure) => emit(DevicePairingError(failure)),
-    );
-    if (discoveredDevices == null) return;
-    if (discoveredDevices.isEmpty) {
-      emit(
-        const DevicePairingError(
-          'Không tìm thấy camera ONVIF nào trên mạng nội bộ.',
-        ),
+    try {
+      emit(const DevicePairingResolving());
+      final resolvedResult = await _deviceRepository.resolveDeviceQr(rawQr);
+      final resolvedDevice = _valueOrError(
+        resolvedResult,
+        (failure) => emit(DevicePairingError(failure)),
       );
-      return;
+      if (resolvedDevice == null) return;
+
+      await _verifyImouAndPersist(resolvedDevice: resolvedDevice, emit: emit);
+    } catch (error) {
+      debugPrint('[PairingBloc] Pairing failed: $error');
+      rethrow;
     }
-
-    emit(
-      DevicePairingMatching(
-        resolvedDevice: resolvedDevice,
-        discoveredDevices: discoveredDevices,
-      ),
-    );
-    final matchResult = await _deviceRepository.matchDiscoveredDevice(
-      devices: discoveredDevices,
-      serialNumber: resolvedDevice.serialNumber,
-    );
-    final matchedDevice = _valueOrError(
-      matchResult,
-      (failure) => emit(DevicePairingError(failure)),
-    );
-    if (matchedDevice == null) return;
-
-    await _obtainStreamAndPersist(
-      resolvedDevice: resolvedDevice,
-      discoveryResult: matchedDevice,
-      emit: emit,
-    );
   }
 
-  Future<void> _obtainStreamAndPersist({
+  Future<void> _verifyImouAndPersist({
     required ResolvedDevice resolvedDevice,
-    required OnvifDiscoveryResult discoveryResult,
-    DeviceCredentials? credentials,
     required Emitter<DevicePairingState> emit,
   }) async {
+    emit(DevicePairingCheckingImou(resolvedDevice: resolvedDevice));
+
+    final statusResult = await _imouStreamRepository.checkDeviceStatus(
+      resolvedDevice.serialNumber,
+    );
+    final imouStatus = _valueOrImouError(
+      statusResult,
+      (failure) => emit(DevicePairingError(failure.message)),
+    );
+    if (imouStatus == null) return;
+
     emit(
       DevicePairingObtainingStream(
         resolvedDevice: resolvedDevice,
-        discoveryResult: discoveryResult,
+        imouStatus: imouStatus,
       ),
     );
 
-    final rtspResult = await _deviceRepository.getRtspStreamUri(
-      device: discoveryResult,
-      credentials: credentials,
+    final streamResult = await _imouStreamRepository.getStreamUrl(
+      resolvedDevice.serialNumber,
     );
-    String? rtspUrl;
-    var failedMessage = '';
-    rtspResult.fold(
-      (failure) => failedMessage = failure,
-      (url) => rtspUrl = url,
-    );
-
-    if (rtspUrl == null) {
-      if (credentials == null) {
-        emit(
-          DevicePairingCredentialsRequired(
-            resolvedDevice: resolvedDevice,
-            discoveryResult: discoveryResult,
-            message: failedMessage.isEmpty
-                ? 'Camera yêu cầu tài khoản ONVIF.'
-                : failedMessage,
-          ),
-        );
-      } else {
-        emit(DevicePairingError(failedMessage));
-      }
-      return;
-    }
+    final streamUrl = _valueOrImouError(streamResult, (failure) {
+      if (imouStatus.isOnline) emit(DevicePairingError(failure.message));
+    });
+    if (streamUrl == null && imouStatus.isOnline) return;
 
     emit(
       DevicePairingPersisting(
         resolvedDevice: resolvedDevice,
-        discoveryResult: discoveryResult,
-        rtspUrl: rtspUrl!,
+        streamUrl: streamUrl ?? '',
       ),
     );
     final saveResult = await _deviceRepository.savePairedDevice(
       resolvedDevice: resolvedDevice,
-      ipAddress: discoveryResult.ipAddress,
-      rtspUrl: rtspUrl!,
+      ipAddress: 'imou-cloud',
+      rtspUrl: streamUrl ?? '',
     );
     final pairedDevice = _valueOrError(
       saveResult,
@@ -244,7 +175,14 @@ class DevicePairingBloc extends Bloc<DevicePairingEvent, DevicePairingState> {
     );
     if (pairedDevice == null) return;
 
-    emit(DevicePairingSuccess(pairedDevice));
+    emit(
+      DevicePairingSuccess(
+        pairedDevice,
+        warningMessage: imouStatus.isOnline
+            ? null
+            : 'Camera đang offline — đã thêm thiết bị nhưng chưa xem được video',
+      ),
+    );
   }
 
   T? _valueOrError<T>(
@@ -252,7 +190,23 @@ class DevicePairingBloc extends Bloc<DevicePairingEvent, DevicePairingState> {
     void Function(String failure) onFailure,
   ) {
     T? value;
-    result.fold(onFailure, (right) => value = right);
+    result.fold((failure) {
+      debugPrint('[PairingBloc] Pairing failed: $failure');
+      onFailure(failure);
+    }, (right) => value = right);
+    return value;
+  }
+
+  T? _valueOrImouError<T>(
+    Either<ImouStreamFailure, T> result,
+    void Function(ImouStreamFailure failure) onFailure,
+  ) {
+    T? value;
+    result.fold((failure) {
+      debugPrint('[PairingBloc] Pairing failed: $failure');
+      debugPrint('[PairingBloc] Pairing failure message: ${failure.message}');
+      onFailure(failure);
+    }, (right) => value = right);
     return value;
   }
 }

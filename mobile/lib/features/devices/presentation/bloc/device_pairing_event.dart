@@ -31,16 +31,3 @@ final class DevicePairingLiveQrDetected extends DevicePairingEvent {
   @override
   List<Object?> get props => [rawQr];
 }
-
-final class DevicePairingCredentialsSubmitted extends DevicePairingEvent {
-  const DevicePairingCredentialsSubmitted({
-    required this.username,
-    required this.password,
-  });
-
-  final String username;
-  final String password;
-
-  @override
-  List<Object?> get props => [username, password];
-}

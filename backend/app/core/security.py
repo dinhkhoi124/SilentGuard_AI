@@ -115,6 +115,12 @@ async def get_or_create_user(firebase_uid: str, email: str = None, name: str = N
         raise he
     except Exception as e:
         print(f"Error in get_or_create_user: {e}")
+        from app.core.config import settings
+        if settings.APP_ENV == "production":
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail={"error": {"code": "DATABASE_ERROR", "message": f"Failed to get or create user: {str(e)}"}}
+            )
         # Development fallback
         fallback_user = {"id": "mock-uuid-user", "firebase_uid": firebase_uid, "email": email, "full_name": name}
         return fallback_user
@@ -132,7 +138,8 @@ async def get_current_user(
     token = authorization.split(" ", 1)[1]
     try:
         decoded = fb_auth.verify_id_token(token)
-    except Exception:
+    except Exception as e:
+        print(f"Error verifying Firebase token: {e}")
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid Firebase token")
 
     firebase_uid = decoded["uid"]

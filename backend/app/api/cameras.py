@@ -60,6 +60,7 @@ async def create_camera(
             "warning": "Lưu lại key này ngay — sẽ không hiển thị lại được"
         }
     except Exception as e:
+        print(f"Error in create_camera: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={"error": {"code": "DATABASE_ERROR", "message": f"Failed to create camera: {str(e)}"}}
@@ -93,6 +94,7 @@ async def list_cameras(
             })
         return cameras_list
     except Exception as e:
+        print(f"Error in list_cameras: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={"error": {"code": "DATABASE_ERROR", "message": f"Failed to retrieve cameras: {str(e)}"}}
@@ -137,6 +139,7 @@ async def rotate_camera_key(
     except HTTPException as he:
         raise he
     except Exception as e:
+        print(f"Error in rotate_camera_key: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={"error": {"code": "DATABASE_ERROR", "message": f"Failed to rotate key: {str(e)}"}}
@@ -173,6 +176,7 @@ async def delete_camera(
     except HTTPException as he:
         raise he
     except Exception as e:
+        print(f"Error in delete_camera: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={"error": {"code": "DATABASE_ERROR", "message": f"Failed to delete camera: {str(e)}"}}
@@ -220,6 +224,7 @@ async def update_camera_details(
     except HTTPException as he:
         raise he
     except Exception as e:
+        print(f"Error in update_camera_details: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={"error": {"code": "DATABASE_ERROR", "message": f"Failed to update camera: {str(e)}"}}
@@ -254,13 +259,13 @@ async def get_upload_url(
         res = supabase.storage.from_("clips").create_signed_upload_url(storage_path)
         upload_url = res.get("signed_url")
     except Exception as e:
+        print(f"Failed to generate signed upload URL from Supabase Storage: {e}")
         from app.core.config import settings
         if settings.APP_ENV == "production":
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail={"error": {"code": "STORAGE_ERROR", "message": f"Failed to generate presigned upload URL: {str(e)}"}}
             )
-        print(f"Failed to generate signed upload URL from Supabase Storage: {e}")
         # Dev fallback
         upload_url = f"https://sceygoxizfbbhqwatqhx.supabase.co/storage/v1/object/upload/sign/clips/{storage_path}?token=mock"
 
@@ -302,6 +307,7 @@ async def camera_heartbeat(
             "last_heartbeat": timestamp
         }
     except Exception as e:
+        print(f"Error in camera_heartbeat database update: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={"error": {"code": "DATABASE_ERROR", "message": f"Failed to update camera heartbeat: {str(e)}"}}

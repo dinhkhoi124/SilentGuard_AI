@@ -41,6 +41,7 @@ async def create_invite(
             "expires_at": expires_at
         }
     except Exception as e:
+        print(f"Error in create_invite: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={"error": {"code": "DATABASE_ERROR", "message": f"Failed to create invite: {str(e)}"}}
@@ -85,6 +86,7 @@ async def get_my_household(
     except HTTPException as he:
         raise he
     except Exception as e:
+        print(f"Error in get_my_household: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={"error": {"code": "DATABASE_ERROR", "message": f"Failed to retrieve household data: {str(e)}"}}

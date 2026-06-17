@@ -336,37 +336,199 @@ Response:
 
 ### 4.5 `GET /api/events/{event_id}` — Alert detail
 
-Trả về đầy đủ 1 event + `clip_url` (signed URL từ Supabase Storage, hết hạn sau X phút).
+Trả về đầy đủ 1 event + `clip_url` (signed URL từ Supabase Storage, hết hạn sau 5 phút).
 
-### 4.6 `POST /api/users/device-token`
+Response 200 OK:
+```json
+{
+  "id": "event-uuid",
+  "event_id": "EVT-20260613-001",
+  "household_id": "household-uuid",
+  "camera_id": "camera-uuid",
+  "event_type": "fall",
+  "severity": "HIGH",
+  "confidence": 0.89,
+  "timestamp": "2026-06-13T02:15:10Z",
+  "duration_sec": 145,
+  "room": "bedroom",
+  "clip_path": "clips/household-uuid/EVT-20260613-001_blur.mp4",
+  "clip_url": "https://xxxx.supabase.co/storage/v1/object/sign/clips/...?token=...",
+  "llm_message": "Ba bạn vừa ngã trong phòng ngủ lúc 2 giờ sáng...",
+  "status": "pending",
+  "escalate_after": "2026-06-13T02:20:10Z",
+  "model_ver": "v1.0.0",
+  "created_at": "2026-06-13T02:15:12Z"
+}
+```
 
-Request: `{ "fcm_token": "..." }` → lưu vào `users.fcm_token` của `current_user`.
+### 4.6 User authentication and device tokens
+
+#### 4.6.1 `POST /api/users/login`
+Verify Firebase Token của người dùng, thực hiện JIT Provisioning (khởi tạo tài khoản tự động trong DB nếu chưa có) và trả về thông tin user.
+
+- **Headers**:
+  - `Authorization: Bearer <idToken>` (Bắt buộc)
+  - `X-Invite-Code: <mã_mời>` (Tùy chọn, khi đăng ký lần đầu và được mời)
+- **Request Body**: Không có body.
+- **Response 200 OK**:
+  ```json
+  {
+    "status": "success",
+    "user": {
+      "id": "uuid-nội-bộ-của-user",
+      "firebase_uid": "firebase-uid-chuẩn",
+      "full_name": "Tên Người Dùng",
+      "email": "user@example.com",
+      "phone": "0123456789",
+      "fcm_token": "fcm-token-string",
+      "role": "family",
+      "created_at": "2026-06-17T03:12:35Z"
+    }
+  }
+  ```
+
+#### 4.6.2 `POST /api/users/logout`
+Đăng xuất tài khoản, tự động hủy liên kết (clear) token FCM ở DB để tránh nhận thông báo đẩy sau khi đăng xuất.
+
+- **Headers**:
+  - `Authorization: Bearer <idToken>` (Bắt buộc)
+- **Response 200 OK**:
+  ```json
+  {
+    "status": "ok",
+    "message": "Logged out successfully. FCM token cleared."
+  }
+  ```
+
+#### 4.6.3 `POST /api/users/device-token`
+Đăng ký/cập nhật FCM token nhận Push Notification.
+
+- **Headers**:
+  - `Authorization: Bearer <idToken>` (Bắt buộc)
+- **Request Body**:
+  ```json
+  {
+    "fcm_token": "fMEIyxxxxxxxxxxxxxxxx..."
+  }
+  ```
+- **Response 200 OK**:
+  ```json
+  {
+    "updated": true
+  }
+  ```
 
 ### 4.7 Contacts management
 
-- `GET /api/contacts`
-- `POST /api/contacts` — `{ "user_id": "...", "priority_order": 2 }`
-- `PATCH /api/contacts/{id}` — đổi `priority_order`
-- `DELETE /api/contacts/{id}`
+Quyền truy cập danh bạ khẩn cấp:
+- **`GET /api/contacts?household_id=...`**
+  - **Quyền**: Thành viên (`member`) trở lên.
+  - **Query Parameters**: `household_id` (Bắt buộc)
+  - **Response 200 OK**:
+    ```json
+    [
+      {
+        "id": "contact-uuid",
+        "household_id": "household-uuid",
+        "user_id": "user-uuid",
+        "priority_order": 1,
+        "created_at": "2026-06-17T03:12:35Z"
+      }
+    ]
+    ```
 
-> Lưu ý: `priority_order` là số nguyên tuyệt đối. Khi xóa contact ở giữa danh sách, app layer cần reorder lại các contact còn lại để tránh gap (`1, 3` → `1, 2`).
+- **`POST /api/contacts`**
+  - **Quyền**: Chỉ chủ hộ (`owner`).
+  - **Request Body**:
+    ```json
+    {
+      "household_id": "household-uuid",
+      "user_id": "user-uuid",
+      "priority_order": 2
+    }
+    ```
+  - **Ràng buộc**: `user_id` bắt buộc phải tồn tại trong bảng `users` và đã là thành viên trong hộ gia đình `household_id` đó.
+  - **Response 200 OK**:
+    ```json
+    {
+      "status": "ok"
+    }
+    ```
+  - **Response 400 Bad Request**:
+    ```json
+    {
+      "detail": {
+        "error": {
+          "code": "VALIDATION_ERROR",
+          "message": "User is not a member of this household"
+        }
+      }
+    }
+    ```
+
+- **`PATCH /api/contacts/{contact_id}`**
+  - **Quyền**: Chỉ chủ hộ (`owner`).
+  - **Query Parameters**: `priority_order` (Bắt buộc, kiểu `int`)
+  - **Cơ chế**: Tự động sắp xếp lại thứ tự ưu tiên của các contact khác trong hộ gia đình để tránh trùng số hay đứt đoạn.
+  - **Response 200 OK**:
+    ```json
+    {
+      "status": "ok"
+    }
+    ```
+
+- **`DELETE /api/contacts/{contact_id}`**
+  - **Quyền**: Chỉ chủ hộ (`owner`).
+  - **Cơ chế**: Xóa liên hệ và tự động cập nhật giảm thứ tự ưu tiên của các liên hệ còn lại để lấp khoảng trống (ví dụ: `[1, 3] -> [1, 2]`).
+  - **Response 200 OK**:
+    ```json
+    {
+      "status": "ok"
+    }
+    ```
 
 ### 4.8 Thresholds / Settings
 
-- `GET /api/settings/thresholds`
-- `PUT /api/settings/thresholds`
+Quản lý các ngưỡng cảnh báo thời gian bất động và khung giờ tắt âm:
+- **`GET /api/settings/thresholds?household_id=...`**
+  - **Quyền**: Thành viên (`member`) trở lên.
+  - **Query Parameters**: `household_id` (Bắt buộc)
+  - **Response 200 OK**:
+    ```json
+    {
+      "household_id": "8c271fac-1165-4142-a7ed-2468f873454b",
+      "low_max_sec": 30,
+      "medium_max_sec": 120,
+      "high_max_sec": 300,
+      "dedup_window_sec": 60,
+      "suppress_windows": [
+        { "start": "13:00", "end": "15:00", "max_still_sec": 3600 }
+      ]
+    }
+    ```
 
-```json
-{
-  "low_max_sec": 30,
-  "medium_max_sec": 120,
-  "high_max_sec": 300,
-  "dedup_window_sec": 60,
-  "suppress_windows": [
-    { "start": "13:00", "end": "15:00", "max_still_sec": 3600 }
-  ]
-}
-```
+- **`PUT /api/settings/thresholds`**
+  - **Quyền**: Chỉ chủ hộ (`owner`).
+  - **Request Body**:
+    ```json
+    {
+      "household_id": "8c271fac-1165-4142-a7ed-2468f873454b",
+      "low_max_sec": 30,
+      "medium_max_sec": 120,
+      "high_max_sec": 300,
+      "dedup_window_sec": 60,
+      "suppress_windows": [
+        { "start": "13:00", "end": "15:00", "max_still_sec": 3600 }
+      ]
+    }
+    ```
+  - **Ràng buộc**: Từng phần tử trong danh sách `suppress_windows` phải có thuộc tính `start` và `end` đúng định dạng `HH:MM` (24 giờ). Vi phạm định dạng sẽ trả về lỗi `422 Unprocessable Entity`.
+  - **Response 200 OK**:
+    ```json
+    {
+      "status": "ok"
+    }
+    ```
 
 ### 4.9 LLM Config via chat
 

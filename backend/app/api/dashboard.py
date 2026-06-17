@@ -57,6 +57,7 @@ async def get_dashboard_summary(
             cameras=cameras
         )
     except Exception as e:
+        print(f"Error in get_dashboard_summary: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={"error": {"code": "DATABASE_ERROR", "message": f"Failed to compute dashboard stats: {str(e)}"}}

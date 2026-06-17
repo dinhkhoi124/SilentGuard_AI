@@ -224,21 +224,56 @@ Thống kê nhanh các chỉ số hiển thị trên trang chủ App.
 ---
 
 ### 3.9 Cấu hình ngưỡng cảnh báo (`GET/PUT /api/settings/thresholds`)
-- **GET**: Lấy cấu hình hiện tại.
-- **PUT**: Cập nhật cấu hình mới.
 
-- **Request / Response Body**:
-```json
-{
-  "low_max_sec": 30,      // Ngưỡng tối đa báo động nhẹ (giây)
-  "medium_max_sec": 120,   // Ngưỡng tối đa báo động vừa (giây)
-  "high_max_sec": 300,    // Ngưỡng tối đa báo động cao (giây)
-  "dedup_window_sec": 60,  // Thời gian chặn trùng lặp giữa các camera
-  "suppress_windows": [
-    { "start": "13:00", "end": "15:00", "max_still_sec": 3600 } // Khoảng thời gian cụ đi ngủ trưa
-  ]
-}
-```
+- **GET /api/settings/thresholds**
+  - **Quyền**: Thành viên (`member`) trở lên.
+  - **Query Parameters**:
+    - `household_id` (Bắt buộc): ID hộ gia đình.
+  - **Response 200 OK**:
+    ```json
+    {
+      "household_id": "8c271fac-1165-4142-a7ed-2468f873454b",
+      "low_max_sec": 30,
+      "medium_max_sec": 120,
+      "high_max_sec": 300,
+      "dedup_window_sec": 60,
+      "suppress_windows": [
+        { "start": "13:00", "end": "15:00", "max_still_sec": 3600 }
+      ]
+    }
+    ```
+
+- **PUT /api/settings/thresholds**
+  - **Quyền**: Chỉ chủ hộ (`owner`).
+  - **Request Body**:
+    ```json
+    {
+      "household_id": "8c271fac-1165-4142-a7ed-2468f873454b",
+      "low_max_sec": 30,
+      "medium_max_sec": 120,
+      "high_max_sec": 300,
+      "dedup_window_sec": 60,
+      "suppress_windows": [
+        { "start": "13:00", "end": "15:00", "max_still_sec": 3600 }
+      ]
+    }
+    ```
+  - **Ràng buộc validation**:
+    - Trường `suppress_windows` chứa các khung giờ tắt âm. Thuộc tính `start` và `end` phải tuân thủ đúng định dạng `HH:MM` (24 giờ).
+    - Nếu sai định dạng, API trả về mã lỗi `422 Unprocessable Entity`.
+  - **Response 200 OK**:
+    ```json
+    {
+      "household_id": "8c271fac-1165-4142-a7ed-2468f873454b",
+      "low_max_sec": 30,
+      "medium_max_sec": 120,
+      "high_max_sec": 300,
+      "dedup_window_sec": 60,
+      "suppress_windows": [
+        { "start": "13:00", "end": "15:00", "max_still_sec": 3600 }
+      ]
+    }
+    ```
 
 ---
 
@@ -258,11 +293,82 @@ Dành cho tính năng ra lệnh bằng giọng nói/tin nhắn cấu hình.
 ### 3.11 Quản lý danh bạ liên hệ khẩn cấp (`GET/POST/PATCH/DELETE /api/contacts`)
 Hệ thống liên hệ khẩn cấp dạng danh sách ưu tiên để escalate cuộc gọi/thông báo khi người dùng chính không phản hồi.
 
-- **POST**: Thêm liên hệ mới.
-- **PATCH**: Đổi thứ tự ưu tiên (`priority_order`).
-- **DELETE**: Xóa liên hệ.
-  
-> **Lưu ý:** Thứ tự ưu tiên `priority_order` là một dãy số nguyên liên tục bắt đầu từ 1. Khi xóa một liên hệ, ứng dụng Frontend cần gọi cập nhật lại thứ tự ưu tiên của các liên hệ còn lại để tránh các khoảng hở (ví dụ: đang có `1, 2, 3`, xóa `2` thì cần reorder lại để danh sách thành `1, 2`).
+- **GET /api/contacts**
+  - **Quyền**: Thành viên (`member`) trở lên.
+  - **Query Parameters**:
+    - `household_id` (Bắt buộc): ID hộ gia đình.
+  - **Response 200 OK**: Trả về danh sách sắp xếp theo `priority_order` tăng dần:
+    ```json
+    [
+      {
+        "id": "contact-uuid-1",
+        "household_id": "household-uuid",
+        "user_id": "user-uuid-1",
+        "priority_order": 1,
+        "created_at": "2026-06-17T03:12:35Z"
+      },
+      {
+        "id": "contact-uuid-2",
+        "household_id": "household-uuid",
+        "user_id": "user-uuid-2",
+        "priority_order": 2,
+        "created_at": "2026-06-17T03:12:36Z"
+      }
+    ]
+    ```
+
+- **POST /api/contacts**
+  - **Quyền**: Chỉ chủ hộ (`owner`).
+  - **Request Body**:
+    ```json
+    {
+      "household_id": "household-uuid",
+      "user_id": "user-uuid-to-add",
+      "priority_order": 3
+    }
+    ```
+  - **Ràng buộc**:
+    - `user_id` bắt buộc phải tồn tại trong hệ thống và đã là thành viên (`household_member`) của hộ gia đình `household_id` tương ứng (không thêm liên hệ cho người ngoài hộ gia đình).
+    - Nếu vi phạm (ví dụ thêm một user không thuộc hộ gia đình), hệ thống trả về lỗi `400 Bad Request` dạng:
+      ```json
+      {
+        "detail": "User is not a member of the household"
+      }
+      ```
+  - **Response 200 OK**:
+    ```json
+    {
+      "id": "new-contact-uuid",
+      "household_id": "household-uuid",
+      "user_id": "user-uuid-to-add",
+      "priority_order": 3,
+      "created_at": "2026-06-17T08:00:00Z"
+    }
+    ```
+
+- **PATCH /api/contacts/{contact_id}**
+  - **Quyền**: Chỉ chủ hộ (`owner`).
+  - **Query Parameters**:
+    - `priority_order` (Bắt buộc, kiểu `int`): Thứ tự ưu tiên mới muốn đổi sang (ví dụ: `?priority_order=1`).
+  - **Cơ chế hoạt động**: 
+    - Khi thay đổi thứ tự ưu tiên của một liên hệ, backend sẽ tự động cập nhật và sắp xếp lại thứ tự ưu tiên (`priority_order`) của các liên hệ khác trong cùng hộ gia đình để đảm bảo tính liên tục (từ 1 đến N), không có khoảng trống (gap) và không bị trùng lặp.
+  - **Response 200 OK**:
+    ```json
+    {
+      "status": "ok"
+    }
+    ```
+
+- **DELETE /api/contacts/{contact_id}**
+  - **Quyền**: Chỉ chủ hộ (`owner`).
+  - **Cơ chế hoạt động**:
+    - Khi xóa một liên hệ, backend sẽ tự động cập nhật giảm thứ tự ưu tiên của các liên hệ còn lại để lấp khoảng trống (ví dụ: đang có priority `[1, 2, 3]`, xóa liên hệ thứ `2` thì liên hệ thứ `3` sẽ tự động chuyển thành thứ `2`).
+  - **Response 200 OK**:
+    ```json
+    {
+      "status": "ok"
+    }
+    ```
 
 ---
 

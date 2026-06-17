@@ -1,4 +1,5 @@
-from pydantic import BaseModel, Field
+import re
+from pydantic import BaseModel, Field, field_validator
 from typing import Dict, List, Optional, Any
 from datetime import datetime
 from uuid import UUID
@@ -83,6 +84,7 @@ class FCMTokenUpdateRequest(BaseModel):
 # 4.7 Contacts Management
 # ----------------------------------------------------
 class ContactCreate(BaseModel):
+    household_id: UUID
     user_id: UUID
     priority_order: int
 
@@ -94,7 +96,15 @@ class SuppressWindow(BaseModel):
     end: str
     max_still_sec: int
 
+    @field_validator("start", "end")
+    @classmethod
+    def validate_time_format(cls, v: str) -> str:
+        if not re.match(r"^(0[0-9]|1[0-9]|2[0-3]):[0-5][0-9]$", v):
+            raise ValueError("Time must be in HH:MM format (24-hour)")
+        return v
+
 class ThresholdUpdate(BaseModel):
+    household_id: str
     low_max_sec: int = 30
     medium_max_sec: int = 120
     high_max_sec: int = 300

@@ -48,6 +48,7 @@ async def get_alerts(
         total = response.count or len(items)
         return AlertListResponse(items=items, total=total)
     except Exception as e:
+        print(f"Error in get_alerts: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={"error": {"code": "DATABASE_ERROR", "message": f"Failed to retrieve alerts: {str(e)}"}}
@@ -106,6 +107,7 @@ async def review_alert(
         supabase.table("events").update(update_data).eq("id", event_uuid).execute()
         return {"status": "ok"}
     except Exception as e:
+        print(f"Error in review_alert: {e}")
         if isinstance(e, HTTPException):
             raise e
         raise HTTPException(
@@ -160,6 +162,7 @@ async def get_event_detail(
 
         return event
     except Exception as e:
+        print(f"Error in get_event_detail: {e}")
         if isinstance(e, HTTPException):
             raise e
         raise HTTPException(

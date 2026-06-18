@@ -729,6 +729,33 @@ Response:
 
 Heartbeat job kiểm tra `cameras.last_heartbeat`. Nếu quá 5 phút → tạo "system event" (severity = `SYSTEM`) và gửi push "Camera X mất kết nối".
 
+### 4.20 Event Feedback API (`POST /api/events/{event_id}/feedback`)
+
+Quyền: `owner` hoặc `member` thuộc household sở hữu event.
+
+- **Headers**:
+  - `Authorization: Bearer <FIREBASE_ID_TOKEN>` (Bắt buộc)
+- **Path Parameters**:
+  - `event_id`: Chuỗi định danh sự kiện (ví dụ: `EVT-20260613-001`), không phải UUID DB.
+- **Request Body**:
+  ```json
+  {
+    "label": "correct",
+    "note": "video thực sự có té ngã"
+  }
+  ```
+- **Ràng buộc validation**:
+  - `label`: Chỉ chấp nhận `"correct"`, `"incorrect"`, hoặc `"uncertain"`. Trả về `422 Unprocessable Entity` nếu không đúng.
+  - Event phải tồn tại (trả về `404 Not Found` nếu không tìm thấy `event_id`).
+  - Người dùng thuộc hộ gia đình của event (trả về `403 Forbidden` nếu không đúng).
+- **Response 201 Created**:
+  ```json
+  {
+    "status": "received",
+    "feedback_id": "feedback-uuid"
+  }
+  ```
+
 ---
 
 ## 5. Severity Engine

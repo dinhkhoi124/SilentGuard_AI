@@ -206,3 +206,83 @@ async def detect_event(
         "event_id": req.event_id
     }
 
+from app.models.schemas import EventFeedbackRequest
+
+@router.post("/{event_id}/feedback", status_code=status.HTTP_201_CREATED)
+async def post_event_feedback(
+    event_id: str,
+    req: EventFeedbackRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    POST /api/events/{event_id}/feedback
+    Allows user to submit feedback for a fall detection event.
+    """
+    # 1. Lookup event by string event_id
+    try:
+        event_res = supabase.table("events").select("id, household_id").eq("event_id", event_id).execute()
+    except Exception as e:
+        print(f"Failed to lookup event: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={"error": {"code": "DATABASE_ERROR", "message": "Failed to look up event"}}
+        )
+
+    if not event_res.data or len(event_res.data) == 0:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"error": {"code": "EVENT_NOT_FOUND", "message": "Event không tồn tại"}}
+        )
+
+    event_record = event_res.data[0]
+    event_uuid = event_record.get("id")
+    household_id = event_record.get("household_id")
+    user_id = current_user.get("id")
+
+    # 2. Verify household access manually
+    try:
+        res = supabase.table("household_members")\
+            .select("*")\
+            .eq("household_id", household_id)\
+            .eq("user_id", user_id)\
+            .execute()
+        if not res.data or len(res.data) == 0:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={"error": {"code": "FORBIDDEN", "message": "Bạn không có quyền truy cập thông tin gia đình này"}}
+            )
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={"error": {"code": "DATABASE_ERROR", "message": f"Database verification error: {str(e)}"}}
+        )
+
+    # 3. Insert into event_feedback table
+    feedback_data = {
+        "event_id": event_uuid,
+        "household_id": household_id,
+        "submitted_by": user_id,
+        "label": req.label,
+        "note": req.note
+    }
+
+    try:
+        feedback_res = supabase.table("event_feedback").insert(feedback_data).select().execute()
+        if not feedback_res.data:
+            raise Exception("No data returned from database insert")
+        inserted = feedback_res.data[0]
+    except Exception as e:
+        print(f"Failed to insert event feedback: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={"error": {"code": "DATABASE_ERROR", "message": f"Failed to save feedback: {str(e)}"}}
+        )
+
+    return {
+        "status": "received",
+        "feedback_id": inserted["id"]
+    }
+
+

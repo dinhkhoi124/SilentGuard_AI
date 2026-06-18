@@ -9,8 +9,37 @@ import 'package:mobile/features/auth/presentation/bloc/auth_event.dart';
 import 'package:mobile/features/auth/presentation/bloc/auth_state.dart';
 import 'package:mobile/injection_container.dart';
 
-class AccountPage extends StatelessWidget {
+class AccountPage extends StatefulWidget {
   const AccountPage({super.key});
+
+  @override
+  State<AccountPage> createState() => _AccountPageState();
+}
+
+class _AccountPageState extends State<AccountPage> {
+  bool _logoutDialogVisible = false;
+
+  @override
+  void dispose() {
+    _logoutDialogVisible = false;
+    super.dispose();
+  }
+
+  void _showLogoutDialog() {
+    if (_logoutDialogVisible || !mounted) return;
+    _logoutDialogVisible = true;
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const _LogoutProgressDialog(),
+    );
+  }
+
+  void _hideLogoutDialog() {
+    if (!_logoutDialogVisible || !mounted) return;
+    _logoutDialogVisible = false;
+    Navigator.of(context, rootNavigator: true).pop();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -18,7 +47,18 @@ class AccountPage extends StatelessWidget {
 
     return BlocListener<AuthBloc, AuthState>(
       listener: (context, state) {
+        if (state is AuthLoading) {
+          _showLogoutDialog();
+          return;
+        }
+
+        if (state is AuthSignedOut) {
+          _hideLogoutDialog();
+          return;
+        }
+
         if (state is AuthFailure) {
+          _hideLogoutDialog();
           ScaffoldMessenger.of(context)
             ..hideCurrentSnackBar()
             ..showSnackBar(
@@ -37,7 +77,7 @@ class AccountPage extends StatelessWidget {
           return CustomScrollView(
             slivers: [
               SliverPadding(
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 120),
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
                 sliver: SliverList.list(
                   children: [
                     _ProfileHeader(user: user),
@@ -308,32 +348,94 @@ class _LogoutTile extends StatelessWidget {
           children: [
             SizedBox(
               width: 42,
-              child: isLoading
-                  ? const SizedBox.square(
-                      dimension: 20,
-                      child: CircularProgressIndicator(
-                        color: AppColors.destructive,
-                        strokeWidth: 2.2,
-                      ),
-                    )
-                  : const Icon(
-                      Iconsax.logout,
-                      color: AppColors.destructive,
-                      size: 24,
-                    ),
+              child: Icon(
+                Iconsax.logout,
+                color: AppColors.destructive.withValues(
+                  alpha: isLoading ? 0.55 : 1,
+                ),
+                size: 24,
+              ),
             ),
             const SizedBox(width: 10),
-            const Expanded(
+            Expanded(
               child: Text(
                 'Đăng xuất',
                 style: TextStyle(
-                  color: AppColors.destructive,
+                  color: AppColors.destructive.withValues(
+                    alpha: isLoading ? 0.55 : 1,
+                  ),
                   fontSize: 16,
                   fontWeight: FontWeight.w800,
                 ),
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _LogoutProgressDialog extends StatelessWidget {
+  const _LogoutProgressDialog();
+
+  @override
+  Widget build(BuildContext context) {
+    return PopScope(
+      canPop: false,
+      child: Dialog(
+        insetPadding: const EdgeInsets.symmetric(horizontal: 32),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(22, 22, 22, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  color: AppColors.destructive.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: const SizedBox.square(
+                  dimension: 48,
+                  child: Icon(
+                    Iconsax.logout,
+                    color: AppColors.destructive,
+                    size: 24,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              const Text(
+                'Đang đăng xuất',
+                style: TextStyle(
+                  color: AppColors.darkText,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Smartify đang kết thúc phiên làm việc của bạn.',
+                style: TextStyle(
+                  color: AppColors.mutedText,
+                  fontSize: 14,
+                  height: 1.4,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: 18),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(99),
+                child: const LinearProgressIndicator(
+                  minHeight: 5,
+                  color: AppColors.destructive,
+                  backgroundColor: AppColors.border,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

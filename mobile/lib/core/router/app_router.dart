@@ -31,7 +31,9 @@ class AppRouter {
     refreshListenable: authNotifier,
     initialLocation: initialLocation,
     redirect: (context, state) {
+      final isReady = authNotifier.isReady;
       final isAuthenticated = authNotifier.isAuthenticated;
+      final onSplash = state.matchedLocation == '/splash';
       final onAuthFlow =
           state.matchedLocation == '/welcome' ||
           state.matchedLocation == '/signup' ||
@@ -40,15 +42,22 @@ class AppRouter {
         '[GoogleAuth] GoRouter.redirect: '
         'authNotifier=${identityHashCode(authNotifier)}, '
         'matchedLocation=${state.matchedLocation}, '
-        'isAuthenticated=$isAuthenticated, onAuthFlow=$onAuthFlow.',
+        'isReady=$isReady, isAuthenticated=$isAuthenticated, '
+        'onSplash=$onSplash, onAuthFlow=$onAuthFlow.',
         name: 'AppRouter',
       );
 
+      if (!isReady) return onSplash ? null : '/splash';
+      if (onSplash) return isAuthenticated ? '/home' : '/welcome';
       if (isAuthenticated && onAuthFlow) return '/home';
       if (!isAuthenticated && !onAuthFlow) return '/welcome';
       return null;
     },
     routes: [
+      GoRoute(
+        path: '/splash',
+        builder: (context, state) => const _SessionCheckingPage(),
+      ),
       GoRoute(
         path: '/welcome',
         builder: (context, state) => const WelcomePage(),
@@ -81,6 +90,22 @@ class AppRouter {
       ),
     ],
   );
+}
+
+class _SessionCheckingPage extends StatelessWidget {
+  const _SessionCheckingPage();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      backgroundColor: AppColors.surface,
+      body: SafeArea(
+        child: Center(
+          child: CircularProgressIndicator(color: AppColors.primary),
+        ),
+      ),
+    );
+  }
 }
 
 class _CameraRouteLoader extends StatelessWidget {

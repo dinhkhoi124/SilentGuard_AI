@@ -15,13 +15,12 @@ class AuthNotifier extends ChangeNotifier {
     this._sessionRepository,
     this._fcmService,
   ) {
-    _isAuthenticated =
-        _authRepository.currentUser != null &&
-        _sessionRepository.currentSession != null;
     developer.log(
       '[GoogleAuth] AuthNotifier created: '
       'instance=${identityHashCode(this)}, '
-      'initialAuthenticated=$_isAuthenticated.',
+      'currentUserPresent=${_authRepository.currentUser != null}, '
+      'cachedBackendSessionPresent=${_sessionRepository.currentSession != null}, '
+      'isReady=$_isReady, isAuthenticated=$_isAuthenticated.',
       name: 'AuthNotifier',
     );
     _subscription = _authRepository.authStateChanges().listen(
@@ -41,9 +40,11 @@ class AuthNotifier extends ChangeNotifier {
   final SessionRepository _sessionRepository;
   final FcmService _fcmService;
   late final StreamSubscription<AppUser?> _subscription;
+  bool _isReady = false;
   bool _isAuthenticated = false;
   int _authRevision = 0;
 
+  bool get isReady => _isReady;
   bool get isAuthenticated => _isAuthenticated;
 
   void _handleAuthStateChanged(AppUser? user) {
@@ -55,13 +56,14 @@ class AuthNotifier extends ChangeNotifier {
     developer.log(
       '[GoogleAuth] authStateChanges emitted: '
       'userPresent=${user != null}, uid=${user?.uid}, '
+      'previousReady=$_isReady, '
       'previousAuthenticated=$_isAuthenticated.',
       name: 'AuthNotifier',
     );
 
     if (user == null) {
       _sessionRepository.clearCachedSession();
-      _setAuthenticated(false);
+      _setStatus(isReady: true, isAuthenticated: false);
       return;
     }
 
@@ -75,11 +77,11 @@ class AuthNotifier extends ChangeNotifier {
           '${failure.message}.',
           name: 'AuthNotifier',
         );
-        _setAuthenticated(false);
+        _setStatus(isReady: true, isAuthenticated: false);
       },
       (_) {
         unawaited(_registerFcmTokenSilently());
-        _setAuthenticated(true);
+        _setStatus(isReady: true, isAuthenticated: true);
       },
     );
   }
@@ -97,19 +99,21 @@ class AuthNotifier extends ChangeNotifier {
     }
   }
 
-  void _setAuthenticated(bool nextAuthenticated) {
-    if (_isAuthenticated == nextAuthenticated) {
+  void _setStatus({required bool isReady, required bool isAuthenticated}) {
+    if (_isReady == isReady && _isAuthenticated == isAuthenticated) {
       developer.log(
-        '[GoogleAuth] AuthNotifier auth boolean unchanged; '
+        '[GoogleAuth] AuthNotifier status unchanged; '
         'notifyListeners() skipped.',
         name: 'AuthNotifier',
       );
       return;
     }
 
-    _isAuthenticated = nextAuthenticated;
+    _isReady = isReady;
+    _isAuthenticated = isAuthenticated;
     developer.log(
-      '[GoogleAuth] AuthNotifier calling notifyListeners().',
+      '[GoogleAuth] AuthNotifier calling notifyListeners(): '
+      'isReady=$_isReady, isAuthenticated=$_isAuthenticated.',
       name: 'AuthNotifier',
     );
     notifyListeners();

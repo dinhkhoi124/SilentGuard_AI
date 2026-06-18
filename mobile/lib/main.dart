@@ -1,12 +1,14 @@
 // lib/main.dart
 
+import 'dart:async';
 import 'dart:developer' as developer;
+import 'dart:ui';
 
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:media_kit/media_kit.dart';
 import 'package:mobile/core/router/app_router.dart';
 import 'package:mobile/core/router/auth_notifier.dart';
 import 'package:mobile/core/services/fcm_service.dart';
@@ -20,18 +22,29 @@ import 'package:mobile/injection_container.dart' as di;
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  developer.log(
-    'Background FCM received: messageId=${message.messageId}, '
-    'data=${message.data}.',
-    name: 'FcmBackground',
-  );
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    ).timeout(const Duration(seconds: 5));
+    developer.log(
+      'Background FCM received: messageId=${message.messageId}, '
+      'data=${message.data}.',
+      name: 'FcmBackground',
+    );
+  } catch (error, stackTrace) {
+    developer.log(
+      'Background FCM initialization failed; message handling skipped.',
+      name: 'FcmBackground',
+      error: error,
+      stackTrace: stackTrace,
+    );
+  }
 }
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  MediaKit.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  _configureCrashReporting();
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
   await di.init();
 
@@ -54,12 +67,35 @@ Future<void> main() async {
       fcmAlert: initialFcmAlert,
     ),
   );
-  await di.sl<FcmService>().initialize(
-    notificationsCubit: notificationsCubit,
-    onNotificationTap: (alert) => _openNotificationAlert(appRouter, alert),
-  );
 
   runApp(MyApp(appRouter: appRouter));
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    unawaited(
+      di
+          .sl<FcmService>()
+          .initialize(
+            notificationsCubit: notificationsCubit,
+            onNotificationTap: (alert) =>
+                _openNotificationAlert(appRouter, alert),
+          )
+          .catchError((Object error, StackTrace stackTrace) {
+            developer.log(
+              'Deferred FCM listener initialization failed.',
+              name: 'Main',
+              error: error,
+              stackTrace: stackTrace,
+            );
+          }),
+    );
+  });
+}
+
+void _configureCrashReporting() {
+  FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
+  PlatformDispatcher.instance.onError = (error, stackTrace) {
+    FirebaseCrashlytics.instance.recordError(error, stackTrace, fatal: true);
+    return true;
+  };
 }
 
 String _initialLocation({

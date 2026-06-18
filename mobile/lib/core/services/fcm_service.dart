@@ -21,6 +21,8 @@ class FcmService {
   final ApiClient _apiClient;
   final FirebaseAuth _firebaseAuth;
   final FirebaseMessaging _messaging;
+  static const _messagingTimeout = Duration(seconds: 5);
+  static const _backendRegistrationTimeout = Duration(seconds: 5);
 
   StreamSubscription<String>? _tokenRefreshSubscription;
   StreamSubscription<RemoteMessage>? _foregroundSubscription;
@@ -79,16 +81,37 @@ class FcmService {
   }
 
   Future<NotificationAlert?> takeInitialAlert() async {
-    final message = await _messaging.getInitialMessage();
-    if (message == null) return null;
-    return _alertFromMessage(message);
+    try {
+      final message = await _messaging.getInitialMessage().timeout(
+        _messagingTimeout,
+      );
+      if (message == null) return null;
+      return _alertFromMessage(message);
+    } catch (error, stackTrace) {
+      developer.log(
+        'Initial FCM message lookup failed; continuing startup.',
+        name: 'FcmService',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      return null;
+    }
   }
 
   Future<void> registerToken() async {
-    await requestNotificationPermission();
-    final token = await _messaging.getToken();
-    _logDebugFcmTokenOnce(token);
-    await _registerTokenValue(token, source: 'current');
+    try {
+      await requestNotificationPermission();
+      final token = await _messaging.getToken().timeout(_messagingTimeout);
+      _logDebugFcmTokenOnce(token);
+      await _registerTokenValue(token, source: 'current');
+    } catch (error, stackTrace) {
+      developer.log(
+        'FCM token retrieval failed; continuing without push registration.',
+        name: 'FcmService',
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
   }
 
   Future<NotificationSettings> requestNotificationPermission() async {
@@ -100,16 +123,16 @@ class FcmService {
       );
     }
 
-    final settings = await _messaging.requestPermission(
-      alert: true,
-      badge: true,
-      sound: true,
-    );
-    await _messaging.setForegroundNotificationPresentationOptions(
-      alert: true,
-      badge: true,
-      sound: true,
-    );
+    final settings = await _messaging
+        .requestPermission(alert: true, badge: true, sound: true)
+        .timeout(_messagingTimeout);
+    await _messaging
+        .setForegroundNotificationPresentationOptions(
+          alert: true,
+          badge: true,
+          sound: true,
+        )
+        .timeout(_messagingTimeout);
     developer.log(
       'FCM permission status: ${settings.authorizationStatus}.',
       name: 'FcmService',
@@ -139,9 +162,9 @@ class FcmService {
     }
 
     try {
-      await _apiClient.postObject('/api/users/device-token', {
-        'fcm_token': normalizedToken,
-      });
+      await _apiClient
+          .postObject('/api/users/device-token', {'fcm_token': normalizedToken})
+          .timeout(_backendRegistrationTimeout);
       developer.log('FCM token registered from $source.', name: 'FcmService');
     } catch (error, stackTrace) {
       developer.log(
@@ -150,7 +173,6 @@ class FcmService {
         error: error,
         stackTrace: stackTrace,
       );
-      rethrow;
     }
   }
 

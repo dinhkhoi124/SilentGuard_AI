@@ -139,6 +139,7 @@ class CameraLivePreview extends StatefulWidget {
 
 class _CameraLivePreviewState extends State<CameraLivePreview> {
   static const _videoAssetPath = 'assets/videos/videoplayback.mp4';
+  static bool _mediaKitInitialized = false;
 
   VideoPlayerController? _assetController;
   Player? _player;
@@ -175,6 +176,7 @@ class _CameraLivePreviewState extends State<CameraLivePreview> {
     }
 
     if (streamUrl == null || streamUrl.isEmpty) return;
+    _ensureMediaKitInitialized();
     final player = Player();
     _player = player;
     _videoController = media_kit_video.VideoController(player);
@@ -192,6 +194,12 @@ class _CameraLivePreviewState extends State<CameraLivePreview> {
         );
       }),
     );
+  }
+
+  void _ensureMediaKitInitialized() {
+    if (_mediaKitInitialized) return;
+    MediaKit.ensureInitialized();
+    _mediaKitInitialized = true;
   }
 
   Future<void> _openStreamWhenReady(Player player, String streamUrl) async {

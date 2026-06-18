@@ -5,6 +5,7 @@ import 'dart:developer' as developer;
 
 import 'package:flutter/foundation.dart';
 import 'package:mobile/core/services/fcm_service.dart';
+import 'package:mobile/core/services/onboarding_service.dart';
 import 'package:mobile/features/auth/domain/entities/app_user.dart';
 import 'package:mobile/features/auth/domain/repositories/auth_repository.dart';
 import 'package:mobile/features/session/domain/repositories/session_repository.dart';
@@ -14,15 +15,19 @@ class AuthNotifier extends ChangeNotifier {
     this._authRepository,
     this._sessionRepository,
     this._fcmService,
+    this._onboardingService,
   ) {
     developer.log(
       '[GoogleAuth] AuthNotifier created: '
       'instance=${identityHashCode(this)}, '
       'currentUserPresent=${_authRepository.currentUser != null}, '
       'cachedBackendSessionPresent=${_sessionRepository.currentSession != null}, '
-      'isReady=$_isReady, isAuthenticated=$_isAuthenticated.',
+      'isReady=$_isReady, isAuthenticated=$_isAuthenticated, '
+      'onboardingCompleted=$_onboardingCompleted.',
       name: 'AuthNotifier',
     );
+    unawaited(_loadOnboardingStatus());
+    unawaited(_completeMinimumSplashDelay());
     _subscription = _authRepository.authStateChanges().listen(
       _handleAuthStateChanged,
       onError: (Object error, StackTrace stackTrace) {
@@ -32,6 +37,7 @@ class AuthNotifier extends ChangeNotifier {
           error: error,
           stackTrace: stackTrace,
         );
+        _completeAuthCheck(false);
       },
     );
   }
@@ -39,13 +45,48 @@ class AuthNotifier extends ChangeNotifier {
   final AuthRepository _authRepository;
   final SessionRepository _sessionRepository;
   final FcmService _fcmService;
+  final OnboardingService _onboardingService;
   late final StreamSubscription<AppUser?> _subscription;
   bool _isReady = false;
   bool _isAuthenticated = false;
+  bool _onboardingCompleted = false;
+  bool _authResolved = false;
+  bool _onboardingLoaded = false;
+  bool _minimumSplashElapsed = false;
   int _authRevision = 0;
 
   bool get isReady => _isReady;
   bool get isAuthenticated => _isAuthenticated;
+  bool get onboardingCompleted => _onboardingCompleted;
+
+  Future<void> completeOnboarding() async {
+    await _onboardingService.markCompleted();
+    if (_onboardingCompleted) return;
+    _onboardingCompleted = true;
+    _notifyStatusChanged('onboarding completed');
+  }
+
+  Future<void> _loadOnboardingStatus() async {
+    try {
+      _onboardingCompleted = await _onboardingService.isCompleted();
+    } catch (error, stackTrace) {
+      developer.log(
+        'Failed to read onboarding completion flag.',
+        name: 'AuthNotifier',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      _onboardingCompleted = false;
+    }
+    _onboardingLoaded = true;
+    _publishStartupStatus();
+  }
+
+  Future<void> _completeMinimumSplashDelay() async {
+    await Future<void>.delayed(const Duration(milliseconds: 900));
+    _minimumSplashElapsed = true;
+    _publishStartupStatus();
+  }
 
   void _handleAuthStateChanged(AppUser? user) {
     final revision = ++_authRevision;
@@ -63,7 +104,7 @@ class AuthNotifier extends ChangeNotifier {
 
     if (user == null) {
       _sessionRepository.clearCachedSession();
-      _setStatus(isReady: true, isAuthenticated: false);
+      _completeAuthCheck(false);
       return;
     }
 
@@ -77,11 +118,11 @@ class AuthNotifier extends ChangeNotifier {
           '${failure.message}.',
           name: 'AuthNotifier',
         );
-        _setStatus(isReady: true, isAuthenticated: false);
+        _completeAuthCheck(false);
       },
       (_) {
         unawaited(_registerFcmTokenSilently());
-        _setStatus(isReady: true, isAuthenticated: true);
+        _completeAuthCheck(true);
       },
     );
   }
@@ -99,8 +140,16 @@ class AuthNotifier extends ChangeNotifier {
     }
   }
 
-  void _setStatus({required bool isReady, required bool isAuthenticated}) {
-    if (_isReady == isReady && _isAuthenticated == isAuthenticated) {
+  void _completeAuthCheck(bool isAuthenticated) {
+    _authResolved = true;
+    final authChanged = _isAuthenticated != isAuthenticated;
+    _isAuthenticated = isAuthenticated;
+    _publishStartupStatus(force: authChanged);
+  }
+
+  void _publishStartupStatus({bool force = false}) {
+    final isReady = _authResolved && _onboardingLoaded && _minimumSplashElapsed;
+    if (_isReady == isReady && !force) {
       developer.log(
         '[GoogleAuth] AuthNotifier status unchanged; '
         'notifyListeners() skipped.',
@@ -110,10 +159,15 @@ class AuthNotifier extends ChangeNotifier {
     }
 
     _isReady = isReady;
-    _isAuthenticated = isAuthenticated;
+    _notifyStatusChanged('startup status');
+  }
+
+  void _notifyStatusChanged(String reason) {
     developer.log(
       '[GoogleAuth] AuthNotifier calling notifyListeners(): '
-      'isReady=$_isReady, isAuthenticated=$_isAuthenticated.',
+      'reason=$reason, isReady=$_isReady, '
+      'isAuthenticated=$_isAuthenticated, '
+      'onboardingCompleted=$_onboardingCompleted.',
       name: 'AuthNotifier',
     );
     notifyListeners();

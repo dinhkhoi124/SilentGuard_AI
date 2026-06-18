@@ -9,8 +9,33 @@ import 'package:mobile/features/auth/presentation/bloc/auth_event.dart';
 import 'package:mobile/features/auth/presentation/bloc/auth_state.dart';
 import 'package:mobile/features/auth/presentation/widgets/app_logo.dart';
 
-class WelcomePage extends StatelessWidget {
+class WelcomePage extends StatefulWidget {
   const WelcomePage({super.key});
+
+  @override
+  State<WelcomePage> createState() => _WelcomePageState();
+}
+
+class _WelcomePageState extends State<WelcomePage> {
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  bool _obscurePassword = true;
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  void _handleSignIn() {
+    context.read<AuthBloc>().add(
+      AuthSignInRequested(
+        email: _emailController.text,
+        password: _passwordController.text,
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -32,45 +57,120 @@ class WelcomePage extends StatelessWidget {
 
         return Scaffold(
           backgroundColor: AppColors.surface,
+          resizeToAvoidBottomInset: true,
           body: SafeArea(
             child: LayoutBuilder(
               builder: (context, constraints) {
                 return SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(24, 36, 24, 24),
+                  padding: const EdgeInsets.fromLTRB(24, 26, 24, 24),
                   child: ConstrainedBox(
                     constraints: BoxConstraints(
-                      minHeight: (constraints.maxHeight - 60).clamp(
+                      minHeight: (constraints.maxHeight - 50).clamp(
                         0.0,
                         double.infinity,
                       ),
                     ),
                     child: IntrinsicHeight(
                       child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const AppLogo(),
-                          const SizedBox(height: 40),
+                          const Center(child: AppLogo()),
+                          const SizedBox(height: 30),
                           const Text(
-                            'Bắt đầu nào!',
-                            textAlign: TextAlign.center,
+                            'Chào mừng trở lại',
                             style: TextStyle(
                               color: AppColors.darkText,
                               fontSize: 28,
-                              fontWeight: FontWeight.w700,
+                              height: 1.12,
+                              fontWeight: FontWeight.w800,
                             ),
                           ),
                           const SizedBox(height: 8),
                           const Text(
-                            'Hãy đăng nhập vào tài khoản của bạn',
-                            textAlign: TextAlign.center,
+                            'Đăng nhập để quản lý ngôi nhà thông minh của bạn.',
                             style: TextStyle(
                               color: AppColors.mutedText,
                               fontSize: 15,
+                              height: 1.45,
+                              fontWeight: FontWeight.w500,
                             ),
                           ),
-                          const SizedBox(height: 40),
-                          _SocialButton(
-                            type: _SocialType.google,
-                            label: 'Tiếp tục với Google',
+                          const SizedBox(height: 30),
+                          const _FieldLabel('Email'),
+                          const SizedBox(height: 8),
+                          _AuthTextField(
+                            controller: _emailController,
+                            hintText: 'Nhập email của bạn',
+                            prefixIcon: Icons.mail_outline_rounded,
+                            keyboardType: TextInputType.emailAddress,
+                          ),
+                          const SizedBox(height: 18),
+                          Row(
+                            children: [
+                              const Expanded(child: _FieldLabel('Mật khẩu')),
+                              TextButton(
+                                onPressed: null,
+                                style: TextButton.styleFrom(
+                                  padding: EdgeInsets.zero,
+                                  minimumSize: Size.zero,
+                                  tapTargetSize:
+                                      MaterialTapTargetSize.shrinkWrap,
+                                ),
+                                child: const Text('Quên mật khẩu?'),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          _AuthTextField(
+                            controller: _passwordController,
+                            hintText: 'Nhập mật khẩu',
+                            prefixIcon: Icons.lock_outline_rounded,
+                            obscureText: _obscurePassword,
+                            suffixIcon: IconButton(
+                              onPressed: () => setState(
+                                () => _obscurePassword = !_obscurePassword,
+                              ),
+                              icon: Icon(
+                                _obscurePassword
+                                    ? Icons.visibility_off_outlined
+                                    : Icons.visibility_outlined,
+                                color: AppColors.mutedText,
+                              ),
+                              tooltip: _obscurePassword
+                                  ? 'Hiện mật khẩu'
+                                  : 'Ẩn mật khẩu',
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+                          SizedBox(
+                            width: double.infinity,
+                            child: FilledButton(
+                              onPressed: isLoading ? null : _handleSignIn,
+                              style: FilledButton.styleFrom(
+                                backgroundColor: AppColors.primary,
+                                foregroundColor: Colors.white,
+                                disabledBackgroundColor: AppColors.primary
+                                    .withValues(alpha: 0.6),
+                                shape: const StadiumBorder(),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 18,
+                                ),
+                              ),
+                              child: isLoading
+                                  ? const SizedBox.square(
+                                      dimension: 22,
+                                      child: CircularProgressIndicator(
+                                        color: Colors.white,
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  : const Text('Đăng nhập'),
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+                          const _DividerLabel('hoặc'),
+                          const SizedBox(height: 16),
+                          _GoogleButton(
                             isLoading: isLoading,
                             onPressed: isLoading
                                 ? null
@@ -78,43 +178,36 @@ class WelcomePage extends StatelessWidget {
                                     const AuthGoogleSignInRequested(),
                                   ),
                           ),
-                          const SizedBox(height: 14),
-                          const _SocialButton(
-                            type: _SocialType.apple,
-                            label: 'Tiếp tục với Apple',
-                          ),
-                          const SizedBox(height: 14),
-                          const _SocialButton(
-                            type: _SocialType.facebook,
-                            label: 'Tiếp tục với Facebook',
-                          ),
-                          const SizedBox(height: 14),
-                          const _SocialButton(
-                            type: _SocialType.twitter,
-                            label: 'Tiếp tục với Twitter',
-                          ),
-                          const SizedBox(height: 32),
-                          _AuthButton(
-                            label: 'Đăng ký',
-                            backgroundColor: AppColors.primary,
-                            foregroundColor: Colors.white,
-                            onPressed: () => context.push('/signup'),
-                          ),
-                          const SizedBox(height: 12),
-                          _AuthButton(
-                            label: 'Đăng nhập',
-                            backgroundColor: AppColors.lightBlue,
-                            foregroundColor: AppColors.primary,
-                            onPressed: () => context.push('/signin'),
+                          const SizedBox(height: 26),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Text(
+                                'Chưa có tài khoản?',
+                                style: TextStyle(
+                                  color: AppColors.mutedText,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              TextButton(
+                                onPressed: isLoading
+                                    ? null
+                                    : () => context.push('/signup'),
+                                child: const Text('Đăng ký'),
+                              ),
+                            ],
                           ),
                           const Spacer(),
-                          const SizedBox(height: 28),
-                          const Text(
-                            'Chính sách bảo mật · Điều khoản dịch vụ',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              color: Color(0xFFBDBDBD),
-                              fontSize: 13,
+                          const SizedBox(height: 18),
+                          const Center(
+                            child: Text(
+                              'Chính sách bảo mật · Điều khoản dịch vụ',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: Color(0xFFBDBDBD),
+                                fontSize: 13,
+                              ),
                             ),
                           ),
                         ],
@@ -131,53 +224,93 @@ class WelcomePage extends StatelessWidget {
   }
 }
 
-class _AuthButton extends StatelessWidget {
-  const _AuthButton({
-    required this.label,
-    required this.backgroundColor,
-    required this.foregroundColor,
-    required this.onPressed,
-  });
+class _FieldLabel extends StatelessWidget {
+  const _FieldLabel(this.label);
 
   final String label;
-  final Color backgroundColor;
-  final Color foregroundColor;
-  final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      height: 56,
-      child: FilledButton(
-        onPressed: onPressed,
-        style: FilledButton.styleFrom(
-          backgroundColor: backgroundColor,
-          foregroundColor: foregroundColor,
-          elevation: 0,
-          shape: const StadiumBorder(),
-          textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-        ),
-        child: Text(label),
+    return Text(
+      label,
+      style: const TextStyle(
+        fontSize: 14,
+        fontWeight: FontWeight.w700,
+        color: AppColors.darkText,
       ),
     );
   }
 }
 
-enum _SocialType { google, apple, facebook, twitter }
-
-class _SocialButton extends StatelessWidget {
-  const _SocialButton({
-    required this.type,
-    required this.label,
-    this.onPressed,
-    this.isLoading = false,
+class _AuthTextField extends StatelessWidget {
+  const _AuthTextField({
+    required this.controller,
+    required this.hintText,
+    required this.prefixIcon,
+    this.keyboardType,
+    this.obscureText = false,
+    this.suffixIcon,
   });
 
-  final _SocialType type;
+  final TextEditingController controller;
+  final String hintText;
+  final IconData prefixIcon;
+  final TextInputType? keyboardType;
+  final bool obscureText;
+  final Widget? suffixIcon;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextFormField(
+      controller: controller,
+      keyboardType: keyboardType,
+      obscureText: obscureText,
+      textInputAction: obscureText
+          ? TextInputAction.done
+          : TextInputAction.next,
+      onFieldSubmitted: obscureText ? (_) => _submit(context) : null,
+      decoration: InputDecoration(
+        prefixIcon: Icon(prefixIcon, color: AppColors.mutedText),
+        suffixIcon: suffixIcon,
+        hintText: hintText,
+      ),
+    );
+  }
+
+  void _submit(BuildContext context) {
+    final state = context.findAncestorStateOfType<_WelcomePageState>();
+    state?._handleSignIn();
+  }
+}
+
+class _DividerLabel extends StatelessWidget {
+  const _DividerLabel(this.label);
+
   final String label;
-  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        const Expanded(child: Divider(color: Color(0xFFE0E0E0))),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: Text(
+            label,
+            style: const TextStyle(fontSize: 13, color: Color(0xFFBDBDBD)),
+          ),
+        ),
+        const Expanded(child: Divider(color: Color(0xFFE0E0E0))),
+      ],
+    );
+  }
+}
+
+class _GoogleButton extends StatelessWidget {
+  const _GoogleButton({required this.isLoading, required this.onPressed});
+
   final bool isLoading;
+  final VoidCallback? onPressed;
 
   @override
   Widget build(BuildContext context) {
@@ -185,7 +318,7 @@ class _SocialButton extends StatelessWidget {
       width: double.infinity,
       height: 56,
       child: OutlinedButton(
-        onPressed: onPressed ?? () {},
+        onPressed: onPressed,
         style: OutlinedButton.styleFrom(
           foregroundColor: AppColors.darkText,
           side: const BorderSide(color: Color(0xFFE0E0E0)),
@@ -205,17 +338,14 @@ class _SocialButton extends StatelessWidget {
                           color: AppColors.primary,
                         ),
                       )
-                    : _SocialLogo(type: type),
+                    : const _GoogleLogo(),
               ),
             ),
-            Expanded(
+            const Expanded(
               child: Text(
-                label,
+                'Tiếp tục với Google',
                 textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                ),
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
               ),
             ),
             const SizedBox(width: 28),
@@ -226,55 +356,25 @@ class _SocialButton extends StatelessWidget {
   }
 }
 
-class _SocialLogo extends StatelessWidget {
-  const _SocialLogo({required this.type});
-
-  final _SocialType type;
-
-  @override
-  Widget build(BuildContext context) {
-    return switch (type) {
-      _SocialType.google => const Icon(
-        Icons.g_mobiledata_rounded,
-        color: Color(0xFF4285F4),
-        size: 30,
-      ),
-      _SocialType.apple => const Icon(
-        Icons.apple,
-        color: Colors.black,
-        size: 25,
-      ),
-      _SocialType.facebook => const _LetterLogo(
-        letter: 'f',
-        background: Color(0xFF1877F2),
-      ),
-      _SocialType.twitter => const _LetterLogo(
-        letter: 'X',
-        background: Color(0xFF1DA1F2),
-      ),
-    };
-  }
-}
-
-class _LetterLogo extends StatelessWidget {
-  const _LetterLogo({required this.letter, required this.background});
-
-  final String letter;
-  final Color background;
+class _GoogleLogo extends StatelessWidget {
+  const _GoogleLogo();
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 24,
-      height: 24,
+      width: 28,
+      height: 28,
       alignment: Alignment.center,
-      decoration: BoxDecoration(color: background, shape: BoxShape.circle),
-      child: Text(
-        letter,
-        style: const TextStyle(
-          color: Colors.white,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(color: const Color(0xFFE0E0E0)),
+      ),
+      child: const Text(
+        'G',
+        style: TextStyle(
           fontSize: 16,
-          fontWeight: FontWeight.w700,
+          fontWeight: FontWeight.bold,
+          color: Color(0xFF4285F4),
         ),
       ),
     );

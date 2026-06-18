@@ -10,6 +10,7 @@ import 'package:mobile/core/network/auth_interceptor.dart';
 import 'package:mobile/core/router/auth_notifier.dart';
 import 'package:mobile/core/services/fcm_service.dart';
 import 'package:mobile/core/services/local_notification_service.dart';
+import 'package:mobile/core/services/onboarding_service.dart';
 import 'package:mobile/features/auth/data/datasources/firebase_auth_datasource.dart';
 import 'package:mobile/features/auth/data/repositories/auth_repository_impl.dart';
 import 'package:mobile/features/auth/domain/repositories/auth_repository.dart';
@@ -35,6 +36,7 @@ import 'package:mobile/features/notifications/presentation/cubit/notifications_c
 import 'package:mobile/features/session/data/datasources/session_remote_datasource.dart';
 import 'package:mobile/features/session/data/repositories/session_repository_impl.dart';
 import 'package:mobile/features/session/domain/repositories/session_repository.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 final sl = GetIt.instance;
 
@@ -48,6 +50,8 @@ Future<void> init() async {
       () => FirebaseAuthHttpClient(firebaseAuth: sl()),
     )
     ..registerLazySingleton(() => ApiClient(client: sl()))
+    ..registerLazySingleton(SharedPreferencesAsync.new)
+    ..registerLazySingleton(() => OnboardingService(sl()))
     ..registerLazySingleton(() => GoogleSignIn.instance)
     ..registerLazySingleton<FirebaseAuthDataSource>(
       () => FirebaseAuthDataSourceImpl(firebaseAuth: sl(), googleSignIn: sl()),
@@ -61,7 +65,7 @@ Future<void> init() async {
     ..registerLazySingleton<AuthRepository>(
       () => AuthRepositoryImpl(dataSource: sl(), sessionRepository: sl()),
     )
-    ..registerLazySingleton(() => AuthNotifier(sl(), sl(), sl()))
+    ..registerLazySingleton(() => AuthNotifier(sl(), sl(), sl(), sl()))
     ..registerLazySingleton(LocalNotificationService.new)
     ..registerLazySingleton(
       () => FcmService(apiClient: sl(), firebaseAuth: sl(), messaging: sl()),

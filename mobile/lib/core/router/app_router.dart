@@ -6,7 +6,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mobile/core/router/auth_notifier.dart';
-import 'package:mobile/features/auth/presentation/pages/signin_page.dart';
 import 'package:mobile/features/auth/presentation/pages/signup_page.dart';
 import 'package:mobile/features/auth/presentation/pages/welcome_page.dart';
 import 'package:mobile/core/utils/app_colors.dart';
@@ -19,51 +18,65 @@ import 'package:mobile/features/home/presentation/bloc/home_bloc.dart';
 import 'package:mobile/features/home/presentation/bloc/home_event.dart';
 import 'package:mobile/features/home/presentation/pages/camera_detail_page.dart';
 import 'package:mobile/features/home/presentation/pages/home_page.dart';
+import 'package:mobile/features/onboarding/presentation/pages/onboarding_page.dart';
+import 'package:mobile/features/onboarding/presentation/pages/splash_page.dart';
 import 'package:mobile/injection_container.dart';
 
 class AppRouter {
-  AppRouter(this.authNotifier, {this.initialLocation = '/home'});
+  AppRouter(this.authNotifier, {this.initialLocation = '/home'})
+    : _postAuthLocation = initialLocation == '/splash'
+          ? '/home'
+          : initialLocation;
 
   final AuthNotifier authNotifier;
   final String initialLocation;
+  final String _postAuthLocation;
 
   late final GoRouter router = GoRouter(
     refreshListenable: authNotifier,
-    initialLocation: initialLocation,
+    initialLocation: '/splash',
     redirect: (context, state) {
       final isReady = authNotifier.isReady;
       final isAuthenticated = authNotifier.isAuthenticated;
+      final onboardingCompleted = authNotifier.onboardingCompleted;
       final onSplash = state.matchedLocation == '/splash';
+      final onOnboarding = state.matchedLocation == '/onboarding';
       final onAuthFlow =
           state.matchedLocation == '/welcome' ||
-          state.matchedLocation == '/signup' ||
-          state.matchedLocation == '/signin';
+          state.matchedLocation == '/signup';
       developer.log(
         '[GoogleAuth] GoRouter.redirect: '
         'authNotifier=${identityHashCode(authNotifier)}, '
         'matchedLocation=${state.matchedLocation}, '
         'isReady=$isReady, isAuthenticated=$isAuthenticated, '
-        'onSplash=$onSplash, onAuthFlow=$onAuthFlow.',
+        'onboardingCompleted=$onboardingCompleted, '
+        'onSplash=$onSplash, onOnboarding=$onOnboarding, '
+        'onAuthFlow=$onAuthFlow.',
         name: 'AppRouter',
       );
 
       if (!isReady) return onSplash ? null : '/splash';
-      if (onSplash) return isAuthenticated ? '/home' : '/welcome';
-      if (isAuthenticated && onAuthFlow) return '/home';
-      if (!isAuthenticated && !onAuthFlow) return '/welcome';
+      if (isAuthenticated) {
+        if (onSplash || onOnboarding || onAuthFlow) return _postAuthLocation;
+        return null;
+      }
+
+      if (!onboardingCompleted) return onOnboarding ? null : '/onboarding';
+      if (onSplash || onOnboarding) return '/welcome';
+      if (!onAuthFlow) return '/welcome';
       return null;
     },
     routes: [
+      GoRoute(path: '/splash', builder: (context, state) => const SplashPage()),
       GoRoute(
-        path: '/splash',
-        builder: (context, state) => const _SessionCheckingPage(),
+        path: '/onboarding',
+        builder: (context, state) => const OnboardingPage(),
       ),
       GoRoute(
         path: '/welcome',
         builder: (context, state) => const WelcomePage(),
       ),
       GoRoute(path: '/signup', builder: (context, state) => const SignUpPage()),
-      GoRoute(path: '/signin', builder: (context, state) => const SignInPage()),
       GoRoute(
         path: '/home',
         builder: (context, state) => BlocProvider(
@@ -90,22 +103,6 @@ class AppRouter {
       ),
     ],
   );
-}
-
-class _SessionCheckingPage extends StatelessWidget {
-  const _SessionCheckingPage();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Scaffold(
-      backgroundColor: AppColors.surface,
-      body: SafeArea(
-        child: Center(
-          child: CircularProgressIndicator(color: AppColors.primary),
-        ),
-      ),
-    );
-  }
 }
 
 class _CameraRouteLoader extends StatelessWidget {

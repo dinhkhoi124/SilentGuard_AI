@@ -66,6 +66,22 @@ class ApiClient {
     );
   }
 
+  Future<int> patch(
+    String path, [
+    Map<String, dynamic>? body,
+    Map<String, String>? extraHeaders,
+  ]) async {
+    final response = await _client
+        .patch(
+          _uri(path),
+          headers: _headers(extraHeaders),
+          body: body == null ? null : jsonEncode(body),
+        )
+        .timeout(AppConfig.networkTimeout);
+    _decode(response, allowEmpty: true);
+    return response.statusCode;
+  }
+
   Future<int> delete(String path) async {
     final response = await _client
         .delete(_uri(path), headers: _headers())

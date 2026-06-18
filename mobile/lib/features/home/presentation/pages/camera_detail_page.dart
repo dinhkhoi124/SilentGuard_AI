@@ -8,8 +8,10 @@ import 'package:mobile/core/config/app_config.dart';
 import 'package:mobile/core/services/local_notification_service.dart';
 import 'package:mobile/core/utils/app_colors.dart';
 import 'package:mobile/features/home/data/mock_events.dart';
+import 'package:mobile/features/home/domain/entities/alert_review_feedback.dart';
 import 'package:mobile/features/home/domain/entities/camera_device.dart';
 import 'package:mobile/features/home/domain/entities/camera_event.dart';
+import 'package:mobile/features/home/presentation/cubit/alert_review_cubit.dart';
 import 'package:mobile/features/home/presentation/widgets/camera_action_buttons.dart';
 import 'package:mobile/features/home/presentation/widgets/camera_event_history_header.dart';
 import 'package:mobile/features/home/presentation/widgets/camera_event_tile.dart';
@@ -99,10 +101,15 @@ class _CameraDetailPageState extends State<CameraDetailPage> {
             const SliverToBoxAdapter(child: SizedBox(height: 16)),
             const SliverToBoxAdapter(child: CameraEventHistoryHeader()),
             SliverList(
-              delegate: SliverChildBuilderDelegate(
-                (_, index) => CameraEventTile(event: events[index]),
-                childCount: events.length,
-              ),
+              delegate: SliverChildBuilderDelegate((_, index) {
+                final event = events[index];
+                return CameraEventTile(
+                  event: event,
+                  initialReviewState: AppConfig.useMockData
+                      ? _mockReviewStateFor(event.id)
+                      : null,
+                );
+              }, childCount: events.length),
             ),
             const SliverToBoxAdapter(child: SizedBox(height: 24)),
           ],
@@ -305,4 +312,64 @@ String _formatTime(DateTime time) {
   return '${time.hour.toString().padLeft(2, '0')}:'
       '${time.minute.toString().padLeft(2, '0')}:'
       '${time.second.toString().padLeft(2, '0')}';
+}
+
+AlertReviewState? _mockReviewStateFor(String eventId) {
+  final status = mockEventFeedbackStatuses[eventId];
+  if (status == null || status == MockEventFeedbackStatus.unreviewed) {
+    return null;
+  }
+
+  final feedback = _mockFeedbackFor(eventId, status);
+  return switch (status) {
+    MockEventFeedbackStatus.submitting => ReviewSubmitting(feedback),
+    MockEventFeedbackStatus.acknowledged ||
+    MockEventFeedbackStatus.dismissed ||
+    MockEventFeedbackStatus.uncertain => ReviewSuccess(feedback),
+    MockEventFeedbackStatus.failed => ReviewFailure(
+      message: 'Mock: chua dong bo phan hoi.',
+      feedback: feedback,
+    ),
+    MockEventFeedbackStatus.unreviewed => null,
+  };
+}
+
+AlertReviewFeedback _mockFeedbackFor(
+  String eventId,
+  MockEventFeedbackStatus status,
+) {
+  return switch (status) {
+    MockEventFeedbackStatus.acknowledged => AlertReviewFeedback(
+      eventId: eventId,
+      action: 'acknowledged',
+      feedbackLabel: 'true_positive',
+    ),
+    MockEventFeedbackStatus.dismissed => AlertReviewFeedback(
+      eventId: eventId,
+      action: 'dismissed',
+      feedbackLabel: 'false_positive',
+      falsePositiveReason: 'Nguoi dung cui xuong nhat do.',
+    ),
+    MockEventFeedbackStatus.uncertain => AlertReviewFeedback(
+      eventId: eventId,
+      action: 'dismissed',
+      feedbackLabel: 'uncertain',
+    ),
+    MockEventFeedbackStatus.failed => AlertReviewFeedback(
+      eventId: eventId,
+      action: 'dismissed',
+      feedbackLabel: 'false_positive',
+      falsePositiveReason: 'Canh bao sai nhung chua dong bo.',
+    ),
+    MockEventFeedbackStatus.submitting => AlertReviewFeedback(
+      eventId: eventId,
+      action: 'acknowledged',
+      feedbackLabel: 'true_positive',
+    ),
+    MockEventFeedbackStatus.unreviewed => AlertReviewFeedback(
+      eventId: eventId,
+      action: 'dismissed',
+      feedbackLabel: 'uncertain',
+    ),
+  };
 }

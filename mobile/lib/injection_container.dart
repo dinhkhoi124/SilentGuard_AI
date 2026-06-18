@@ -26,12 +26,17 @@ import 'package:mobile/features/devices/domain/repositories/device_repository.da
 import 'package:mobile/features/devices/domain/repositories/imou_stream_repository.dart';
 import 'package:mobile/features/devices/presentation/bloc/device_pairing_bloc.dart';
 import 'package:mobile/features/home/data/repositories/home_repository_impl.dart';
+import 'package:mobile/features/home/data/datasources/alert_review_remote_data_source.dart';
+import 'package:mobile/features/home/data/repositories/alert_review_repository_impl.dart';
 import 'package:mobile/features/home/domain/repositories/home_repository.dart';
+import 'package:mobile/features/home/domain/repositories/alert_review_repository.dart';
 import 'package:mobile/features/home/domain/usecases/delete_camera_device.dart';
 import 'package:mobile/features/home/domain/usecases/get_camera_devices.dart';
 import 'package:mobile/features/home/domain/usecases/get_devices.dart';
 import 'package:mobile/features/home/domain/usecases/get_weather.dart';
+import 'package:mobile/features/home/domain/usecases/review_alert.dart';
 import 'package:mobile/features/home/presentation/bloc/home_bloc.dart';
+import 'package:mobile/features/home/presentation/cubit/alert_review_cubit.dart';
 import 'package:mobile/features/notifications/presentation/cubit/notifications_cubit.dart';
 import 'package:mobile/features/session/data/datasources/session_remote_datasource.dart';
 import 'package:mobile/features/session/data/repositories/session_repository_impl.dart';
@@ -119,4 +124,13 @@ Future<void> init() async {
     ..registerLazySingleton(() => DeleteCameraDevice(sl()))
     ..registerLazySingleton(() => GetWeather(sl()))
     ..registerLazySingleton<HomeRepository>(() => HomeRepositoryImpl(sl()));
+  sl
+    ..registerLazySingleton<AlertReviewRemoteDataSource>(
+      () => AlertReviewRemoteDataSourceImpl(sl()),
+    )
+    ..registerLazySingleton<AlertReviewRepository>(
+      () => AlertReviewRepositoryImpl(sl()),
+    )
+    ..registerLazySingleton(() => ReviewAlert(sl()))
+    ..registerFactory(() => AlertReviewCubit(sl()));
 }

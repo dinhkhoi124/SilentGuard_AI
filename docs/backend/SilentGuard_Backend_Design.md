@@ -221,9 +221,37 @@ CREATE INDEX idx_household_invites_code ON household_invites(code);
 
 ## 4. API Endpoints — Contract đầy đủ
 
-### 4.0 `POST /api/cameras/upload-url` — Lấy presigned URL để upload clip
+### 4.0 `POST /api/events/upload-video` — Tải video sự kiện lên (Demo Flow)
+
+Được sử dụng bởi ứng dụng Client (App/Web) trong quá trình Demo để tải lên một video giả lập luồng stream của Camera. 
+
+- **Headers**:
+  - `Authorization: Bearer <FIREBASE_ID_TOKEN>` (Bắt buộc)
+- **Body**: `multipart/form-data`
+  - `household_id` (Form Field): ID của hộ gia đình (UUID).
+  - `file` (Form Field): Tệp tin video.
+- **Ràng buộc**: Người dùng phải thuộc thành viên (`member` hoặc `owner`) của hộ gia đình `household_id` đó. Trả về `403 Forbidden` nếu không có quyền.
+- **Xử lý**:
+  - Lưu trữ file video vào Supabase Storage bucket `clips`.
+  - Sinh đường dẫn lưu trữ: `videos/{household_id}/{uuid}_{filename}`.
+  - Sinh signed URL truy cập trực tiếp có thời hạn **1 năm** phục vụ Demo.
+  - Sinh `upload_token` ngẫu nhiên có tiền tố `vid_`.
+  - Khởi tạo bản ghi `video_uploads` với trạng thái `pending`.
+- **Response 201 Created**:
+  ```json
+  {
+    "upload_id": "video-upload-uuid",
+    "video_url": "https://xxxx.supabase.co/storage/v1/object/sign/clips/videos/...",
+    "upload_token": "vid_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+  }
+  ```
+
+---
+
+### 4.0.1 `POST /api/cameras/upload-url` — Lấy presigned URL để upload clip từ Edge Device
 
 Header: `X-Device-Key: <device_api_key>`
+
 
 Request:
 ```json
@@ -246,9 +274,9 @@ Luồng đúng:
 
 ---
 
-### 4.1 `POST /api/events/detect`
+### 4.2 `POST /api/events/detect`
 
-Header: `X-Device-Key: <device_api_key>`
+Header: `X-Device-Key: <device_api_key>` HOẶC `X-Upload-Token: <upload_token>` (Demo Flow)
 
 Request:
 ```json
@@ -266,15 +294,18 @@ Request:
 ```
 
 Xử lý:
-1. Xác thực `device_api_key` → lấy `camera_id`, `household_id`.
-2. Validate severity theo `thresholds` của household.
-3. Insert vào `events`.
-4. Nếu `severity != LOW` → gọi `AlertEngine.process(event)`.
+1. **Xác thực**:
+   - Nếu có `X-Device-Key` -> Thực hiện xác thực thiết bị biên camera bình thường, lấy `camera_id` và `household_id`.
+   - Nếu có `X-Upload-Token` -> Tra cứu bảng `video_uploads`. Nếu token hợp lệ và trạng thái là `'pending'`, lấy `household_id`, gán `camera_id = NULL` và `source = 'video_upload'`. Trả về `401 Unauthorized` nếu không hợp lệ.
+2. **Demo fallback**: Nếu `source == 'video_upload'`, tự động ép `severity = 'HIGH'` và `duration_sec = 999`.
+3. **Insert DB**: Thêm bản ghi vào bảng `events`. Nếu `source == 'video_upload'`, cập nhật trạng thái bảng `video_uploads` thành `'processed'` và liên kết `event_id`.
+4. Nếu `severity != LOW` -> gọi `AlertEngine.process(event)`. (Lưu ý: Bỏ qua bước reclassify severity dựa trên `duration_sec` trong Alert Engine đối với nguồn `video_upload`).
 
 Response:
 ```json
 { "status": "received", "event_id": "EVT-20260613-001" }
 ```
+
 
 ### 4.2 `GET /api/alerts?status=pending&limit=20&offset=0&household_id=<uuid>`
 

@@ -74,8 +74,12 @@ async def process_event(event_data: dict) -> None:
         return
 
     # 3. Reclassify severity according to thresholds
-    severity = classify_severity(duration_sec, thresholds)
-    event_data["severity"] = severity
+    # Bypass reclassify step if source is video_upload (keep severity = HIGH as sent by AI Engineer)
+    if event_data.get("source") != "video_upload":
+        severity = classify_severity(duration_sec, thresholds)
+        event_data["severity"] = severity
+    else:
+        severity = event_data.get("severity") or "HIGH"
     
     if severity == "LOW":
         event_data["status"] = "logged_only"

@@ -157,31 +157,81 @@ Camera → RAM (edge) → YOLOv8 keypoints extraction
 
 ---
 
-## 🚀 Quick Start
+## 🚀 Hướng Dẫn Cấu Hình & Chạy Dự Án (Setup Instructions)
 
-> ⚙️ Phần này sẽ được cập nhật sau khi hoàn thành Sprint 2 (Core Pipeline).
+Dự án gồm hai phần chính chạy độc lập: **Backend API (FastAPI)** và **AI Server (Edge AI Pipeline Worker)**.
 
-**Yêu cầu môi trường:**
+### 1. Backend API (FastAPI)
+Nằm trong thư mục `backend/`.
+
+#### Yêu cầu cài đặt:
 - Python 3.11+
-- Raspberry Pi 4B (≥ 4GB RAM) hoặc Intel NUC
-- Camera IP hỗ trợ RTSP
-- Tài khoản Supabase + Firebase project
+- Cơ sở dữ liệu Supabase đã tạo sẵn các bảng.
 
+#### Biến môi trường (`backend/.env`):
+Sao chép `.env.example` thành `.env` và cập nhật:
+```ini
+SUPABASE_URL=...
+SUPABASE_SERVICE_KEY=...
+FIREBASE_SERVICE_ACCOUNT_PATH=./firebase-service-account.json
+AI_SERVER_URL=http://localhost:5000/process
+ANTHROPIC_API_KEY=your_anthropic_api_key
+APP_ENV=development
+```
+
+#### Cài đặt và Chạy:
 ```bash
-# Clone repo
-git clone https://github.com/AI20K-Build-Cohort-2/C2-App-128.git
-cd C2-App-128/team-128
-
-# Cài đặt backend
-cd src
-cp .env.example .env   # điền biến môi trường
+cd backend
+# Cài đặt thư viện
 pip install -r requirements.txt
-uvicorn main:app --reload
 
-# Cài đặt edge (trên Raspberry Pi)
-cd src/edge
-pip install -r requirements-edge.txt
-python run_edge.py
+# Khởi động server (Mặc định chạy ở cổng 8000)
+uvicorn app.main:app --reload
+```
+
+---
+
+### 2. AI Server (Edge AI Worker)
+Nằm trong thư mục `src/edge_ai/`. Server này đóng vai trò như một Edge Worker giả lập nhận diện video.
+
+#### Yêu cầu cài đặt:
+- Cài đặt thư viện: `pip install ultralytics opencv-python numpy requests fastapi uvicorn`
+
+#### Chạy AI Server (Mặc định chạy ở cổng 5000):
+```bash
+cd src/edge_ai
+python ai_worker.py
+```
+
+---
+
+## 🔍 Sample Queries (Các Lệnh Gọi Test)
+
+Dưới đây là các lệnh gọi HTTP Request (`curl`) phục vụ việc kiểm thử luồng hoạt động tự động.
+
+### 1. Tải Video Sự Kiện Lên (Demo Flow)
+Gửi yêu cầu upload video ngắn lên hệ thống. Backend sẽ tự lưu trữ video và tự động trigger AI Server xử lý dưới nền.
+```bash
+curl -X POST "http://localhost:8000/api/events/upload-video" \
+  -H "Authorization: Bearer <DÁN_FIREBASE_TOKEN_CỦA_USER>" \
+  -F "household_id=9578af65-eea9-4769-9ba8-4b3818e2780a" \
+  -F "file=@test_fall.mp4"
+```
+
+### 2. Phản Hồi Sự Kiện (Feedback API)
+Gia đình gửi đánh giá độ chính xác của cảnh báo ngã (chỉ chấp nhận label: `correct`, `incorrect`, `uncertain`).
+```bash
+curl -X POST "http://localhost:8000/api/events/EVT-20260618-331/feedback" \
+  -H "Authorization: Bearer <DÁN_FIREBASE_TOKEN_CỦA_USER>" \
+  -H "Content-Type: application/json" \
+  -d "{\"label\":\"correct\",\"note\":\"Cụ ngã thật, đã hỗ trợ kịp thời\"}"
+```
+
+### 3. Lấy Lịch Sự Kiện
+Lấy toàn bộ danh sách sự cố đã xảy ra của hộ gia đình (phân trang và lọc theo phòng/mức độ nghiêm trọng).
+```bash
+curl "http://localhost:8000/api/events/history?household_id=9578af65-eea9-4769-9ba8-4b3818e2780a&page=1&page_size=10" \
+  -H "Authorization: Bearer <DÁN_FIREBASE_TOKEN_CỦA_USER>"
 ```
 
 ---
@@ -191,7 +241,7 @@ python run_edge.py
 | Sprint | Tuần | Trạng thái | Mục tiêu chính |
 |---|---|---|---|
 | **Sprint 1** | W1–W2 | ✅ Hoàn thành | Thiết kế kiến trúc, wireframe, ERD, API contract |
-| **Sprint 2** | W2–W3 | 🔄 Đang làm | Core pipeline edge, API backend, Alert Engine, push notification |
+| **Sprint 2** | W2–W3 | ✅ Hoàn thành | Core pipeline edge, API backend, Alert Engine, push notification |
 | **Sprint 3** | W4 | 📋 Lên kế hoạch | Claude LLM integration, Dashboard, sửa lỗi từ Sprint 2 |
 | **Sprint 4** | W5–W6 | 📋 Lên kế hoạch | Deploy production, threshold per-user, kiểm thử E2E |
 
@@ -200,23 +250,17 @@ python run_edge.py
 ## 📁 Cấu trúc thư mục
 
 ```
-team-128/
-├── src/                  ← Backend FastAPI chính của SilentGuard
-│   ├── edge/             ← Edge AI pipeline (YOLOv8-Pose + blur)
-│   ├── api/              ← FastAPI routes, models, services
-│   ├── alert/            ← Alert Engine + FCM + auto-call
-│   └── llm/              ← Claude integration
-├── frontend/             ← ⚠️ Prototype Next.js (VinBus cũ, không dùng production)
-├── backend/              ← ⚠️ Prototype Node.js/Fastify (VinBus cũ, không dùng)
-├── docs/                 ← Tài liệu kỹ thuật chi tiết
-├── scripts/              ← Scripts tiện ích (setup, migration, eval)
-├── tests/                ← Test suite (unit + integration)
-├── eval/                 ← Đánh giá model AI (precision/recall)
-├── README.md             ← File này
-├── ARCHITECTURE.md       ← Kiến trúc hệ thống chi tiết
-└── PROJECT_MAP.md        ← Bản đồ thư mục và phân công
+C2-App-128/
+├── backend/              ← Mã nguồn FastAPI chính (routes, models, database)
+├── src/
+│   └── edge_ai/          ← Mô hình YOLOv8-Pose và AI worker backend trigger
+├── docs/                 ← Tài liệu thiết kế API & hướng dẫn kết nối
+├── mobile/               ← Ứng dụng di động Flutter
+├── tests/                ← Bộ test của hệ thống
+└── README.md             ← File này
 ```
 
 ---
 
 > 📄 Xem thêm: [ARCHITECTURE.md](./ARCHITECTURE.md) · [PROJECT_MAP.md](./PROJECT_MAP.md)
+

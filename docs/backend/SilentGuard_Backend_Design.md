@@ -756,6 +756,49 @@ Quyền: `owner` hoặc `member` thuộc household sở hữu event.
   }
   ```
 
+### 4.21 Event History API (`GET /api/events/history`)
+
+Quyền: `owner` hoặc `member` thuộc household.
+
+- **Headers**:
+  - `Authorization: Bearer <FIREBASE_ID_TOKEN>` (Bắt buộc)
+- **Query Parameters**:
+  - `household_id` (Bắt buộc): ID của hộ gia đình (UUID).
+  - `severity` (Tùy chọn): Lọc theo mức độ nghiêm trọng (`LOW`, `MEDIUM`, `HIGH`, `CRITICAL`, `SYSTEM`).
+  - `room` (Tùy chọn): Lọc theo tên phòng.
+  - `from_date` (Tùy chọn): Lọc từ thời điểm (ISO 8601, ví dụ: `2026-06-18T00:00:00Z`).
+  - `to_date` (Tùy chọn): Lọc đến thời điểm (ISO 8601).
+  - `page` (Tùy chọn, mặc định `1`): Trang cần lấy.
+  - `page_size` (Tùy chọn, mặc định `20`, tối đa `100`): Kích thước trang.
+- **Ràng buộc**: Người dùng phải là thành viên của hộ gia đình được truyền vào. Trả về `403 Forbidden` nếu không đúng.
+- **Response 200 OK**:
+  ```json
+  {
+    "items": [
+      {
+        "id": "event-uuid",
+        "event_id": "EVT-20260618-331",
+        "household_id": "household-uuid",
+        "camera_id": null,
+        "source": "video_upload",
+        "event_type": "fall",
+        "severity": "HIGH",
+        "confidence": 0.91,
+        "timestamp": "2026-06-18T16:00:00+00:00",
+        "duration_sec": 999,
+        "room": "bedroom",
+        "clip_path": "https://...",
+        "status": "pending",
+        "model_ver": "v1.0.0",
+        "created_at": "2026-06-18T16:00:02+00:00"
+      }
+    ],
+    "total": 1,
+    "page": 1,
+    "page_size": 20
+  }
+  ```
+
 ---
 
 ## 5. Severity Engine

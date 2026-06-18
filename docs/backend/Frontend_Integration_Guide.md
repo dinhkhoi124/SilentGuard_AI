@@ -186,6 +186,74 @@ Gọi khi người nhà xác nhận trạng thái cảnh báo trên App (ví d�
 
 ---
 
+### 3.6.1 Phản hồi sự kiện (Feedback) (`POST /api/events/{event_id}/feedback`)
+Gửi phản hồi của gia đình về tính chính xác của cảnh báo ngã (dùng làm dữ liệu cải thiện mô hình AI).
+
+- **Headers**:
+```http
+Authorization: Bearer <FIREBASE_ID_TOKEN>
+Content-Type: application/json
+```
+- **Path Parameters**:
+  - `event_id`: Chuỗi ID sự kiện (ví dụ: `EVT-20260618-331`), không phải UUID DB.
+- **Request Body**:
+```json
+{
+  "label": "correct", // Chỉ nhận: "correct" | "incorrect" | "uncertain"
+  "note": "video thực sự có ngã" // (Tùy chọn) ghi chú thêm
+}
+```
+- **Response 201 Created**:
+```json
+{
+  "status": "received",
+  "feedback_id": "feedback-uuid"
+}
+```
+
+---
+
+### 3.6.2 Xem lịch sử sự kiện toàn bộ (`GET /api/events/history`)
+Lấy toàn bộ lịch sử các sự kiện của hộ gia đình (bao gồm tất cả mức độ nghiêm trọng và trạng thái, không loại trừ LOW hay SYSTEM).
+
+- **Headers**:
+```http
+Authorization: Bearer <FIREBASE_ID_TOKEN>
+```
+- **Query Parameters**:
+  - `household_id` (Bắt buộc): ID hộ gia đình.
+  - `severity` (Tùy chọn): Lọc theo độ nghiêm trọng (`LOW`, `MEDIUM`, `HIGH`, `CRITICAL`, `SYSTEM`).
+  - `room` (Tùy chọn): Lọc theo phòng.
+  - `from_date` (Tùy chọn): Lọc từ thời điểm (ISO 8601).
+  - `to_date` (Tùy chọn): Lọc đến thời điểm (ISO 8601).
+  - `page` (Tùy chọn, mặc định `1`): Trang số.
+  - `page_size` (Tùy chọn, mặc định `20`, tối đa `100`): Số bản ghi trên trang.
+
+- **Response 200 OK**:
+```json
+{
+  "items": [
+    {
+      "id": "event-uuid",
+      "event_id": "EVT-20260618-331",
+      "severity": "HIGH",
+      "confidence": 0.91,
+      "timestamp": "2026-06-18T16:00:00Z",
+      "duration_sec": 999,
+      "room": "bedroom",
+      "clip_path": "clips/...",
+      "status": "pending"
+    }
+  ],
+  "total": 1,
+  "page": 1,
+  "page_size": 20
+}
+```
+
+---
+
+
 ### 3.7 Xem báo cáo ngày (`GET /api/reports/daily`)
 Báo cáo tổng hợp tình trạng sức khỏe/sự cố của người cao tuổi do AI Claude tổng hợp.
 

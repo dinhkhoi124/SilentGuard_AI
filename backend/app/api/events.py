@@ -285,4 +285,92 @@ async def post_event_feedback(
         "feedback_id": inserted["id"]
     }
 
+from typing import Optional
+from datetime import datetime
+from fastapi import Query
+
+@router.get("/history", status_code=status.HTTP_200_OK)
+async def get_event_history(
+    household_id: str = Query(..., description="ID của hộ gia đình (bắt buộc)"),
+    severity: Optional[str] = Query(None, description="Lọc theo độ nghiêm trọng (LOW/MEDIUM/HIGH/CRITICAL/SYSTEM)"),
+    room: Optional[str] = Query(None, description="Lọc theo phòng"),
+    from_date: Optional[datetime] = Query(None, description="Lọc từ ngày (ISO 8601)"),
+    to_date: Optional[datetime] = Query(None, description="Lọc đến ngày (ISO 8601)"),
+    page: int = Query(1, ge=1, description="Số trang, bắt đầu từ 1"),
+    page_size: int = Query(20, ge=1, le=100, description="Kích thước trang (tối đa 100)"),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    GET /api/events/history
+    Retrieve complete event history for a household with optional filters.
+    Includes all severity levels and statuses without implicit filters.
+    """
+    user_id = current_user.get("id")
+    
+    # 1. Verify household access manually
+    try:
+        auth_res = supabase.table("household_members")\
+            .select("*")\
+            .eq("household_id", household_id)\
+            .eq("user_id", user_id)\
+            .execute()
+        if not auth_res.data or len(auth_res.data) == 0:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={"error": {"code": "FORBIDDEN", "message": "Bạn không có quyền truy cập thông tin gia đình này"}}
+            )
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={"error": {"code": "DATABASE_ERROR", "message": f"Database verification error: {str(e)}"}}
+        )
+
+    # 2. Build query
+    try:
+        # Start count query and records query
+        # Since postgrest client doesn't support easy count and select at once with dynamic python bindings easily without count parameter,
+        # we can fetch the count using count='exact' in select.
+        query = supabase.table("events").select("*", count="exact").eq("household_id", household_id)
+        
+        if severity:
+            query = query.eq("severity", severity)
+        if room:
+            query = query.eq("room", room)
+        if from_date:
+            query = query.gte("timestamp", from_date.isoformat())
+        if to_date:
+            query = query.lte("timestamp", to_date.isoformat())
+            
+        # Sắp xếp mới nhất trước
+        query = query.order("timestamp", desc=True)
+        
+        # Áp pagination
+        offset = (page - 1) * page_size
+        query = query.range(offset, offset + page_size - 1)
+        
+        res = query.execute()
+        
+        items = res.data or []
+        total = res.count or 0
+        
+        # Map fields so that they match the expected response format (e.g., matching GET /api/alerts where clip_path/clip_url might be returned)
+        # Note: if the client expects clip_url, we should populate it or let the client retrieve it from the details endpoint.
+        # But we'll return raw records which already contain clip_path, room, etc.
+        
+        return {
+            "items": items,
+            "total": total,
+            "page": page,
+            "page_size": page_size
+        }
+    except Exception as e:
+        print(f"Error querying event history: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={"error": {"code": "DATABASE_ERROR", "message": f"Failed to retrieve event history: {str(e)}"}}
+        )
+
+
 

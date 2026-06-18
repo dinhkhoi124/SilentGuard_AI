@@ -91,7 +91,7 @@ class DevicePairingPage extends StatelessWidget {
                       warningMessage ??
                       '${device.name} đã sẵn sàng phát luồng trực tiếp trong Smartify.',
                   primaryLabel: 'Hoàn tất',
-                  onPrimary: () => context.pop(true),
+                  onPrimary: () => context.pop(device.toCameraDevice()),
                 ),
               DevicePairingError(:final message) => _MessageView(
                 icon: Icons.warning_amber_rounded,

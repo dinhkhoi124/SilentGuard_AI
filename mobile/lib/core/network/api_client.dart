@@ -66,11 +66,12 @@ class ApiClient {
     );
   }
 
-  Future<void> delete(String path) async {
+  Future<int> delete(String path) async {
     final response = await _client
         .delete(_uri(path), headers: _headers())
         .timeout(AppConfig.networkTimeout);
     _decode(response, allowEmpty: true);
+    return response.statusCode;
   }
 
   Uri _uri(String path) {

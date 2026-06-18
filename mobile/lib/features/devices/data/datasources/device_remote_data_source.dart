@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:mobile/core/network/api_client.dart';
 import 'package:mobile/features/devices/data/models/device_models.dart';
 import 'package:mobile/features/devices/domain/entities/paired_device.dart';
@@ -103,8 +104,9 @@ class DeviceRemoteDataSourceImpl implements DeviceRemoteDataSource {
   }
 
   @override
-  Future<void> deletePairedDevice(String deviceId) {
-    return _apiClient.delete('/api/cameras/$deviceId');
+  Future<void> deletePairedDevice(String deviceId) async {
+    final status = await _apiClient.delete('/api/cameras/$deviceId');
+    debugPrint('[Camera] DELETE $deviceId status: $status');
   }
 
   String _currentHouseholdId() {

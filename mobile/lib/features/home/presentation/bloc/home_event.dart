@@ -1,6 +1,7 @@
 // lib/features/home/presentation/bloc/home_event.dart
 
 import 'package:equatable/equatable.dart';
+import 'package:mobile/features/home/domain/entities/camera_device.dart';
 
 sealed class HomeEvent extends Equatable {
   const HomeEvent();
@@ -37,6 +38,15 @@ final class HomeDeviceDeleted extends HomeEvent {
 
   @override
   List<Object?> get props => [deviceId];
+}
+
+final class HomeDevicePaired extends HomeEvent {
+  const HomeDevicePaired(this.device);
+
+  final CameraDevice device;
+
+  @override
+  List<Object?> get props => [device];
 }
 
 final class HomeAccessoryToggled extends HomeEvent {

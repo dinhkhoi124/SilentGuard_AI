@@ -198,18 +198,32 @@ class _CameraLivePreviewState extends State<CameraLivePreview> {
     await WidgetsBinding.instance.endOfFrame;
     if (!mounted || !identical(_player, player)) return;
     await player.stop();
+    // The Imou API currently returns RTMP URLs. media_kit receives the URL
+    // as-is; RTMP playback on Android depends on bundled native media support.
     await player.open(Media(streamUrl), play: true);
   }
 
   void _listenToPlayerLogs(Player player) {
     unawaited(
       player.stream.error.forEach((error) {
+        debugPrint('[Player] error: $error');
         developer.log('media_kit error: $error', name: 'CameraLivePreview');
       }),
     );
     unawaited(
       player.stream.log.forEach((record) {
+        debugPrint('[Player] log: $record');
         developer.log(record.toString(), name: 'CameraLivePreview.media_kit');
+      }),
+    );
+    unawaited(
+      player.stream.playing.forEach((playing) {
+        debugPrint('[Player] playing: $playing');
+      }),
+    );
+    unawaited(
+      player.stream.buffering.forEach((buffering) {
+        debugPrint('[Player] buffering: $buffering');
       }),
     );
     unawaited(

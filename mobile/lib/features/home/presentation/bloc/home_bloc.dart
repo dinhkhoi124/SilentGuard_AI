@@ -24,6 +24,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     on<RoomFilterChanged>(_onRoomFilterChanged);
     on<AddDeviceTapped>(_onAddDeviceTapped);
     on<HomeDeviceDeleted>(_onDeviceDeleted);
+    on<HomeDevicePaired>(_onDevicePaired);
     on<HomeAccessoryToggled>(_onAccessoryToggled);
     on<NotificationTapped>((event, emit) {});
   }
@@ -111,6 +112,22 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     _activeDevices = _activeDevices
         .where((device) => device.id != event.deviceId)
         .toList();
+    emit(currentState.copyWith(devices: List.unmodifiable(_activeDevices)));
+  }
+
+  void _onDevicePaired(HomeDevicePaired event, Emitter<HomeState> emit) {
+    final currentState = state;
+    if (currentState is! HomeLoaded) return;
+
+    final deviceIndex = _activeDevices.indexWhere(
+      (device) => device.id == event.device.id,
+    );
+    if (deviceIndex == -1) {
+      _activeDevices = [..._activeDevices, event.device];
+    } else {
+      _activeDevices = List.of(_activeDevices);
+      _activeDevices[deviceIndex] = event.device;
+    }
     emit(currentState.copyWith(devices: List.unmodifiable(_activeDevices)));
   }
 

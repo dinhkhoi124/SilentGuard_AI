@@ -1,32 +1,163 @@
-from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
-from app.core.security import verify_device_key_dependency
+import uuid
+import secrets
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, Form, UploadFile, File, Header
+from app.core.security import verify_device_key_dependency, get_current_user, require_household_role
 from app.core.supabase_client import supabase
 from app.models.schemas import EventDetectRequest
 from app.services.alert_engine import process_event
 
 router = APIRouter(prefix="/api/events", tags=["Events"])
 
+@router.post("/upload-video", status_code=status.HTTP_201_CREATED)
+async def upload_video(
+    background_tasks: BackgroundTasks,
+    household_id: str = Form(...),
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    POST /api/events/upload-video
+    Uploads a video to Supabase Storage and inserts a record into video_uploads.
+    Manually verifies that the user belongs to the requested household.
+    """
+    # Verify access to the requested household manually
+    user_id = current_user.get("id")
+    try:
+        res = supabase.table("household_members")\
+            .select("*")\
+            .eq("household_id", household_id)\
+            .eq("user_id", user_id)\
+            .execute()
+        if not res.data or len(res.data) == 0:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={"error": {"code": "FORBIDDEN", "message": "Bạn không có quyền truy cập thông tin gia đình này"}}
+            )
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={"error": {"code": "DATABASE_ERROR", "message": f"Database verification error: {str(e)}"}}
+        )
+
+    filename = file.filename
+    unique_id = uuid.uuid4()
+    storage_path = f"videos/{household_id}/{unique_id}_{filename}"
+    
+    try:
+        # Read file content
+        file_bytes = await file.read()
+        
+        # Upload to Supabase Storage 'clips' bucket
+        supabase.storage.from_("clips").upload(
+            path=storage_path,
+            file=file_bytes,
+            file_options={"content-type": file.content_type}
+        )
+        
+        # Create a signed URL valid for 1 year (or similar long duration for demo)
+        # 31536000 seconds = 1 year
+        signed_res = supabase.storage.from_("clips").create_signed_url(storage_path, 31536000)
+        video_url = signed_res.get("signedURL") or signed_res.get("signed_url")
+        if not video_url:
+            raise Exception("Failed to obtain signed URL")
+            
+    except Exception as e:
+        print(f"File upload or signing failed: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={"error": {"code": "UPLOAD_ERROR", "message": f"Failed to upload/sign video file: {str(e)}"}}
+        )
+        
+    upload_token = f"vid_{secrets.token_urlsafe(32)}"
+    
+    upload_data = {
+        "household_id": household_id,
+        "uploaded_by": current_user.get("id"),
+        "storage_path": storage_path,
+        "video_url": video_url,
+        "upload_token": upload_token,
+        "status": "pending"
+    }
+    
+    try:
+        db_res = supabase.table("video_uploads").insert(upload_data).select().execute()
+        if not db_res.data:
+            raise Exception("No data returned from DB insert")
+        inserted = db_res.data[0]
+    except Exception as e:
+        print(f"Database insertion for video_uploads failed: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={"error": {"code": "DATABASE_ERROR", "message": f"Failed to save video upload to database: {str(e)}"}}
+        )
+        
+    return {
+        "upload_id": inserted["id"],
+        "video_url": video_url,
+        "upload_token": upload_token
+    }
+
 @router.post("/detect", status_code=status.HTTP_201_CREATED)
 async def detect_event(
     req: EventDetectRequest,
     background_tasks: BackgroundTasks,
-    camera: dict = Depends(verify_device_key_dependency)
+    x_device_key: str = Header(None, alias="X-Device-Key"),
+    x_upload_token: str = Header(None, alias="X-Upload-Token")
 ):
     """
     POST /api/events/detect
-    Ref: Section 4.1 of Design Doc (MVP V1)
-    Receives fall detection events from edge devices.
-    Performs authentication with X-Device-Key, checks the key, and inserts raw event into events table.
+    Receives fall detection events. Supports either X-Device-Key or X-Upload-Token authentication.
     """
-    camera_id = camera.get("id")
-    household_id = camera.get("household_id")
+    camera_id = None
+    household_id = None
+    source = "camera"
+    video_upload_record = None
+
+    if x_device_key:
+        # Standard camera auth flow
+        camera = await verify_device_key_dependency(x_device_key)
+        camera_id = camera.get("id")
+        household_id = camera.get("household_id")
+        source = "camera"
+    elif x_upload_token:
+        # Video upload auth flow
+        try:
+            res = supabase.table("video_uploads").select("*").eq("upload_token", x_upload_token).execute()
+            if not res.data or res.data[0].get("status") != "pending":
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail={"error": {"code": "UNAUTHORIZED", "message": "Invalid or already processed upload token"}}
+                )
+            video_upload_record = res.data[0]
+            household_id = video_upload_record.get("household_id")
+            camera_id = None
+            source = "video_upload"
+        except HTTPException as he:
+            raise he
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail={"error": {"code": "UNAUTHORIZED", "message": "Failed to authenticate upload token"}}
+            )
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={"error": {"code": "UNAUTHORIZED", "message": "Missing X-Device-Key or X-Upload-Token header"}}
+        )
+
+    # Force severity to HIGH and set default duration_sec to 999 if video upload source
+    if source == "video_upload":
+        req.severity = "HIGH"
+        req.duration_sec = 999
 
     # Insert raw event into Supabase `events` table
-    # Ref: Section 4.1 Steps 1-3
     event_data = {
         "event_id": req.event_id,
         "household_id": household_id,
         "camera_id": camera_id,
+        "source": source,
         "event_type": req.event_type,
         "severity": req.severity,
         "confidence": float(req.confidence),
@@ -39,7 +170,7 @@ async def detect_event(
     }
 
     try:
-        res = supabase.table("events").insert(event_data).execute()
+        res = supabase.table("events").insert(event_data).select().execute()
         if res.data and len(res.data) > 0:
             inserted_event = res.data[0]
         else:
@@ -54,8 +185,19 @@ async def detect_event(
             )
         inserted_event = event_data
 
+    # If processed from a video upload, update status & link event_id
+    if source == "video_upload" and video_upload_record:
+        try:
+            event_uuid = inserted_event.get("id")
+            if event_uuid:
+                supabase.table("video_uploads").update({
+                    "status": "processed",
+                    "event_id": event_uuid
+                }).eq("id", video_upload_record["id"]).execute()
+        except Exception as e:
+            print(f"Failed to update video_uploads record: {e}")
+
     # Step 4: Nếu severity != LOW -> gọi AlertEngine.process(event)
-    # Ref: Section 4.1 & Section 6
     if req.severity != "LOW":
         background_tasks.add_task(process_event, inserted_event)
 
@@ -63,3 +205,172 @@ async def detect_event(
         "status": "received",
         "event_id": req.event_id
     }
+
+from app.models.schemas import EventFeedbackRequest
+
+@router.post("/{event_id}/feedback", status_code=status.HTTP_201_CREATED)
+async def post_event_feedback(
+    event_id: str,
+    req: EventFeedbackRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    POST /api/events/{event_id}/feedback
+    Allows user to submit feedback for a fall detection event.
+    """
+    # 1. Lookup event by string event_id
+    try:
+        event_res = supabase.table("events").select("id, household_id").eq("event_id", event_id).execute()
+    except Exception as e:
+        print(f"Failed to lookup event: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={"error": {"code": "DATABASE_ERROR", "message": "Failed to look up event"}}
+        )
+
+    if not event_res.data or len(event_res.data) == 0:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"error": {"code": "EVENT_NOT_FOUND", "message": "Event không tồn tại"}}
+        )
+
+    event_record = event_res.data[0]
+    event_uuid = event_record.get("id")
+    household_id = event_record.get("household_id")
+    user_id = current_user.get("id")
+
+    # 2. Verify household access manually
+    try:
+        res = supabase.table("household_members")\
+            .select("*")\
+            .eq("household_id", household_id)\
+            .eq("user_id", user_id)\
+            .execute()
+        if not res.data or len(res.data) == 0:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={"error": {"code": "FORBIDDEN", "message": "Bạn không có quyền truy cập thông tin gia đình này"}}
+            )
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={"error": {"code": "DATABASE_ERROR", "message": f"Database verification error: {str(e)}"}}
+        )
+
+    # 3. Insert into event_feedback table
+    feedback_data = {
+        "event_id": event_uuid,
+        "household_id": household_id,
+        "submitted_by": user_id,
+        "label": req.label,
+        "note": req.note
+    }
+
+    try:
+        feedback_res = supabase.table("event_feedback").insert(feedback_data).select().execute()
+        if not feedback_res.data:
+            raise Exception("No data returned from database insert")
+        inserted = feedback_res.data[0]
+    except Exception as e:
+        print(f"Failed to insert event feedback: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={"error": {"code": "DATABASE_ERROR", "message": f"Failed to save feedback: {str(e)}"}}
+        )
+
+    return {
+        "status": "received",
+        "feedback_id": inserted["id"]
+    }
+
+from typing import Optional
+from datetime import datetime
+from fastapi import Query
+
+@router.get("/history", status_code=status.HTTP_200_OK)
+async def get_event_history(
+    household_id: str = Query(..., description="ID của hộ gia đình (bắt buộc)"),
+    severity: Optional[str] = Query(None, description="Lọc theo độ nghiêm trọng (LOW/MEDIUM/HIGH/CRITICAL/SYSTEM)"),
+    room: Optional[str] = Query(None, description="Lọc theo phòng"),
+    from_date: Optional[datetime] = Query(None, description="Lọc từ ngày (ISO 8601)"),
+    to_date: Optional[datetime] = Query(None, description="Lọc đến ngày (ISO 8601)"),
+    page: int = Query(1, ge=1, description="Số trang, bắt đầu từ 1"),
+    page_size: int = Query(20, ge=1, le=100, description="Kích thước trang (tối đa 100)"),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    GET /api/events/history
+    Retrieve complete event history for a household with optional filters.
+    Includes all severity levels and statuses without implicit filters.
+    """
+    user_id = current_user.get("id")
+    
+    # 1. Verify household access manually
+    try:
+        auth_res = supabase.table("household_members")\
+            .select("*")\
+            .eq("household_id", household_id)\
+            .eq("user_id", user_id)\
+            .execute()
+        if not auth_res.data or len(auth_res.data) == 0:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={"error": {"code": "FORBIDDEN", "message": "Bạn không có quyền truy cập thông tin gia đình này"}}
+            )
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={"error": {"code": "DATABASE_ERROR", "message": f"Database verification error: {str(e)}"}}
+        )
+
+    # 2. Build query
+    try:
+        # Start count query and records query
+        # Since postgrest client doesn't support easy count and select at once with dynamic python bindings easily without count parameter,
+        # we can fetch the count using count='exact' in select.
+        query = supabase.table("events").select("*", count="exact").eq("household_id", household_id)
+        
+        if severity:
+            query = query.eq("severity", severity)
+        if room:
+            query = query.eq("room", room)
+        if from_date:
+            query = query.gte("timestamp", from_date.isoformat())
+        if to_date:
+            query = query.lte("timestamp", to_date.isoformat())
+            
+        # Sắp xếp mới nhất trước
+        query = query.order("timestamp", desc=True)
+        
+        # Áp pagination
+        offset = (page - 1) * page_size
+        query = query.range(offset, offset + page_size - 1)
+        
+        res = query.execute()
+        
+        items = res.data or []
+        total = res.count or 0
+        
+        # Map fields so that they match the expected response format (e.g., matching GET /api/alerts where clip_path/clip_url might be returned)
+        # Note: if the client expects clip_url, we should populate it or let the client retrieve it from the details endpoint.
+        # But we'll return raw records which already contain clip_path, room, etc.
+        
+        return {
+            "items": items,
+            "total": total,
+            "page": page,
+            "page_size": page_size
+        }
+    except Exception as e:
+        print(f"Error querying event history: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={"error": {"code": "DATABASE_ERROR", "message": f"Failed to retrieve event history: {str(e)}"}}
+        )
+
+
+

@@ -30,7 +30,7 @@ async def create_invite(
     }
     
     try:
-        res = supabase.table("household_invites").insert(invite_data).execute()
+        res = supabase.table("household_invites").insert(invite_data).select().execute()
         if not res.data:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

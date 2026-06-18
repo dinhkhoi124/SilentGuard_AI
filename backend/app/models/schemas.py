@@ -116,3 +116,19 @@ class ThresholdUpdate(BaseModel):
 # ----------------------------------------------------
 class LLMConfigRequest(BaseModel):
     message: str
+
+# ----------------------------------------------------
+# 4.20 Event Feedback
+# ----------------------------------------------------
+class EventFeedbackRequest(BaseModel):
+    label: str = Field(..., description="correct, incorrect, or uncertain")
+    note: Optional[str] = None
+
+    @field_validator("label")
+    @classmethod
+    def validate_label(cls, v: str) -> str:
+        valid_labels = {"correct", "incorrect", "uncertain"}
+        if v not in valid_labels:
+            raise ValueError("label must be one of: 'correct', 'incorrect', 'uncertain'")
+        return v
+

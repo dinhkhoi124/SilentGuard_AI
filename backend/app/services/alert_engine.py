@@ -12,6 +12,22 @@ async def process_event(event_data: dict) -> None:
     Ref: Section 6 Alert Engine & Notification Flow
     """
     event_id = event_data.get("id")
+    event_code = event_data.get("event_id")
+    
+    # If database UUID is missing or None, query the database using the unique event_code string
+    if (not event_id or str(event_id).strip().lower() == "none") and event_code:
+        try:
+            res = supabase.table("events").select("id").eq("event_id", event_code).execute()
+            if res.data and len(res.data) > 0:
+                event_id = res.data[0].get("id")
+                event_data["id"] = event_id
+        except Exception as e:
+            print(f"Error retrieving database UUID for event_code {event_code}: {e}")
+
+    # Ensure event_id is converted to string for serialization/query checks
+    if event_id:
+        event_id = str(event_id)
+
     household_id = event_data.get("household_id")
     event_type = event_data.get("event_type", "fall")
     timestamp_str = event_data.get("timestamp")
@@ -30,14 +46,18 @@ async def process_event(event_data: dict) -> None:
     dedup_window = thresholds.get("dedup_window_sec", 60)
     dedup_time = event_time - timedelta(seconds=dedup_window)
     try:
-        dup_query = supabase.table("events")\
+        query = supabase.table("events")\
             .select("id")\
             .eq("household_id", household_id)\
             .eq("event_type", event_type)\
             .neq("status", "logged_only")\
-            .gt("timestamp", dedup_time.isoformat())\
-            .neq("id", event_id)\
-            .execute()
+            .gt("timestamp", dedup_time.isoformat())
+        
+        # Only exclude self if we have a valid database UUID
+        if event_id and str(event_id).strip().lower() != "none":
+            query = query.neq("id", event_id)
+            
+        dup_query = query.execute()
         
         if dup_query.data and len(dup_query.data) > 0:
             # Duplicate found, set status to logged_only and return
@@ -54,8 +74,12 @@ async def process_event(event_data: dict) -> None:
         return
 
     # 3. Reclassify severity according to thresholds
-    severity = classify_severity(duration_sec, thresholds)
-    event_data["severity"] = severity
+    # Bypass reclassify step if source is video_upload (keep severity = HIGH as sent by AI Engineer)
+    if event_data.get("source") != "video_upload":
+        severity = classify_severity(duration_sec, thresholds)
+        event_data["severity"] = severity
+    else:
+        severity = event_data.get("severity") or "HIGH"
     
     if severity == "LOW":
         event_data["status"] = "logged_only"
@@ -102,9 +126,12 @@ async def _generate_and_update_llm_message(event_id: str) -> None:
     Generate message async with 10s timeout fallback.
     Ref: Section 6
     """
+    if not event_id or str(event_id).strip().lower() == "none":
+        print("Warning: _generate_and_update_llm_message aborted due to invalid event_id")
+        return
     try:
         # Fetch latest event state
-        response = supabase.table("events").select("*").eq("id", event_id).execute()
+        response = supabase.table("events").select("*").eq("id", str(event_id)).execute()
         if not response.data:
             return
         event = response.data[0]
@@ -115,6 +142,6 @@ async def _generate_and_update_llm_message(event_id: str) -> None:
         )
         if llm_msg:
             # Update DB with generated message
-            supabase.table("events").update({"llm_message": llm_msg}).eq("id", event_id).execute()
+            supabase.table("events").update({"llm_message": llm_msg}).eq("id", str(event_id)).execute()
     except Exception as e:
         print(f"LLM async generation fallback / timeout: {e}")

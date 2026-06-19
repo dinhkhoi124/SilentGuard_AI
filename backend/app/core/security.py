@@ -260,3 +260,16 @@ async def verify_device_key_dependency(x_device_key: str = Header(None, alias="X
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail={"error": {"code": "INVALID_DEVICE_KEY", "message": "Device key không hợp lệ hoặc camera chưa đăng ký"}}
         )
+
+def verify_owner_role(household_id: str, user_id: str) -> None:
+    """
+    Verify if the user has the 'owner' role for a given household.
+    Raises HTTPException (403 Forbidden) if the user is not an owner.
+    """
+    member_res = supabase.table("household_members").select("*").eq("household_id", household_id).eq("user_id", user_id).execute()
+    if not member_res.data or member_res.data[0]["role"] != "owner":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"error": {"code": "FORBIDDEN", "message": "Yêu cầu quyền chủ hộ (owner)"}}
+        )
+

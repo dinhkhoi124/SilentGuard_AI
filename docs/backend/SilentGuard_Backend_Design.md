@@ -54,13 +54,16 @@ CREATE TABLE users (
     phone           TEXT,
     fcm_token       TEXT,
     role            TEXT DEFAULT 'family' CHECK (role IN ('family', 'admin')),
+    active_household_id UUID REFERENCES households(id),
     created_at      TIMESTAMPTZ DEFAULT now()
 );
 
 -- ============ ELDERLY PROFILE ============
 CREATE TABLE households (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name            TEXT,
     elderly_name    TEXT,
+    address         TEXT,
     owner_user_id   UUID REFERENCES users(id),
     created_at      TIMESTAMPTZ DEFAULT now()
 );
@@ -589,7 +592,7 @@ Response:
 
 ### 4.12 `GET /api/households/me` — Truy vấn thông tin hộ gia đình của user hiện tại
 
-Quyền: `owner` hoặc `member` (Thành viên hộ gia đình).
+Quyền: `owner` hoặc `member`. Trả về hộ gia đình đang active (`users.active_household_id`). Nếu chưa thiết lập, tự động fallback sang hộ đầu tiên tham gia và thiết lập làm active.
 
 Header: `Authorization: Bearer <token>`
 
@@ -598,7 +601,78 @@ Response:
 {
   "household_id": "household-uuid",
   "role": "owner",
-  "elderly_name": "Nguyen Van A"
+  "name": "Nha Ba Me",
+  "elderly_name": "Nguyen Van A",
+  "address": "123 Nguyen Trai",
+  "created_at": "2026-06-19T03:00:00Z"
+}
+```
+
+### 4.12a `POST /api/households` — Tạo hộ gia đình mới
+
+Quyền: Bất kỳ user nào đã đăng nhập.
+
+Header: `Authorization: Bearer <token>`
+Body:
+```json
+{
+  "name": "Nha Ba Me",
+  "elderly_name": "Nha ong ba Nguyen",
+  "address": "123 Nguyen Trai"
+}
+```
+
+Response:
+```json
+{
+  "id": "household-uuid",
+  "name": "Nha Ba Me",
+  "elderly_name": "Nha ong ba Nguyen",
+  "address": "123 Nguyen Trai",
+  "role": "owner",
+  "created_at": "2026-06-19T03:00:00Z"
+}
+```
+
+### 4.12b `GET /api/households` — Liệt kê toàn bộ hộ gia đình của user
+
+Quyền: Bất kỳ user nào đã đăng nhập.
+
+Header: `Authorization: Bearer <token>`
+
+Response:
+```json
+{
+  "households": [
+    {
+      "id": "household-uuid",
+      "name": "Nha Ba Me",
+      "elderly_name": "Nha ong ba Nguyen",
+      "address": "123 Nguyen Trai",
+      "role": "owner",
+      "is_active": true
+    }
+  ],
+  "active_household_id": "household-uuid"
+}
+```
+
+### 4.12c `POST /api/users/switch-household` — Chuyển đổi hộ gia đình hoạt động
+
+Quyền: Thành viên thuộc hộ gia đình đích.
+
+Header: `Authorization: Bearer <token>`
+Body:
+```json
+{
+  "household_id": "household-uuid"
+}
+```
+
+Response:
+```json
+{
+  "active_household_id": "household-uuid"
 }
 ```
 

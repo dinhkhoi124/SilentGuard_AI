@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Request
-from app.core.security import get_current_user, require_household_role
+from app.core.security import get_current_user, require_household_role, verify_owner_role
 from app.core.supabase_client import supabase
 from app.models.schemas import ThresholdUpdate, ContactCreate, LLMConfigRequest
 from app.services.llm_service import parse_config
@@ -151,13 +151,7 @@ async def update_contact(
         household_id = contact["household_id"]
         
         # Verify user is owner of this household
-        user_id = user.get("id")
-        member_res = supabase.table("household_members").select("*").eq("household_id", household_id).eq("user_id", user_id).execute()
-        if not member_res.data or member_res.data[0]["role"] != "owner":
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail={"error": {"code": "FORBIDDEN", "message": "Yêu cầu quyền chủ hộ (owner)"}}
-            )
+        verify_owner_role(household_id, user.get("id"))
             
         # Reorder other contacts in same household to avoid gap or duplication
         contacts_res = supabase.table("contacts").select("*").eq("household_id", household_id).execute()
@@ -217,13 +211,7 @@ async def delete_contact(
         household_id = deleted_contact["household_id"]
         
         # Verify user is owner of this household
-        user_id = user.get("id")
-        member_res = supabase.table("household_members").select("*").eq("household_id", household_id).eq("user_id", user_id).execute()
-        if not member_res.data or member_res.data[0]["role"] != "owner":
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail={"error": {"code": "FORBIDDEN", "message": "Yêu cầu quyền chủ hộ (owner)"}}
-            )
+        verify_owner_role(household_id, user.get("id"))
         
         # 2. Delete contact
         supabase.table("contacts").delete().eq("id", contact_id).execute()

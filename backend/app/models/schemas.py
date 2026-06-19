@@ -116,3 +116,15 @@ class ThresholdUpdate(BaseModel):
 # ----------------------------------------------------
 class LLMConfigRequest(BaseModel):
     message: str
+
+# ----------------------------------------------------
+# 4.12 Multi-Household
+# ----------------------------------------------------
+class HouseholdCreateRequest(BaseModel):
+    name: str
+    elderly_name: str
+    address: Optional[str] = None
+
+class SwitchHouseholdRequest(BaseModel):
+    household_id: str
+

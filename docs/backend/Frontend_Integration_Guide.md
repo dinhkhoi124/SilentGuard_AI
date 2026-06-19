@@ -373,11 +373,17 @@ Hệ thống liên hệ khẩn cấp dạng danh sách ưu tiên để escalate 
 ---
 
 ### 3.12 Tạo mã mời thành viên mới (`POST /api/households/invite`)
-Sinh mã mời ngẫu nhiên có hiệu lực trong 24 giờ. Chỉ áp dụng cho tài khoản có vai trò `owner`.
+Sinh mã mời ngẫu nhiên có hiệu lực trong 24 giờ. Chỉ áp dụng cho tài khoản có vai trò `owner` của hộ gia đình đó. Mặc định sử dụng `active_household_id` của người gọi (hoặc gửi `household_id` tùy chọn trong request body).
 
 - **Headers**:
 ```http
 Authorization: Bearer <FIREBASE_ID_TOKEN>
+```
+- **Request Body (Optional)**:
+```json
+{
+  "household_id": "household-uuid"
+}
 ```
 - **Response 201 Created**:
 ```json
@@ -390,7 +396,7 @@ Authorization: Bearer <FIREBASE_ID_TOKEN>
 ---
 
 ### 3.13 Lấy thông tin hộ gia đình hiện tại (`GET /api/households/me`)
-Lấy thông tin hộ gia đình của user hiện tại cùng với vai trò (`role`) tương ứng của họ.
+Lấy thông tin hộ gia đình đang active (`active_household_id`) của user hiện tại cùng với vai trò (`role`) tương ứng của họ. Nếu chưa thiết lập active household, backend tự động thiết lập và fallback về hộ đầu tiên tham gia.
 
 - **Headers**:
 ```http
@@ -401,9 +407,93 @@ Authorization: Bearer <FIREBASE_ID_TOKEN>
 {
   "household_id": "household-uuid",
   "role": "owner", // Hoặc "member"
-  "elderly_name": "Nguyen Van A"
+  "name": "Nha Ba Me",
+  "elderly_name": "Nguyen Van A",
+  "address": "123 Nguyen Trai",
+  "created_at": "2026-06-19T03:00:00.000Z"
 }
 ```
+
+---
+
+### 3.13a Tạo hộ gia đình mới (`POST /api/households`)
+Đăng ký một hộ gia đình mới và tự động thiết lập làm hộ gia đình hoạt động của user hiện tại với vai trò `owner`.
+
+- **Headers**:
+```http
+Authorization: Bearer <FIREBASE_ID_TOKEN>
+Content-Type: application/json
+```
+- **Request Body**:
+```json
+{
+  "name": "Nha Ba Me",
+  "elderly_name": "Nha ong ba Nguyen",
+  "address": "123 Nguyen Trai"
+}
+```
+- **Response 201 Created**:
+```json
+{
+  "id": "household-uuid",
+  "name": "Nha Ba Me",
+  "elderly_name": "Nha ong ba Nguyen",
+  "address": "123 Nguyen Trai",
+  "role": "owner",
+  "created_at": "2026-06-19T03:00:00.000Z"
+}
+```
+
+---
+
+### 3.13b Danh sách hộ gia đình của user (`GET /api/households`)
+Liệt kê toàn bộ hộ gia đình mà user hiện tại đang tham gia, kèm thông tin vai trò và cờ `is_active`.
+
+- **Headers**:
+```http
+Authorization: Bearer <FIREBASE_ID_TOKEN>
+```
+- **Response 200 OK**:
+```json
+{
+  "households": [
+    {
+      "id": "household-uuid",
+      "name": "Nha Ba Me",
+      "elderly_name": "Nha ong ba Nguyen",
+      "address": "123 Nguyen Trai",
+      "role": "owner",
+      "is_active": true
+    }
+  ],
+  "active_household_id": "household-uuid"
+}
+```
+
+---
+
+### 3.13c Chuyển đổi hộ gia đình hoạt động (`POST /api/users/switch-household`)
+Chuyển đổi hộ gia đình active hiện tại của user. Chỉ thành viên của hộ gia đình đích mới được phép switch.
+
+- **Headers**:
+```http
+Authorization: Bearer <FIREBASE_ID_TOKEN>
+Content-Type: application/json
+```
+- **Request Body**:
+```json
+{
+  "household_id": "household-uuid"
+}
+```
+- **Response 200 OK**:
+```json
+{
+  "active_household_id": "household-uuid"
+}
+```
+
+---
 
 ---
 

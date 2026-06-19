@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from typing import Optional, List
 from pydantic import BaseModel, Field
 from fastapi import APIRouter, Depends, HTTPException, status, Request
-from app.core.security import get_current_user, require_household_role, verify_device_key_dependency
+from app.core.security import get_current_user, require_household_role, verify_device_key_dependency, verify_owner_role
 from app.core.supabase_client import supabase
 from app.models.schemas import UploadUrlRequest, UploadUrlResponse
 
@@ -118,13 +118,7 @@ async def rotate_camera_key(
         camera = cam_res.data[0]
         
         # Verify user is owner of this household
-        user_id = user.get("id")
-        member_res = supabase.table("household_members").select("*").eq("household_id", camera["household_id"]).eq("user_id", user_id).execute()
-        if not member_res.data or member_res.data[0]["role"] != "owner":
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail={"error": {"code": "FORBIDDEN", "message": "Yêu cầu quyền chủ hộ (owner)"}}
-            )
+        verify_owner_role(camera["household_id"], user.get("id"))
             
         new_plain_key = f"sg_live_{secrets.token_urlsafe(32)}"
         new_hashed_key = hashlib.sha256(new_plain_key.encode()).hexdigest()
@@ -163,13 +157,7 @@ async def delete_camera(
         camera = cam_res.data[0]
         
         # Verify owner role
-        user_id = user.get("id")
-        member_res = supabase.table("household_members").select("*").eq("household_id", camera["household_id"]).eq("user_id", user_id).execute()
-        if not member_res.data or member_res.data[0]["role"] != "owner":
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail={"error": {"code": "FORBIDDEN", "message": "Yêu cầu quyền chủ hộ (owner)"}}
-            )
+        verify_owner_role(camera["household_id"], user.get("id"))
             
         supabase.table("cameras").update({"deleted_at": datetime.now(timezone.utc).isoformat()}).eq("id", camera_id).execute()
         return {"status": "ok"}
@@ -201,13 +189,7 @@ async def update_camera_details(
         camera = cam_res.data[0]
         
         # Verify owner role
-        user_id = user.get("id")
-        member_res = supabase.table("household_members").select("*").eq("household_id", camera["household_id"]).eq("user_id", user_id).execute()
-        if not member_res.data or member_res.data[0]["role"] != "owner":
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail={"error": {"code": "FORBIDDEN", "message": "Yêu cầu quyền chủ hộ (owner)"}}
-            )
+        verify_owner_role(camera["household_id"], user.get("id"))
             
         update_data = {}
         if req.name is not None:

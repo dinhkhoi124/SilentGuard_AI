@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from app.core.security import get_current_user
 from app.core.supabase_client import supabase
-from app.models.schemas import FCMTokenUpdateRequest
+from app.models.schemas import FCMTokenUpdateRequest, SwitchHouseholdRequest
 
 router = APIRouter(prefix="/api/users", tags=["Users"])
 
@@ -58,3 +58,38 @@ async def register_device_token(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={"error": {"code": "DATABASE_ERROR", "message": f"Failed to register FCM token: {str(e)}"}}
         )
+
+@router.post("/switch-household", status_code=status.HTTP_200_OK)
+async def switch_household(
+    req: SwitchHouseholdRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    POST /api/users/switch-household
+    Switches the user's active household.
+    """
+    user_id = current_user.get("id")
+    try:
+        # Verify user is a member of target household
+        mem_res = supabase.table("household_members").select("*").eq("household_id", req.household_id).eq("user_id", user_id).execute()
+        if not mem_res.data:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={"error": {"code": "FORBIDDEN", "message": "Bạn không thuộc về hộ gia đình này"}}
+            )
+            
+        # Update users table
+        supabase.table("users").update({"active_household_id": req.household_id}).eq("id", user_id).execute()
+        
+        return {
+            "active_household_id": req.household_id
+        }
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        print(f"Error in switch_household: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={"error": {"code": "DATABASE_ERROR", "message": f"Failed to switch household: {str(e)}"}}
+        )
+

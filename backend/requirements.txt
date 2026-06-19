@@ -4,6 +4,6 @@ supabase
 firebase-admin
 python-dotenv
 apscheduler
-anthropic
+openai
 pydantic
 python-multipart

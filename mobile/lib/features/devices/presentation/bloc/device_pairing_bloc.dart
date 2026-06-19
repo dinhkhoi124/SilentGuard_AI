@@ -1,5 +1,6 @@
+import 'dart:developer' as developer;
+
 import 'package:dartz/dartz.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:mobile/features/devices/domain/entities/resolved_device.dart';
 import 'package:mobile/features/devices/domain/failures/imou_stream_failure.dart';
@@ -123,7 +124,7 @@ class DevicePairingBloc extends Bloc<DevicePairingEvent, DevicePairingState> {
 
       await _verifyImouAndPersist(resolvedDevice: resolvedDevice, emit: emit);
     } catch (error) {
-      debugPrint('[PairingBloc] Pairing failed: $error');
+      developer.log('Pairing failed.', name: 'DevicePairingBloc', error: error);
       rethrow;
     }
   }
@@ -191,7 +192,7 @@ class DevicePairingBloc extends Bloc<DevicePairingEvent, DevicePairingState> {
   ) {
     T? value;
     result.fold((failure) {
-      debugPrint('[PairingBloc] Pairing failed: $failure');
+      developer.log('Pairing failed: $failure', name: 'DevicePairingBloc');
       onFailure(failure);
     }, (right) => value = right);
     return value;
@@ -203,8 +204,10 @@ class DevicePairingBloc extends Bloc<DevicePairingEvent, DevicePairingState> {
   ) {
     T? value;
     result.fold((failure) {
-      debugPrint('[PairingBloc] Pairing failed: $failure');
-      debugPrint('[PairingBloc] Pairing failure message: ${failure.message}');
+      developer.log(
+        'Pairing failed: ${failure.message}',
+        name: 'DevicePairingBloc',
+      );
       onFailure(failure);
     }, (right) => value = right);
     return value;

@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:mobile/features/home/domain/entities/alert_review_feedback.dart';
 import 'package:mobile/features/home/domain/usecases/review_alert.dart';
@@ -54,16 +53,6 @@ class AlertReviewCubit extends Cubit<AlertReviewState> {
   }
 
   void _emitState(AlertReviewState nextState) {
-    final feedback = switch (nextState) {
-      ReviewSubmitting(:final feedback) => feedback,
-      ReviewSuccess(:final feedback) => feedback,
-      ReviewFailure(:final feedback) => feedback,
-      ReviewInitial() => null,
-    };
-    debugPrint(
-      '[Review] state=${nextState.runtimeType}'
-      '${feedback == null ? '' : ' event=${feedback.eventId} action=${feedback.action}'}',
-    );
     emit(nextState);
   }
 }

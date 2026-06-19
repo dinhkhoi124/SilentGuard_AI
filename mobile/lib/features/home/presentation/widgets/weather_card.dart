@@ -8,10 +8,12 @@ import 'package:mobile/features/home/domain/entities/weather_info.dart';
 class WeatherCard extends StatelessWidget {
   const WeatherCard({super.key, required this.weather});
 
-  final WeatherInfo weather;
+  final WeatherInfo? weather;
 
   @override
   Widget build(BuildContext context) {
+    final weather = this.weather;
+
     return Container(
       height: 220,
       decoration: BoxDecoration(
@@ -46,62 +48,105 @@ class WeatherCard extends StatelessWidget {
           const Positioned(right: 18, top: 22, child: _WeatherArtwork()),
           Padding(
             padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '${weather.temperature.toStringAsFixed(0)}°C',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 34,
-                    height: 1,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 9),
-                Text(
-                  weather.city,
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.86),
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  weather.condition == 'Today Cloudy'
-                      ? 'Hôm nay có mây'
-                      : weather.condition,
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.68),
-                    fontSize: 13,
-                  ),
-                ),
-                const Spacer(),
-                Row(
-                  children: [
-                    _WeatherStat(
-                      icon: Iconsax.cloud,
-                      value: '${weather.aqi}',
-                      label: 'AQI',
-                    ),
-                    _WeatherStat(
-                      icon: Iconsax.drop,
-                      value: '${weather.humidity.toStringAsFixed(1)}%',
-                      label: 'Độ ẩm',
-                    ),
-                    _WeatherStat(
-                      icon: Iconsax.wind,
-                      value: '${weather.windSpeed.toStringAsFixed(1)} m/s',
-                      label: 'Gió',
-                    ),
-                  ],
-                ),
-              ],
-            ),
+            child: weather == null
+                ? const _WeatherUnavailable()
+                : _WeatherContent(weather: weather),
           ),
         ],
       ),
+    );
+  }
+}
+
+class _WeatherContent extends StatelessWidget {
+  const _WeatherContent({required this.weather});
+
+  final WeatherInfo weather;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          '${weather.temperature.toStringAsFixed(0)}°C',
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 34,
+            height: 1,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 9),
+        Text(
+          weather.city,
+          style: TextStyle(
+            color: Colors.white.withValues(alpha: 0.86),
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          weather.condition,
+          style: TextStyle(
+            color: Colors.white.withValues(alpha: 0.68),
+            fontSize: 13,
+          ),
+        ),
+        const Spacer(),
+        Row(
+          children: [
+            _WeatherStat(
+              icon: Iconsax.cloud,
+              value: '${weather.aqi}',
+              label: 'AQI',
+            ),
+            _WeatherStat(
+              icon: Iconsax.drop,
+              value: '${weather.humidity.toStringAsFixed(1)}%',
+              label: 'Độ ẩm',
+            ),
+            _WeatherStat(
+              icon: Iconsax.wind,
+              value: '${weather.windSpeed.toStringAsFixed(1)} m/s',
+              label: 'Gió',
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _WeatherUnavailable extends StatelessWidget {
+  const _WeatherUnavailable();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Icon(Iconsax.cloud_cross, color: Colors.white, size: 34),
+        const SizedBox(height: 12),
+        const Text(
+          'Chưa có dữ liệu thời tiết',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 20,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Kết nối API thời tiết để hiển thị nhiệt độ, AQI và độ ẩm tại đây.',
+          style: TextStyle(
+            color: Colors.white.withValues(alpha: 0.72),
+            fontSize: 13,
+            height: 1.4,
+          ),
+        ),
+      ],
     );
   }
 }

@@ -28,7 +28,6 @@ class FcmService {
   StreamSubscription<RemoteMessage>? _foregroundSubscription;
   StreamSubscription<RemoteMessage>? _openedSubscription;
   bool _initialized = false;
-  bool _debugFcmTokenLogged = false;
 
   Future<void> initialize({
     required NotificationsCubit notificationsCubit,
@@ -102,7 +101,6 @@ class FcmService {
     try {
       await requestNotificationPermission();
       final token = await _messaging.getToken().timeout(_messagingTimeout);
-      _logDebugFcmTokenOnce(token);
       await _registerTokenValue(token, source: 'current');
     } catch (error, stackTrace) {
       developer.log(
@@ -174,14 +172,6 @@ class FcmService {
         stackTrace: stackTrace,
       );
     }
-  }
-
-  void _logDebugFcmTokenOnce(String? token) {
-    if (_debugFcmTokenLogged) return;
-    _debugFcmTokenLogged = true;
-
-    // TODO: remove debug FCM token print before shipping.
-    developer.log('[DEBUG_FCM_TOKEN] $token', name: 'DebugFcmToken');
   }
 
   NotificationAlert _alertFromMessage(RemoteMessage message) {

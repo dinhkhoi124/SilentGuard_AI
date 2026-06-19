@@ -143,7 +143,6 @@ class _FeedbackStatusRow extends StatelessWidget {
           _FeedbackActionButton(
             label: 'Thử lại',
             onPressed: () {
-              debugPrint('[Review] retry event=${event.id}');
               final failedFeedback = (state as ReviewFailure).feedback;
               _openReviewSheet(context, initialFeedback: failedFeedback);
             },

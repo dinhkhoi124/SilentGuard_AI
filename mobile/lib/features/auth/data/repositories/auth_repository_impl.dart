@@ -76,7 +76,7 @@ class AuthRepositoryImpl implements AuthRepository {
       final user = await _dataSource.signInWithGoogle();
       developer.log(
         '[GoogleAuth] datasource returned: '
-        'userPresent=${user != null}, uid=${user?.uid}, email=${user?.email}.',
+        'userPresent=${user != null}.',
         name: 'AuthRepository',
       );
       return Right(user?.toAppUser());

@@ -84,8 +84,7 @@ class FirebaseAuthDataSourceImpl implements FirebaseAuthDataSource {
       );
       final googleUser = await _googleSignIn.authenticate();
       developer.log(
-        '[GoogleAuth] authenticate() returned user: '
-        'email=${googleUser.email}, id=${googleUser.id}.',
+        '[GoogleAuth] authenticate() returned a Google user.',
         name: 'FirebaseAuthDataSource',
       );
       final googleAuth = googleUser.authentication;
@@ -111,9 +110,8 @@ class FirebaseAuthDataSourceImpl implements FirebaseAuthDataSource {
         credential,
       );
       developer.log(
-        '[GoogleAuth] signInWithCredential() returned: '
-        'uid=${userCredential.user?.uid}, '
-        'email=${userCredential.user?.email}.',
+        '[GoogleAuth] signInWithCredential() completed: '
+        'userPresent=${userCredential.user != null}.',
         name: 'FirebaseAuthDataSource',
       );
       return userCredential.user;

@@ -2,24 +2,19 @@
 
 import 'dart:async';
 import 'dart:developer' as developer;
+import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart' as media_kit_video;
 import 'package:mobile/core/utils/app_colors.dart';
-import 'package:video_player/video_player.dart';
 
 class CameraVideoPlayer extends StatelessWidget {
-  const CameraVideoPlayer({
-    super.key,
-    required this.currentTime,
-    this.rtspUrl,
-    this.useMockAsset = false,
-  });
+  const CameraVideoPlayer({super.key, required this.currentTime, this.rtspUrl});
 
   final String currentTime;
   final String? rtspUrl;
-  final bool useMockAsset;
 
   @override
   Widget build(BuildContext context) {
@@ -32,7 +27,7 @@ class CameraVideoPlayer extends StatelessWidget {
           child: Stack(
             fit: StackFit.expand,
             children: [
-              CameraLivePreview(rtspUrl: rtspUrl, useMockAsset: useMockAsset),
+              CameraLivePreview(rtspUrl: rtspUrl),
               Positioned(
                 top: 10,
                 left: 10,
@@ -128,23 +123,21 @@ class CameraVideoPlayer extends StatelessWidget {
 }
 
 class CameraLivePreview extends StatefulWidget {
-  const CameraLivePreview({super.key, this.rtspUrl, this.useMockAsset = false});
+  const CameraLivePreview({super.key, this.rtspUrl});
 
   final String? rtspUrl;
-  final bool useMockAsset;
 
   @override
   State<CameraLivePreview> createState() => _CameraLivePreviewState();
 }
 
 class _CameraLivePreviewState extends State<CameraLivePreview> {
-  static const _videoAssetPath = 'assets/videos/videoplayback.mp4';
+  static const _mediaKitChannel = MethodChannel('smartify/media_kit');
   static bool _mediaKitInitialized = false;
+  static bool _nativeMediaKitRegistered = false;
 
-  VideoPlayerController? _assetController;
   Player? _player;
   media_kit_video.VideoController? _videoController;
-  bool _assetReady = false;
 
   @override
   void initState() {
@@ -155,8 +148,7 @@ class _CameraLivePreviewState extends State<CameraLivePreview> {
   @override
   void didUpdateWidget(covariant CameraLivePreview oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.rtspUrl != widget.rtspUrl ||
-        oldWidget.useMockAsset != widget.useMockAsset) {
+    if (oldWidget.rtspUrl != widget.rtspUrl) {
       _disposeControllers();
       _initController();
     }
@@ -170,19 +162,9 @@ class _CameraLivePreviewState extends State<CameraLivePreview> {
 
   void _initController() {
     final streamUrl = widget.rtspUrl?.trim();
-    if (widget.useMockAsset) {
-      _initMockAsset();
-      return;
-    }
-
     if (streamUrl == null || streamUrl.isEmpty) return;
-    _ensureMediaKitInitialized();
-    final player = Player();
-    _player = player;
-    _videoController = media_kit_video.VideoController(player);
-    _listenToPlayerLogs(player);
     unawaited(
-      _openStreamWhenReady(player, streamUrl).catchError((
+      _openStreamWhenReady(streamUrl).catchError((
         Object error,
         StackTrace stackTrace,
       ) {
@@ -202,36 +184,47 @@ class _CameraLivePreviewState extends State<CameraLivePreview> {
     _mediaKitInitialized = true;
   }
 
-  Future<void> _openStreamWhenReady(Player player, String streamUrl) async {
+  Future<void> _ensureNativeMediaKitRegistered() async {
+    if (!Platform.isAndroid || _nativeMediaKitRegistered) return;
+    await _mediaKitChannel.invokeMethod<void>('registerMediaKit');
+    _nativeMediaKitRegistered = true;
+  }
+
+  Future<void> _openStreamWhenReady(String streamUrl) async {
     await WidgetsBinding.instance.endOfFrame;
-    if (!mounted || !identical(_player, player)) return;
+    if (!mounted || widget.rtspUrl?.trim() != streamUrl) return;
+
+    await _ensureNativeMediaKitRegistered();
+    _ensureMediaKitInitialized();
+    final player = Player();
+    final videoController = media_kit_video.VideoController(player);
+
+    if (!mounted || widget.rtspUrl?.trim() != streamUrl) {
+      unawaited(player.dispose());
+      return;
+    }
+
+    _player = player;
+    _videoController = videoController;
+    _listenToPlayerLogs(player);
+    setState(() {});
+
     await player.stop();
-    // The Imou API currently returns RTMP URLs. media_kit receives the URL
-    // as-is; RTMP playback on Android depends on bundled native media support.
+    // Imou currently returns RTMP URLs. media_kit receives the URL as-is;
+    // RTMP playback on Android depends on the bundled native media support.
+    if (!mounted || !identical(_player, player)) return;
     await player.open(Media(streamUrl), play: true);
   }
 
   void _listenToPlayerLogs(Player player) {
     unawaited(
       player.stream.error.forEach((error) {
-        debugPrint('[Player] error: $error');
         developer.log('media_kit error: $error', name: 'CameraLivePreview');
       }),
     );
     unawaited(
       player.stream.log.forEach((record) {
-        debugPrint('[Player] log: $record');
         developer.log(record.toString(), name: 'CameraLivePreview.media_kit');
-      }),
-    );
-    unawaited(
-      player.stream.playing.forEach((playing) {
-        debugPrint('[Player] playing: $playing');
-      }),
-    );
-    unawaited(
-      player.stream.buffering.forEach((buffering) {
-        debugPrint('[Player] buffering: $buffering');
       }),
     );
     unawaited(
@@ -246,59 +239,19 @@ class _CameraLivePreviewState extends State<CameraLivePreview> {
     );
   }
 
-  Future<void> _initMockAsset() async {
-    final controller = VideoPlayerController.asset(_videoAssetPath);
-    _assetController = controller;
-    try {
-      await controller.initialize();
-      await controller.setLooping(true);
-      await controller.play();
-      if (mounted && identical(_assetController, controller)) {
-        setState(() => _assetReady = true);
-      }
-    } catch (error, stackTrace) {
-      developer.log(
-        'Không thể khởi tạo video mẫu.',
-        name: 'CameraLivePreview',
-        error: error,
-        stackTrace: stackTrace,
-      );
-      if (identical(_assetController, controller)) {
-        _assetController = null;
-      }
-      unawaited(controller.dispose());
-    }
-  }
-
   void _disposeControllers() {
-    final assetController = _assetController;
     final player = _player;
-    _assetController = null;
     _player = null;
     _videoController = null;
-    _assetReady = false;
 
-    if (assetController != null) unawaited(assetController.dispose());
     if (player != null) unawaited(player.dispose());
   }
 
   @override
   Widget build(BuildContext context) {
     final videoController = _videoController;
-    final assetController = _assetController;
 
-    if (widget.useMockAsset && _assetReady && assetController != null) {
-      return FittedBox(
-        fit: BoxFit.cover,
-        child: SizedBox(
-          width: assetController.value.size.width,
-          height: assetController.value.size.height,
-          child: VideoPlayer(assetController),
-        ),
-      );
-    }
-
-    if (!widget.useMockAsset && videoController != null) {
+    if (videoController != null) {
       return media_kit_video.Video(
         controller: videoController,
         fit: BoxFit.cover,

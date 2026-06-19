@@ -1,7 +1,7 @@
 import 'dart:convert';
+import 'dart:developer' as developer;
 
 import 'package:crypto/crypto.dart';
-import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:mobile/core/config/app_config.dart';
 import 'package:mobile/features/devices/domain/entities/imou_device_status.dart';
@@ -111,8 +111,6 @@ class ImouCloudDataSourceImpl implements ImouCloudDataSource {
     _ensureConfigured();
     final uri = _uri(method);
     final body = _openApiBody(params);
-    debugPrint('[Imou] >>> POST $uri');
-    debugPrint('[Imou] >>> body: ${jsonEncode(body)}');
 
     final response = await _client
         .post(
@@ -124,10 +122,12 @@ class ImouCloudDataSourceImpl implements ImouCloudDataSource {
           body: jsonEncode(body),
         )
         .timeout(AppConfig.networkTimeout);
-    debugPrint('[Imou] <<< status: ${response.statusCode}');
-    debugPrint('[Imou] <<< body: ${response.body}');
 
     if (response.statusCode != 200) {
+      developer.log(
+        'Imou method $method returned HTTP ${response.statusCode}.',
+        name: 'ImouCloudDataSource',
+      );
       throw ImouCloudException(
         'Imou Cloud returned HTTP ${response.statusCode}.',
       );
@@ -138,7 +138,7 @@ class ImouCloudDataSourceImpl implements ImouCloudDataSource {
       throw const ImouCloudException('Invalid Imou Cloud response.');
     }
     final payload = Map<String, dynamic>.from(decoded);
-    return _dataPayload(payload, method, response.body);
+    return _dataPayload(payload, method);
   }
 
   Map<String, dynamic> _openApiBody(Map<String, dynamic> params) {
@@ -176,7 +176,6 @@ class ImouCloudDataSourceImpl implements ImouCloudDataSource {
   Map<String, dynamic> _dataPayload(
     Map<String, dynamic> payload,
     String method,
-    String responseBody,
   ) {
     final result = payload['result'];
     if (result is! Map) {
@@ -185,7 +184,10 @@ class ImouCloudDataSourceImpl implements ImouCloudDataSource {
 
     final code = result['code']?.toString();
     if (code != '0') {
-      debugPrint('[Imou] Error response: $responseBody');
+      developer.log(
+        'Imou method $method returned code $code.',
+        name: 'ImouCloudDataSource',
+      );
       throw ImouCloudException(
         result['msg']?.toString() ??
             result['message']?.toString() ??

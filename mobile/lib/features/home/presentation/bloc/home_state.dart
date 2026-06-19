@@ -27,7 +27,7 @@ final class HomeLoaded extends HomeState {
     this.openPairingFlow = false,
   });
 
-  final WeatherInfo weather;
+  final WeatherInfo? weather;
   final List<CameraDevice> devices;
   final String selectedRoom;
   final bool openPairingFlow;

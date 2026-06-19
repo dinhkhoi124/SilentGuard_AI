@@ -2,20 +2,16 @@
 
 import 'dart:async';
 import 'dart:developer' as developer;
-import 'dart:ui';
 
 import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_native_splash/flutter_native_splash.dart';
+import 'package:mobile/core/bootstrap/app_initializer.dart';
 import 'package:mobile/core/router/app_router.dart';
-import 'package:mobile/core/router/auth_notifier.dart';
-import 'package:mobile/core/services/fcm_service.dart';
-import 'package:mobile/core/services/local_notification_service.dart';
 import 'package:mobile/core/theme/app_theme.dart';
 import 'package:mobile/features/auth/presentation/bloc/auth_bloc.dart';
-import 'package:mobile/features/notifications/domain/entities/notification_alert.dart';
 import 'package:mobile/features/notifications/presentation/cubit/notifications_cubit.dart';
 import 'package:mobile/firebase_options.dart';
 import 'package:mobile/injection_container.dart' as di;
@@ -42,95 +38,86 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 }
 
 Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+  // Tier 1: only the Flutter binding and Firebase core are allowed to block
+  // before runApp. Everything else is delayed until Flutter can paint splash.
+  final binding = WidgetsFlutterBinding.ensureInitialized();
+  FlutterNativeSplash.preserve(widgetsBinding: binding);
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  _configureCrashReporting();
-  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-  await di.init();
 
-  late final AppRouter appRouter;
-  final notificationsCubit = di.sl<NotificationsCubit>();
-  final initialFcmAlert = await di.sl<FcmService>().takeInitialAlert();
-  if (initialFcmAlert != null) {
-    notificationsCubit.receiveOpenedAlert(initialFcmAlert);
-  }
-
-  final initialCameraId = await di.sl<LocalNotificationService>().initialize(
-    onCameraNotificationTap: (cameraId) {
-      appRouter.router.go('/camera/$cameraId');
-    },
-  );
-  appRouter = AppRouter(
-    di.sl<AuthNotifier>(),
-    initialLocation: _initialLocation(
-      localCameraId: initialCameraId,
-      fcmAlert: initialFcmAlert,
+  runApp(
+    const BootstrapApp(
+      initializer: AppInitializer(
+        backgroundMessageHandler: _firebaseMessagingBackgroundHandler,
+      ),
     ),
   );
-
-  runApp(MyApp(appRouter: appRouter));
-  WidgetsBinding.instance.addPostFrameCallback((_) {
-    unawaited(
-      di
-          .sl<FcmService>()
-          .initialize(
-            notificationsCubit: notificationsCubit,
-            onNotificationTap: (alert) =>
-                _openNotificationAlert(appRouter, alert),
-          )
-          .catchError((Object error, StackTrace stackTrace) {
-            developer.log(
-              'Deferred FCM listener initialization failed.',
-              name: 'Main',
-              error: error,
-              stackTrace: stackTrace,
-            );
-          }),
-    );
-  });
 }
 
-void _configureCrashReporting() {
-  FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
-  PlatformDispatcher.instance.onError = (error, stackTrace) {
-    FirebaseCrashlytics.instance.recordError(error, stackTrace, fatal: true);
-    return true;
-  };
+class BootstrapApp extends StatefulWidget {
+  const BootstrapApp({super.key, required this.initializer});
+
+  final AppInitializer initializer;
+
+  @override
+  State<BootstrapApp> createState() => _BootstrapAppState();
 }
 
-String _initialLocation({
-  required String? localCameraId,
-  required NotificationAlert? fcmAlert,
-}) {
-  if (localCameraId != null) return '/camera/$localCameraId';
+class _BootstrapAppState extends State<BootstrapApp> {
+  AppInitializationResult? _initializationResult;
 
-  final fcmCameraId = fcmAlert?.cameraId;
-  if (fcmCameraId != null && fcmCameraId.isNotEmpty) {
-    return '/camera/${Uri.encodeComponent(fcmCameraId)}';
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(_initializePostFrame());
+    });
   }
 
-  return '/home';
-}
+  Future<void> _initializePostFrame() async {
+    try {
+      // Tier 2: plugin setup, DI, local notifications, initial FCM lookup, and
+      // router creation are intentionally post-frame. AppInitializer yields
+      // between platform-channel calls to avoid DartMessenger congestion.
+      final result = await widget.initializer.initializeAfterFirstFrame();
+      if (!mounted) return;
 
-void _openNotificationAlert(AppRouter appRouter, NotificationAlert alert) {
-  final cameraId = alert.cameraId;
-  if (cameraId != null && cameraId.isNotEmpty) {
-    appRouter.router.go('/camera/${Uri.encodeComponent(cameraId)}');
-    return;
+      setState(() => _initializationResult = result);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        widget.initializer.scheduleMessagingSetup(result);
+      });
+    } catch (error, stackTrace) {
+      developer.log(
+        'App post-frame initialization failed.',
+        name: 'Bootstrap',
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
   }
-
-  appRouter.router.go('/home');
-}
-
-class MyApp extends StatelessWidget {
-  const MyApp({super.key, this.appRouter});
-
-  final AppRouter? appRouter;
 
   @override
   Widget build(BuildContext context) {
-    final router = appRouter ?? AppRouter(di.sl<AuthNotifier>());
+    final result = _initializationResult;
+    if (result == null) {
+      return MaterialApp(
+        title: 'WatchNest',
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.light,
+        home: const Scaffold(backgroundColor: Color(0xFF2B5CE6)),
+      );
+    }
 
+    return MyApp(appRouter: result.appRouter);
+  }
+}
+
+class MyApp extends StatelessWidget {
+  const MyApp({super.key, required this.appRouter});
+
+  final AppRouter appRouter;
+
+  @override
+  Widget build(BuildContext context) {
     return MultiBlocProvider(
       providers: [
         BlocProvider(create: (_) => di.sl<AuthBloc>()),
@@ -140,7 +127,7 @@ class MyApp extends StatelessWidget {
         title: 'WatchNest',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.light,
-        routerConfig: router.router,
+        routerConfig: appRouter.router,
       ),
     );
   }

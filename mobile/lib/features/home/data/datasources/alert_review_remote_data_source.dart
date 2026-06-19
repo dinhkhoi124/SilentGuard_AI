@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:mobile/core/network/api_client.dart';
 
 abstract interface class AlertReviewRemoteDataSource {
@@ -37,22 +36,9 @@ class AlertReviewRemoteDataSourceImpl implements AlertReviewRemoteDataSource {
       'clip_timestamp': ?clipTimestamp,
     };
 
-    debugPrint(
-      '[Review] PATCH event=$eventId action=$mappedAction status=sending',
+    await _apiClient.patch(
+      '/api/alerts/${Uri.encodeComponent(eventId)}/review',
+      body,
     );
-    try {
-      final status = await _apiClient.patch(
-        '/api/alerts/${Uri.encodeComponent(eventId)}/review',
-        body,
-      );
-      debugPrint(
-        '[Review] PATCH event=$eventId action=$mappedAction status=$status',
-      );
-    } catch (error) {
-      debugPrint(
-        '[Review] PATCH event=$eventId action=$mappedAction status=failed',
-      );
-      rethrow;
-    }
   }
 }

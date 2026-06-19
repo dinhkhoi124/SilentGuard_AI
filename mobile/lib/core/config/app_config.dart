@@ -1,6 +1,4 @@
 abstract final class AppConfig {
-  static const bool useMockData = bool.fromEnvironment('USE_MOCK_DATA');
-
   static const String apiBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
     defaultValue: 'https://c2-app-128-production.up.railway.app',

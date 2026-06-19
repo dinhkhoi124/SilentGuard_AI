@@ -2,9 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:dartz/dartz.dart';
-import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
-import 'package:mobile/core/config/app_config.dart';
 import 'package:mobile/core/network/api_client.dart';
 import 'package:mobile/features/home/data/datasources/alert_review_remote_data_source.dart';
 import 'package:mobile/features/home/domain/entities/alert_review_feedback.dart';
@@ -17,14 +15,6 @@ class AlertReviewRepositoryImpl implements AlertReviewRepository {
 
   @override
   Future<Either<String, void>> reviewAlert(AlertReviewFeedback feedback) async {
-    if (AppConfig.useMockData) {
-      debugPrint(
-        '[Review] PATCH event=${feedback.eventId} '
-        'action=${feedback.action} status=mock',
-      );
-      return const Right(null);
-    }
-
     try {
       await _remoteDataSource.reviewAlert(
         eventId: feedback.eventId,

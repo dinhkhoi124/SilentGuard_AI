@@ -7,5 +7,5 @@ abstract interface class HomeRepository {
   Future<Either<String, List<Device>>> getDevices();
   Future<Either<String, List<CameraDevice>>> getCameraDevices();
   Future<Either<String, void>> deleteCameraDevice(String deviceId);
-  Future<Either<String, WeatherInfo>> getWeather();
+  Future<Either<String, WeatherInfo?>> getWeather();
 }

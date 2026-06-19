@@ -3,12 +3,20 @@
 import 'dart:async';
 import 'dart:developer' as developer;
 
-import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
+import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:mobile/core/services/fcm_service.dart';
 import 'package:mobile/core/services/onboarding_service.dart';
 import 'package:mobile/features/auth/domain/entities/app_user.dart';
 import 'package:mobile/features/auth/domain/repositories/auth_repository.dart';
 import 'package:mobile/features/session/domain/repositories/session_repository.dart';
+
+enum AuthStartupPhase {
+  checkingSession,
+  provisioningSession,
+  unauthenticated,
+  authenticated,
+}
 
 class AuthNotifier extends ChangeNotifier {
   AuthNotifier(
@@ -22,7 +30,8 @@ class AuthNotifier extends ChangeNotifier {
       'instance=${identityHashCode(this)}, '
       'currentUserPresent=${_authRepository.currentUser != null}, '
       'cachedBackendSessionPresent=${_sessionRepository.currentSession != null}, '
-      'isReady=$_isReady, isAuthenticated=$_isAuthenticated, '
+      'phase=$_phase, isReady=$_isReady, '
+      'isAuthenticated=$_isAuthenticated, '
       'onboardingCompleted=$_onboardingCompleted.',
       name: 'AuthNotifier',
     );
@@ -53,11 +62,16 @@ class AuthNotifier extends ChangeNotifier {
   bool _authResolved = false;
   bool _onboardingLoaded = false;
   bool _minimumSplashElapsed = false;
+  bool _disposed = false;
+  bool _splashRemoved = false;
   int _authRevision = 0;
+  int _fcmRegistrationRevision = 0;
+  AuthStartupPhase _phase = AuthStartupPhase.checkingSession;
 
   bool get isReady => _isReady;
   bool get isAuthenticated => _isAuthenticated;
   bool get onboardingCompleted => _onboardingCompleted;
+  AuthStartupPhase get phase => _phase;
 
   Future<void> completeOnboarding() async {
     await _onboardingService.markCompleted();
@@ -90,13 +104,9 @@ class AuthNotifier extends ChangeNotifier {
 
   void _handleAuthStateChanged(AppUser? user) {
     final revision = ++_authRevision;
-    unawaited(_syncAuthState(user, revision));
-  }
-
-  Future<void> _syncAuthState(AppUser? user, int revision) async {
     developer.log(
       '[GoogleAuth] authStateChanges emitted: '
-      'userPresent=${user != null}, uid=${user?.uid}, '
+      'userPresent=${user != null}, previousPhase=$_phase, '
       'previousReady=$_isReady, '
       'previousAuthenticated=$_isAuthenticated.',
       name: 'AuthNotifier',
@@ -108,8 +118,34 @@ class AuthNotifier extends ChangeNotifier {
       return;
     }
 
+    _startProvisioning(revision);
+  }
+
+  void _startProvisioning(int revision) {
+    _authResolved = false;
+    _isAuthenticated = false;
+    _phase = AuthStartupPhase.provisioningSession;
+    _publishStartupStatus(force: true);
+
+    unawaited(
+      Future<void>.microtask(() => _provisionSession(revision)).catchError((
+        Object error,
+        StackTrace stackTrace,
+      ) {
+        developer.log(
+          'Backend provisioning crashed in AuthNotifier.',
+          name: 'AuthNotifier',
+          error: error,
+          stackTrace: stackTrace,
+        );
+        if (revision == _authRevision) _completeAuthCheck(false);
+      }),
+    );
+  }
+
+  Future<void> _provisionSession(int revision) async {
     final result = await _sessionRepository.provisionSession();
-    if (revision != _authRevision) return;
+    if (_disposed || revision != _authRevision) return;
 
     result.fold(
       (failure) {
@@ -121,10 +157,25 @@ class AuthNotifier extends ChangeNotifier {
         _completeAuthCheck(false);
       },
       (_) {
-        unawaited(_registerFcmTokenSilently());
         _completeAuthCheck(true);
+        _scheduleFcmTokenRegistration(revision);
       },
     );
+  }
+
+  void _scheduleFcmTokenRegistration(int revision) {
+    if (_fcmRegistrationRevision == revision) return;
+    _fcmRegistrationRevision = revision;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_disposed || revision != _authRevision) return;
+      unawaited(
+        Future<void>.delayed(
+          const Duration(milliseconds: 500),
+          _registerFcmTokenSilently,
+        ),
+      );
+    });
   }
 
   Future<void> _registerFcmTokenSilently() async {
@@ -144,11 +195,15 @@ class AuthNotifier extends ChangeNotifier {
     _authResolved = true;
     final authChanged = _isAuthenticated != isAuthenticated;
     _isAuthenticated = isAuthenticated;
+    _phase = isAuthenticated
+        ? AuthStartupPhase.authenticated
+        : AuthStartupPhase.unauthenticated;
     _publishStartupStatus(force: authChanged);
   }
 
   void _publishStartupStatus({bool force = false}) {
     final isReady = _authResolved && _onboardingLoaded && _minimumSplashElapsed;
+    final wasReady = _isReady;
     if (_isReady == isReady && !force) {
       developer.log(
         '[GoogleAuth] AuthNotifier status unchanged; '
@@ -159,13 +214,19 @@ class AuthNotifier extends ChangeNotifier {
     }
 
     _isReady = isReady;
+    if (!wasReady && isReady && !_splashRemoved) {
+      _splashRemoved = true;
+      // Remove the native splash only when router auth state is resolved, so
+      // users never see the wrong route during Firebase session restoration.
+      FlutterNativeSplash.remove();
+    }
     _notifyStatusChanged('startup status');
   }
 
   void _notifyStatusChanged(String reason) {
     developer.log(
       '[GoogleAuth] AuthNotifier calling notifyListeners(): '
-      'reason=$reason, isReady=$_isReady, '
+      'reason=$reason, phase=$_phase, isReady=$_isReady, '
       'isAuthenticated=$_isAuthenticated, '
       'onboardingCompleted=$_onboardingCompleted.',
       name: 'AuthNotifier',
@@ -175,6 +236,7 @@ class AuthNotifier extends ChangeNotifier {
 
   @override
   void dispose() {
+    _disposed = true;
     _authRevision++;
     _subscription.cancel();
     super.dispose();

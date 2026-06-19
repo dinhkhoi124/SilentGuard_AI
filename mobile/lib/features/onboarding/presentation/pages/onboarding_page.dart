@@ -105,7 +105,7 @@ static const _pages = [
                 width: double.infinity,
                 child: FilledButton(
                   onPressed: _continue,
-                  child: Text(isFinalPage ? 'Get started' : 'Continue'),
+                  child: Text(isFinalPage ? 'Bắt đầu' : 'Tiếp tục'),
                 ),
               ),
             ],

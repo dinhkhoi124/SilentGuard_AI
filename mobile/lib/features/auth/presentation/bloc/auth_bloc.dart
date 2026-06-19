@@ -3,6 +3,7 @@
 import 'dart:async';
 import 'dart:developer' as developer;
 
+import 'package:flutter/widgets.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:mobile/core/services/fcm_service.dart';
 import 'package:mobile/features/auth/domain/entities/app_user.dart';
@@ -122,7 +123,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       (user) async {
         developer.log(
           '[GoogleAuth] AuthBloc received success branch: '
-          'userPresent=${user != null}, uid=${user?.uid}, email=${user?.email}.',
+          'userPresent=${user != null}.',
           name: 'AuthBloc',
         );
         if (user == null) {
@@ -161,12 +162,23 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     emit(const AuthProvisioning());
     final sessionResult = await _sessionRepository.provisionSession();
     sessionResult.fold((failure) => emit(AuthFailure(failure.message)), (_) {
-      unawaited(_registerFcmTokenSilently());
       developer.log(
         '[GoogleAuth] AuthBloc emitting AuthSuccess after backend provisioning.',
         name: 'AuthBloc',
       );
       emit(AuthSuccess(user));
+      _scheduleFcmTokenRegistration();
+    });
+  }
+
+  void _scheduleFcmTokenRegistration() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(
+        Future<void>.delayed(
+          const Duration(milliseconds: 500),
+          _registerFcmTokenSilently,
+        ),
+      );
     });
   }
 

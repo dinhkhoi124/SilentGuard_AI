@@ -6,8 +6,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:iconsax/iconsax.dart';
-import 'package:mobile/core/config/app_config.dart';
 import 'package:mobile/core/utils/app_colors.dart';
+import 'package:mobile/core/widgets/wave_text_loader.dart';
 import 'package:mobile/features/account/presentation/pages/account_page.dart';
 import 'package:mobile/features/home/domain/entities/camera_device.dart';
 import 'package:mobile/features/home/presentation/bloc/home_bloc.dart';
@@ -156,9 +156,7 @@ class _HomeTab extends StatelessWidget {
       },
       builder: (context, state) {
         return switch (state) {
-          HomeInitial() || HomeLoading() => const Center(
-            child: CircularProgressIndicator(color: AppColors.primary),
-          ),
+          HomeInitial() || HomeLoading() => const WaveTextLoader(),
           HomeError(:final message) => _ErrorView(message: message),
           HomeLoaded() => _LoadedHome(state: state),
         };
@@ -506,11 +504,6 @@ class _ErrorView extends StatelessWidget {
 }
 
 void _handleAddDevicePressed(BuildContext context) {
-  if (AppConfig.useMockData) {
-    context.read<HomeBloc>().add(const AddDeviceTapped());
-    return;
-  }
-
   unawaited(_openPairingFlow(context));
 }
 

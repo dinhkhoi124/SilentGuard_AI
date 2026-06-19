@@ -19,12 +19,11 @@ import 'package:mobile/features/home/presentation/bloc/home_event.dart';
 import 'package:mobile/features/home/presentation/pages/camera_detail_page.dart';
 import 'package:mobile/features/home/presentation/pages/home_page.dart';
 import 'package:mobile/features/onboarding/presentation/pages/onboarding_page.dart';
-import 'package:mobile/features/onboarding/presentation/pages/splash_page.dart';
 import 'package:mobile/injection_container.dart';
 
 class AppRouter {
   AppRouter(this.authNotifier, {this.initialLocation = '/home'})
-    : _postAuthLocation = initialLocation == '/splash'
+    : _postAuthLocation = initialLocation == '/loading'
           ? '/home'
           : initialLocation;
 
@@ -34,12 +33,13 @@ class AppRouter {
 
   late final GoRouter router = GoRouter(
     refreshListenable: authNotifier,
-    initialLocation: '/splash',
+    initialLocation: '/loading',
     redirect: (context, state) {
       final isReady = authNotifier.isReady;
       final isAuthenticated = authNotifier.isAuthenticated;
       final onboardingCompleted = authNotifier.onboardingCompleted;
-      final onSplash = state.matchedLocation == '/splash';
+      final authPhase = authNotifier.phase;
+      final onLoading = state.matchedLocation == '/loading';
       final onOnboarding = state.matchedLocation == '/onboarding';
       final onAuthFlow =
           state.matchedLocation == '/welcome' ||
@@ -48,26 +48,31 @@ class AppRouter {
         '[GoogleAuth] GoRouter.redirect: '
         'authNotifier=${identityHashCode(authNotifier)}, '
         'matchedLocation=${state.matchedLocation}, '
-        'isReady=$isReady, isAuthenticated=$isAuthenticated, '
+        'phase=$authPhase, isReady=$isReady, '
+        'isAuthenticated=$isAuthenticated, '
         'onboardingCompleted=$onboardingCompleted, '
-        'onSplash=$onSplash, onOnboarding=$onOnboarding, '
+        'onLoading=$onLoading, onOnboarding=$onOnboarding, '
         'onAuthFlow=$onAuthFlow.',
         name: 'AppRouter',
       );
 
-      if (!isReady) return onSplash ? null : '/splash';
+      if (!isReady) return onLoading ? null : '/loading';
       if (isAuthenticated) {
-        if (onSplash || onOnboarding || onAuthFlow) return _postAuthLocation;
+        if (onLoading || onOnboarding || onAuthFlow) return _postAuthLocation;
         return null;
       }
 
       if (!onboardingCompleted) return onOnboarding ? null : '/onboarding';
-      if (onSplash || onOnboarding) return '/welcome';
+      if (onLoading || onOnboarding) return '/welcome';
       if (!onAuthFlow) return '/welcome';
       return null;
     },
     routes: [
-      GoRoute(path: '/splash', builder: (context, state) => const SplashPage()),
+      GoRoute(
+        path: '/loading',
+        builder: (context, state) =>
+            const Scaffold(backgroundColor: Color(0xFF2B5CE6)),
+      ),
       GoRoute(
         path: '/onboarding',
         builder: (context, state) => const OnboardingPage(),

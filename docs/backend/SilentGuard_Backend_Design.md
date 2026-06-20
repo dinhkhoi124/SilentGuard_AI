@@ -966,26 +966,23 @@ async def send_push(user_id: str, event: Event):
 
 ---
 
-## 8. LLM Service (Claude API)
+## 8. LLM Service (OpenAI API / Rule-based)
 
+### 8.1 Cảnh báo tức thời (Rule-based)
+Hàm `generate_alert_message` được triển khai hoàn toàn bằng phương pháp rule-based (không sử dụng LLM):
 ```python
 # app/services/llm_service.py
-async def generate_alert_message(event: Event) -> str:
-    prompt = f"""
-    Một sự cố té ngã vừa được phát hiện:
-    - Mức độ: {event.severity}
-    - Thời gian: {event.timestamp}
-    - Phòng: {event.room}
-    - Bất động: {event.duration_sec} giây
+async def generate_alert_message(event: dict) -> str:
+    # 1. Parse timestamp thành định dạng HH:MM
+    # 2. Sinh thông báo bằng tiếng Việt theo severity (LOW, MEDIUM, HIGH, CRITICAL)
+```
+* **LOW**: Người thân vừa té ngã trong {room} lúc {time_str} và đã tự đứng dậy sau {duration_sec} giây. Dù vậy, té ngã ở người cao tuổi có thể gây chấn thương không rõ ngay — nên gọi điện hỏi thăm sức khỏe trong hôm nay.
+* **MEDIUM**: ⚠️ Cảnh báo: Phát hiện té ngã trong {room} lúc {time_str}. Người thân chưa đứng dậy sau {duration_sec} giây. Vui lòng kiểm tra.
+* **HIGH**: 🚨 Khẩn cấp: Phát hiện té ngã trong {room} lúc {time_str}. Người thân bất động hơn {duration_sec} giây. Cần kiểm tra ngay!
+* **CRITICAL**: 🆘 NGUY HIỂM: Người thân bất động hơn {duration_sec} giây trong {room} kể từ {time_str}. Liên hệ cấp cứu ngay!
 
-    Viết 1-2 câu tin nhắn tự nhiên, ấm áp, rõ ràng cho gia đình,
-    nêu rõ mức độ nghiêm trọng và hành động nên làm.
-    """
-    return await call_claude(prompt)
-
-async def generate_daily_report(events: list[Event]) -> str:
-    # Tổng hợp event log của 1 ngày thành đoạn văn tự nhiên
-    ...
+### 8.2 Daily Report & Config Parser (OpenAI `gpt-4o-mini`)
+Các tác vụ phân tích cấu hình từ hội thoại (`parse_config`) và tổng hợp báo cáo ngày (`generate_daily_report`) sử dụng OpenAI client với model `gpt-4o-mini`.
 
 from pydantic import BaseModel, Field, validator
 from typing import Optional
@@ -1087,7 +1084,7 @@ SUPABASE_URL=https://xxxx.supabase.co
 SUPABASE_SERVICE_KEY=xxxx
 FIREBASE_SERVICE_ACCOUNT_JSON={"type":"service_account",...}
 FIREBASE_SERVICE_ACCOUNT_PATH=./firebase-service-account.json
-ANTHROPIC_API_KEY=xxxx
+OPENAI_API_KEY=xxxx
 APP_ENV=development
 ```
 
@@ -1104,7 +1101,7 @@ APP_ENV=development
 }
 ```
 
-Mã lỗi thường dùng: `UNAUTHORIZED`, `INVALID_DEVICE_KEY`, `EVENT_NOT_FOUND`, `VALIDATION_ERROR`, `LLM_TIMEOUT`.
+Mã lỗi thường dùng: `UNAUTHORIZED`, `INVALID_DEVICE_KEY`, `EVENT_NOT_FOUND`, `VALIDATION_ERROR`, `LLM_TIMEOUT`, `DUPLICATE_EVENT` (trả về 409 khi trùng lặp event_id).
 
 ---
 

@@ -3,6 +3,7 @@ import json
 from datetime import datetime
 from typing import Optional, List
 from pydantic import BaseModel, Field, field_validator
+from fastapi import HTTPException
 from openai import OpenAI
 from app.core.config import settings
 
@@ -13,6 +14,7 @@ is_mock = not api_key or api_key == "xxxx" or "your-openai-key" in api_key or "y
 if not is_mock:
     client = OpenAI(
         api_key=api_key,
+        timeout=30.0,
     )
 else:
     print("Warning: OPENAI_API_KEY is not configured or holds a placeholder value. Running LLM service in mock mode.")
@@ -113,6 +115,13 @@ async def parse_config(message: str) -> ParsedConfig:
     Parse configuration from user chat instructions.
     Ref: Section 8 parse_config
     """
+    MAX_CONFIG_LENGTH = 500  # ký tự
+    if len(message) > MAX_CONFIG_LENGTH:
+        raise HTTPException(
+            status_code=400,
+            detail={"error": {"code": "INPUT_TOO_LONG", "message": f"Nội dung cấu hình tối đa {MAX_CONFIG_LENGTH} ký tự"}}
+        )
+
     prompt = f"""
     Người dùng nói: "{message}"
     Trả về JSON với các field sau (chỉ điền field được đề cập, bỏ qua field không liên quan):
@@ -146,5 +155,8 @@ async def parse_config(message: str) -> ParsedConfig:
         data = json.loads(raw)
         return ParsedConfig(**data)
     except Exception as e:
-        print(f"Error calling Claude API to parse config: {e}")
-        raise ValueError(f"Không thể phân tích cấu hình tự động: {e}")
+        print(f"[parse_config] LLM error: {e}")  # chỉ log server-side
+        raise HTTPException(
+            status_code=503,
+            detail={"error": {"code": "LLM_UNAVAILABLE", "message": "Không thể xử lý cấu hình lúc này, vui lòng thử lại sau"}}
+        )

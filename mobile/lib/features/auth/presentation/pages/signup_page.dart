@@ -104,7 +104,7 @@ class _SignUpPageState extends State<SignUpPage> {
                         ),
                       ),
                       SizedBox(width: 8),
-                      Icon(Icons.person, color: Color(0xFF7B9FCC), size: 28),
+                      Icon(Icons.person, color: AppColors.primaryLight, size: 28),
                     ],
                   ),
                   const SizedBox(height: 6),
@@ -210,25 +210,25 @@ class _SignUpPageState extends State<SignUpPage> {
                   const SizedBox(height: 24),
                   const Row(
                     children: [
-                      Expanded(child: Divider(color: Color(0xFFE0E0E0))),
+                      Expanded(child: Divider(color: AppColors.border)),
                       Padding(
                         padding: EdgeInsets.symmetric(horizontal: 14),
                         child: Text(
                           'hoặc',
                           style: TextStyle(
-                            color: Color(0xFFBDBDBD),
+                            color: AppColors.mutedText,
                             fontSize: 13,
                           ),
                         ),
                       ),
-                      Expanded(child: Divider(color: Color(0xFFE0E0E0))),
+                      Expanded(child: Divider(color: AppColors.border)),
                     ],
                   ),
                   const SizedBox(height: 20),
                   _SocialButton(
                     icon: const Icon(
                       Icons.g_mobiledata_rounded,
-                      color: Color(0xFF4285F4),
+                      color: AppColors.googleBlue,
                       size: 30,
                     ),
                     label: 'Tiếp tục với Google',
@@ -326,7 +326,7 @@ class _AuthTextField extends StatelessWidget {
         onSubmitted: obscureText ? (_) => _submit(context) : null,
         decoration: InputDecoration(
           hintText: hintText,
-          hintStyle: const TextStyle(color: Color(0xFFBDBDBD)),
+          hintStyle: const TextStyle(color: AppColors.mutedText),
           prefixIcon: Icon(prefixIcon, color: AppColors.mutedText),
           suffixIcon: suffixIcon,
           filled: true,
@@ -374,7 +374,7 @@ class _SocialButton extends StatelessWidget {
         onPressed: onPressed,
         style: OutlinedButton.styleFrom(
           foregroundColor: AppColors.darkText,
-          side: const BorderSide(color: Color(0xFFE0E0E0)),
+          side: const BorderSide(color: AppColors.border),
           shape: const StadiumBorder(),
           padding: const EdgeInsets.symmetric(horizontal: 16),
         ),

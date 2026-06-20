@@ -27,7 +27,7 @@ class CameraSafetyStatus extends StatelessWidget {
         children: [
           const _CircleIcon(
             icon: Icons.verified_user,
-            backgroundColor: Color(0xFFEEEBFD),
+            backgroundColor: AppColors.infoBackground,
             iconColor: AppColors.primary,
             size: 48,
           ),
@@ -49,7 +49,7 @@ class CameraSafetyStatus extends StatelessWidget {
                   'Hiện tại không có sự cố',
                   style: TextStyle(
                     fontSize: 13,
-                    color: Color(0xFF4CAF50),
+                    color: AppColors.safe,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -76,7 +76,7 @@ class CameraSafetyStatus extends StatelessWidget {
                 width: 20,
                 height: 20,
                 decoration: const BoxDecoration(
-                  color: Color(0xFF4CAF50),
+                  color: AppColors.safe,
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(Icons.check, size: 12, color: Colors.white),

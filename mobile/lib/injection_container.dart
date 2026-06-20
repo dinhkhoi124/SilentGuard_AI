@@ -41,6 +41,11 @@ import 'package:mobile/features/notifications/presentation/cubit/notifications_c
 import 'package:mobile/features/session/data/datasources/session_remote_datasource.dart';
 import 'package:mobile/features/session/data/repositories/session_repository_impl.dart';
 import 'package:mobile/features/session/domain/repositories/session_repository.dart';
+import 'package:mobile/features/video_upload/data/datasources/video_upload_remote_datasource.dart';
+import 'package:mobile/features/video_upload/data/repositories/video_upload_repository_impl.dart';
+import 'package:mobile/features/video_upload/domain/repositories/video_upload_repository.dart';
+import 'package:mobile/features/video_upload/domain/usecases/upload_video_usecase.dart';
+import 'package:mobile/features/video_upload/presentation/bloc/video_upload_bloc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 final sl = GetIt.instance;
@@ -67,6 +72,13 @@ Future<void> init() async {
     ..registerLazySingleton<SessionRepository>(
       () => SessionRepositoryImpl(sl()),
     )
+    ..registerLazySingleton<VideoUploadRemoteDatasource>(
+      () => VideoUploadRemoteDatasourceImpl(firebaseAuth: sl()),
+    )
+    ..registerLazySingleton<VideoUploadRepository>(
+      () => VideoUploadRepositoryImpl(sl()),
+    )
+    ..registerLazySingleton(() => UploadVideoUseCase(sl()))
     ..registerLazySingleton<AuthRepository>(
       () => AuthRepositoryImpl(dataSource: sl(), sessionRepository: sl()),
     )
@@ -89,6 +101,9 @@ Future<void> init() async {
         getCameraDevices: sl(),
         deleteCameraDevice: sl(),
       ),
+    )
+    ..registerFactory(
+      () => VideoUploadBloc(uploadVideoUseCase: sl(), sessionRepository: sl()),
     )
     ..registerFactory(
       () =>

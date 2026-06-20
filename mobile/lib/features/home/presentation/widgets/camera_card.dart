@@ -57,10 +57,21 @@ class CameraCard extends StatelessWidget {
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
-                    if (thumbnailBytes case final bytes?)
-                      Image.memory(bytes, fit: BoxFit.cover)
-                    else
-                      const ColoredBox(color: Colors.black),
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 300),
+                      child: thumbnailBytes != null
+                          ? ClipRRect(
+                              key: ValueKey('thumb-${device.id}'),
+                              borderRadius: BorderRadius.circular(18),
+                              child: Image.memory(
+                                thumbnailBytes!,
+                                fit: BoxFit.cover,
+                                width: double.infinity,
+                                height: double.infinity,
+                              ),
+                            )
+                          : _buildEmptyThumbnailPlaceholder(context),
+                    ),
                     Positioned(
                       top: 0,
                       left: 0,
@@ -82,7 +93,7 @@ class CameraCard extends StatelessWidget {
                                   height: 8,
                                   decoration: BoxDecoration(
                                     color: device.isArmed
-                                        ? const Color(0xFF4CAF50)
+                                        ? AppColors.safe
                                         : AppColors.mutedText,
                                     shape: BoxShape.circle,
                                   ),
@@ -169,7 +180,7 @@ class CameraCard extends StatelessWidget {
                                 style: TextStyle(
                                   fontSize: 10,
                                   color: device.isArmed
-                                      ? const Color(0xFF4CAF50)
+                                      ? AppColors.safe
                                       : AppColors.mutedText,
                                 ),
                               ),
@@ -204,6 +215,37 @@ class CameraCard extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyThumbnailPlaceholder(BuildContext context) {
+    return Container(
+      key: const ValueKey('thumb-empty'),
+      width: double.infinity,
+      height: double.infinity,
+      decoration: BoxDecoration(
+        color: Colors.grey,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: const Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.videocam_outlined,
+            size: 32,
+            color: Colors.white,
+          ),
+          SizedBox(height: 4),
+          Text(
+            'SmartiFy',
+            style: TextStyle(
+              fontFamily: 'Syne Mono',
+              fontSize: 11,
+              color: Colors.white,
+            ),
+          ),
+        ],
       ),
     );
   }

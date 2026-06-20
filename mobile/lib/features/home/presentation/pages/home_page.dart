@@ -22,6 +22,7 @@ import 'package:mobile/features/home/presentation/widgets/weather_card.dart';
 import 'package:mobile/features/notifications/domain/entities/notification_alert.dart';
 import 'package:mobile/features/notifications/presentation/cubit/notifications_cubit.dart';
 import 'package:mobile/features/notifications/presentation/cubit/notifications_state.dart';
+import 'package:mobile/features/video_upload/presentation/bloc/video_upload_bloc.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -37,81 +38,132 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-    return BlocListener<NotificationsCubit, NotificationsState>(
+    return BlocListener<VideoUploadBloc, VideoUploadState>(
       listenWhen: (previous, current) =>
-          previous.revision != current.revision &&
-          current.latestDelivery == NotificationDelivery.foreground &&
-          current.latestAlert != null,
+          current is VideoUploadSuccess || current is VideoUploadFailure,
       listener: (context, state) {
-        final alert = state.latestAlert;
-        if (alert == null) return;
-        _showForegroundAlert(context, alert);
+        final messenger = ScaffoldMessenger.of(context)..hideCurrentSnackBar();
+        if (state is VideoUploadSuccess) {
+          messenger.showSnackBar(
+            const SnackBar(
+              content: Text(
+                '✅ Đã gửi video thành công! Chúng tôi sẽ thông báo nếu phát hiện bất thường.',
+              ),
+              backgroundColor: AppColors.darkText,
+            ),
+          );
+        } else if (state is VideoUploadFailure) {
+          messenger.showSnackBar(
+            const SnackBar(
+              content: Text('❌ Gửi video thất bại. Vui lòng thử lại.'),
+              backgroundColor: AppColors.badgeRed,
+            ),
+          );
+        }
+        context.read<VideoUploadBloc>().add(const VideoUploadResetRequested());
       },
-      child: PopScope(
-        canPop: false,
-        onPopInvokedWithResult: (didPop, result) {},
-        child: Scaffold(
-          resizeToAvoidBottomInset: false,
-          appBar: AppBar(
-            automaticallyImplyLeading: false,
-            toolbarHeight: 72,
-            titleSpacing: 20,
-            title: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  _tabTitles[_selectedTab],
-                  style: const TextStyle(
-                    color: AppColors.darkText,
-                    fontSize: 22,
-                    fontWeight: FontWeight.w700,
+      child: BlocListener<NotificationsCubit, NotificationsState>(
+        listenWhen: (previous, current) =>
+            previous.revision != current.revision &&
+            current.latestDelivery == NotificationDelivery.foreground &&
+            current.latestAlert != null,
+        listener: (context, state) {
+          final alert = state.latestAlert;
+          if (alert == null) return;
+          _showForegroundAlert(context, alert);
+        },
+        child: PopScope(
+          canPop: false,
+          onPopInvokedWithResult: (didPop, result) {},
+          child: Scaffold(
+            resizeToAvoidBottomInset: false,
+            appBar: AppBar(
+              automaticallyImplyLeading: false,
+              toolbarHeight: 72,
+              titleSpacing: 20,
+              title: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    _tabTitles[_selectedTab],
+                    style: const TextStyle(
+                      color: AppColors.darkText,
+                      fontSize: 22,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
+                  const SizedBox(width: 7),
+                ],
+              ),
+              actions: [
+                _TopBarButton(
+                  icon: Iconsax.cpu,
+                  tooltip: 'Trợ lý AI',
+                  onPressed: () {},
                 ),
-                const SizedBox(width: 7),
+                const SizedBox(width: 4),
+                _TopBarButton(
+                  icon: Iconsax.notification,
+                  tooltip: 'Thông báo',
+                  hasBadge: context.select(
+                    (NotificationsCubit cubit) => cubit.state.hasUnread,
+                  ),
+                  onPressed: () {
+                    context.read<NotificationsCubit>().markAllRead();
+                    context.read<HomeBloc>().add(const NotificationTapped());
+                  },
+                ),
+                const SizedBox(width: 14),
               ],
             ),
-            actions: [
-              _TopBarButton(
-                icon: Iconsax.cpu,
-                tooltip: 'Trợ lý AI',
-                onPressed: () {},
+            body: BlocBuilder<VideoUploadBloc, VideoUploadState>(
+              builder: (context, uploadState) {
+                final uploadInProgress = uploadState is VideoUploadLoading;
+                return Stack(
+                  children: [
+                    IndexedStack(
+                      index: _selectedTab,
+                      children: const [
+                        _HomeTab(),
+                        _ComingSoonTab(
+                          icon: Iconsax.task_square,
+                          title: 'Tự động hóa',
+                          message:
+                              'Các kịch bản thông minh sẽ sớm xuất hiện tại đây.',
+                        ),
+                        _ComingSoonTab(
+                          icon: Iconsax.chart,
+                          title: 'Báo cáo',
+                          message:
+                              'Theo dõi dữ liệu nhà thông minh trong phiên bản tới.',
+                        ),
+                        AccountPage(),
+                      ],
+                    ),
+                    if (uploadInProgress)
+                      const Positioned(
+                        left: 0,
+                        top: 0,
+                        right: 0,
+                        child: LinearProgressIndicator(minHeight: 3),
+                      ),
+                  ],
+                );
+              },
+            ),
+            floatingActionButton: _selectedTab == 0 ? const _HomeFabs() : null,
+            bottomNavigationBar: BottomNavBar(
+              selectedIndex: _selectedTab,
+              uploadDisabled: context.select(
+                (VideoUploadBloc bloc) => bloc.state is VideoUploadLoading,
               ),
-              const SizedBox(width: 4),
-              _TopBarButton(
-                icon: Iconsax.notification,
-                tooltip: 'Thông báo',
-                hasBadge: context.select(
-                  (NotificationsCubit cubit) => cubit.state.hasUnread,
-                ),
-                onPressed: () {
-                  context.read<NotificationsCubit>().markAllRead();
-                  context.read<HomeBloc>().add(const NotificationTapped());
-                },
-              ),
-              const SizedBox(width: 14),
-            ],
-          ),
-          body: IndexedStack(
-            index: _selectedTab,
-            children: const [
-              _HomeTab(),
-              _ComingSoonTab(
-                icon: Iconsax.task_square,
-                title: 'Tự động hóa',
-                message: 'Các kịch bản thông minh sẽ sớm xuất hiện tại đây.',
-              ),
-              _ComingSoonTab(
-                icon: Iconsax.chart,
-                title: 'Báo cáo',
-                message: 'Theo dõi dữ liệu nhà thông minh trong phiên bản tới.',
-              ),
-              AccountPage(),
-            ],
-          ),
-          floatingActionButton: _selectedTab == 0 ? const _HomeFabs() : null,
-          bottomNavigationBar: BottomNavBar(
-            selectedIndex: _selectedTab,
-            onSelected: (index) => setState(() => _selectedTab = index),
+              onSelected: (index) => setState(() => _selectedTab = index),
+              onUploadSelected: () {
+                context.read<VideoUploadBloc>().add(
+                  const VideoUploadSubmitRequested(),
+                );
+              },
+            ),
           ),
         ),
       ),

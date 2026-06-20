@@ -9,10 +9,14 @@ class BottomNavBar extends StatelessWidget {
     super.key,
     required this.selectedIndex,
     required this.onSelected,
+    required this.onUploadSelected,
+    this.uploadDisabled = false,
   });
 
   final int selectedIndex;
   final ValueChanged<int> onSelected;
+  final VoidCallback onUploadSelected;
+  final bool uploadDisabled;
 
   @override
   Widget build(BuildContext context) {
@@ -38,6 +42,12 @@ class BottomNavBar extends StatelessWidget {
                 label: 'Tự động',
                 active: selectedIndex == 1,
                 onTap: () => onSelected(1),
+              ),
+              _NavItem(
+                icon: Icons.video_library_outlined,
+                label: 'Gửi video',
+                onTap: uploadDisabled ? null : onUploadSelected,
+                disabled: uploadDisabled,
               ),
               _NavItem(
                 icon: Iconsax.chart,
@@ -67,20 +77,27 @@ class _NavItem extends StatelessWidget {
     required this.onTap,
     this.active = false,
     this.hasBadge = false,
+    this.disabled = false,
   });
 
   final IconData icon;
   final String label;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
   final bool active;
   final bool hasBadge;
+  final bool disabled;
 
   @override
   Widget build(BuildContext context) {
-    final color = active ? AppColors.primary : AppColors.mutedText;
+    final color = disabled
+        ? AppColors.mutedText.withValues(alpha: 0.45)
+        : active
+        ? AppColors.primary
+        : AppColors.mutedText;
     return Expanded(
       child: Semantics(
         button: true,
+        enabled: !disabled,
         selected: active,
         label: label,
         child: InkResponse(
@@ -120,6 +137,8 @@ class _NavItem extends StatelessWidget {
               const SizedBox(height: 4),
               Text(
                 label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   color: color,
                   fontSize: 11,

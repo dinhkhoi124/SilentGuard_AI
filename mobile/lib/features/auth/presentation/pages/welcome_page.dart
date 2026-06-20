@@ -205,7 +205,7 @@ class _WelcomePageState extends State<WelcomePage> {
                               'Chính sách bảo mật · Điều khoản dịch vụ',
                               textAlign: TextAlign.center,
                               style: TextStyle(
-                                color: Color(0xFFBDBDBD),
+                                color: AppColors.mutedText,
                                 fontSize: 13,
                               ),
                             ),
@@ -292,15 +292,15 @@ class _DividerLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        const Expanded(child: Divider(color: Color(0xFFE0E0E0))),
+        const Expanded(child: Divider(color: AppColors.border)),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12),
           child: Text(
             label,
-            style: const TextStyle(fontSize: 13, color: Color(0xFFBDBDBD)),
+            style: const TextStyle(fontSize: 13, color: AppColors.mutedText),
           ),
         ),
-        const Expanded(child: Divider(color: Color(0xFFE0E0E0))),
+        const Expanded(child: Divider(color: AppColors.border)),
       ],
     );
   }
@@ -321,7 +321,7 @@ class _GoogleButton extends StatelessWidget {
         onPressed: onPressed,
         style: OutlinedButton.styleFrom(
           foregroundColor: AppColors.darkText,
-          side: const BorderSide(color: Color(0xFFE0E0E0)),
+          side: const BorderSide(color: AppColors.border),
           shape: const StadiumBorder(),
           padding: const EdgeInsets.symmetric(horizontal: 16),
         ),
@@ -367,14 +367,14 @@ class _GoogleLogo extends StatelessWidget {
       alignment: Alignment.center,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        border: Border.all(color: const Color(0xFFE0E0E0)),
+        border: Border.all(color: AppColors.border),
       ),
       child: const Text(
         'G',
         style: TextStyle(
           fontSize: 16,
           fontWeight: FontWeight.bold,
-          color: Color(0xFF4285F4),
+          color: AppColors.googleBlue,
         ),
       ),
     );

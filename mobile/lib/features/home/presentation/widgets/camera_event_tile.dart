@@ -582,7 +582,7 @@ class _LevelBadge extends StatelessWidget {
     ),
     EventType.normal => (
       backgroundColor: const Color(0xFFE8F5E9),
-      iconColor: const Color(0xFF4CAF50),
+      iconColor: AppColors.safe,
       icon: Icons.directions_run,
     ),
     EventType.reconnect => (

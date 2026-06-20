@@ -35,7 +35,7 @@ class EmptyDevices extends StatelessWidget {
             ),
             const SizedBox(height: 22),
             const Text(
-              'Chưa có thiết bị',
+              'Chưa có camera nào',
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: AppColors.darkText,
@@ -45,7 +45,7 @@ class EmptyDevices extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             const Text(
-              'Bạn chưa thêm thiết bị nào.',
+              'Hãy thêm camera để bắt đầu theo dõi an toàn cho người thân nhé.',
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: AppColors.mutedText,
@@ -118,7 +118,7 @@ class _ClipboardPainter extends CustomPainter {
       ..drawLine(const Offset(45, 78), const Offset(64, 78), stroke);
 
     final pencil = Paint()
-      ..color = const Color(0xFFFFC857)
+      ..color = AppColors.warning
       ..style = PaintingStyle.stroke
       ..strokeWidth = 8
       ..strokeCap = StrokeCap.round;

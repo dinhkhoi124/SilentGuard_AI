@@ -337,7 +337,7 @@ class _StatusDot extends StatelessWidget {
     width: 8,
     height: 8,
     decoration: const BoxDecoration(
-      color: Color(0xFF4CAF50),
+      color: AppColors.safe,
       shape: BoxShape.circle,
     ),
   );

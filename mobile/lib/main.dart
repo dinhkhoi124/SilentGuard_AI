@@ -13,6 +13,7 @@ import 'package:mobile/core/router/app_router.dart';
 import 'package:mobile/core/theme/app_theme.dart';
 import 'package:mobile/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:mobile/features/notifications/presentation/cubit/notifications_cubit.dart';
+import 'package:mobile/features/video_upload/presentation/bloc/video_upload_bloc.dart';
 import 'package:mobile/firebase_options.dart';
 import 'package:mobile/injection_container.dart' as di;
 
@@ -119,6 +120,7 @@ class MyApp extends StatelessWidget {
     return MultiBlocProvider(
       providers: [
         BlocProvider(create: (_) => di.sl<AuthBloc>()),
+        BlocProvider(create: (_) => di.sl<VideoUploadBloc>()),
         BlocProvider.value(value: di.sl<NotificationsCubit>()),
       ],
       child: MaterialApp.router(

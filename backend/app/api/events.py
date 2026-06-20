@@ -120,7 +120,13 @@ async def upload_video(
     # Auto-trigger AI server if configured
     ai_server_url = os.getenv("AI_SERVER_URL")
     if ai_server_url:
-        backend_detect_url = f"{str(request.base_url).rstrip('/')}/api/events/detect"
+        # Resolve correct scheme when behind Railway proxy
+        proto = request.headers.get("x-forwarded-proto", "http")
+        base_url = str(request.base_url)
+        if proto == "https" and base_url.startswith("http://"):
+            base_url = base_url.replace("http://", "https://")
+            
+        backend_detect_url = f"{base_url.rstrip('/')}/api/events/detect"
         background_tasks.add_task(
             notify_ai_server,
             video_url,

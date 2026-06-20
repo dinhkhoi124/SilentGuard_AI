@@ -1,6 +1,8 @@
+import os
 import uuid
 import secrets
-from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, Form, UploadFile, File, Header
+import httpx
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, Form, UploadFile, File, Header, Request
 from app.core.security import verify_device_key_dependency, get_current_user, require_household_role
 from app.core.supabase_client import supabase
 from app.models.schemas import EventDetectRequest
@@ -8,8 +10,30 @@ from app.services.alert_engine import process_event
 
 router = APIRouter(prefix="/api/events", tags=["Events"])
 
+async def notify_ai_server(video_url: str, upload_token: str, backend_detect_url: str):
+    ai_server_url = os.getenv("AI_SERVER_URL")
+    if not ai_server_url:
+        print("[Backend] AI_SERVER_URL environment variable is not set. Skipping auto-analysis.")
+        return
+    
+    url = f"{ai_server_url.rstrip('/')}/analyze"
+    payload = {
+        "video_url": video_url,
+        "upload_token": upload_token,
+        "api_url": backend_detect_url,
+        "room": "bedroom"
+    }
+    
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(url, json=payload, timeout=10.0)
+            print(f"[Backend] AI Server response: {response.status_code} - {response.text}")
+    except Exception as e:
+        print(f"[Backend] Failed to trigger AI Server: {e}")
+
 @router.post("/upload-video", status_code=status.HTTP_201_CREATED)
 async def upload_video(
+    request: Request,
     background_tasks: BackgroundTasks,
     household_id: str = Form(...),
     file: UploadFile = File(...),
@@ -93,6 +117,17 @@ async def upload_video(
             detail={"error": {"code": "DATABASE_ERROR", "message": f"Failed to save video upload to database: {str(e)}"}}
         )
         
+    # Auto-trigger AI server if configured
+    ai_server_url = os.getenv("AI_SERVER_URL")
+    if ai_server_url:
+        backend_detect_url = f"{str(request.base_url).rstrip('/')}/api/events/detect"
+        background_tasks.add_task(
+            notify_ai_server,
+            video_url,
+            upload_token,
+            backend_detect_url
+        )
+
     return {
         "upload_id": inserted["id"],
         "video_url": video_url,

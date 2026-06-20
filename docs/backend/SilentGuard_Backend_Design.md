@@ -368,6 +368,29 @@ Response:
 }
 ```
 
+### 4.4a `POST /api/events/{event_id}/feedback` — Phản hồi độ chính xác cảnh báo
+
+Quyền: `owner` hoặc `member` (Thành viên hộ gia đình của cảnh báo).
+
+Header: `Authorization: Bearer <token>`
+
+Request Body:
+```json
+{
+  "label": "correct",
+  "note": "Ba bị trượt chân nhưng không sao"
+}
+```
+*(Chấp nhận label: "correct" | "incorrect" | "uncertain")*
+
+Response:
+```json
+{
+  "status": "received",
+  "feedback_id": "feedback-uuid"
+}
+```
+
 ### 4.5 `GET /api/events/{event_id}` — Alert detail
 
 Trả về đầy đủ 1 event + `clip_url` (signed URL từ Supabase Storage, hết hạn sau 5 phút).
@@ -676,6 +699,33 @@ Response:
 }
 ```
 
+### 4.12d `PATCH /api/households/{household_id}` — Cập nhật thông tin hộ gia đình
+
+Quyền: `owner` (Chủ hộ).
+
+Header: `Authorization: Bearer <token>`
+
+Request Body (Partial Update):
+```json
+{
+  "name": "Nha Ong Ba Ngoai",
+  "elderly_name": "Ong Nguyen Van A",
+  "address": "456 Tran Hung Dao"
+}
+```
+*(Tất cả các trường đều là tùy chọn. Yêu cầu gửi ít nhất 1 trường)*
+
+Response:
+```json
+{
+  "id": "household-uuid",
+  "name": "Nha Ong Ba Ngoai",
+  "elderly_name": "Ong Nguyen Van A",
+  "address": "456 Tran Hung Dao",
+  "created_at": "2026-06-19T03:00:00Z"
+}
+```
+
 ### 4.13 `POST /api/cameras` — Đăng ký camera mới
 
 Quyền: `owner` (Chủ hộ).
@@ -724,6 +774,25 @@ Response:
 ]
 ```
 *(Lưu ý: Không bao giờ trả về device_api_key hay hash của nó ở endpoint này)*
+
+### 4.14a `GET /api/cameras/{camera_id}` — Lấy thông tin chi tiết camera
+
+Quyền: `owner` hoặc `member` (Thành viên hộ gia đình).
+
+Header: `Authorization: Bearer <token>`
+
+Response:
+```json
+{
+  "id": "camera-uuid",
+  "name": "Camera Hành Lang",
+  "room": "hallway",
+  "status": "online",
+  "fps": 15,
+  "last_heartbeat": "2026-06-20T10:00:00Z",
+  "created_at": "2026-06-16T09:00:00Z"
+}
+```
 
 ### 4.15 `PATCH /api/cameras/{camera_id}/rotate-key` — Đổi mã kết nối camera mới
 

@@ -100,6 +100,55 @@ async def list_cameras(
             detail={"error": {"code": "DATABASE_ERROR", "message": f"Failed to retrieve cameras: {str(e)}"}}
         )
 
+@router.get("/{camera_id}")
+async def get_camera_detail(
+    camera_id: str,
+    user: dict = Depends(get_current_user)
+):
+    """
+    GET /api/cameras/{camera_id}
+    """
+    try:
+        res = supabase.table("cameras").select("*").eq("id", camera_id).execute()
+        if not res.data or res.data[0].get("deleted_at") is not None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={"error": {"code": "CAMERA_NOT_FOUND", "message": "Camera not found"}}
+            )
+            
+        camera = res.data[0]
+        household_id = camera.get("household_id")
+        
+        member_res = supabase.table("household_members")\
+            .select("role")\
+            .eq("household_id", household_id)\
+            .eq("user_id", user["id"])\
+            .execute()
+            
+        if not member_res.data:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={"error": {"code": "FORBIDDEN", "message": "Bạn không có quyền truy cập camera của hộ gia đình này"}}
+            )
+            
+        return {
+            "id": camera["id"],
+            "name": camera["name"],
+            "room": camera["room"],
+            "status": camera["status"],
+            "fps": camera["fps"],
+            "last_heartbeat": camera.get("last_heartbeat"),
+            "created_at": camera["created_at"]
+        }
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        print(f"Error in get_camera_detail: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={"error": {"code": "DATABASE_ERROR", "message": str(e)}}
+        )
+
 @router.patch("/{camera_id}/rotate-key")
 async def rotate_camera_key(
     camera_id: str,

@@ -1,7 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from typing import Optional
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from app.core.security import get_current_user, require_household_role
 from app.core.supabase_client import supabase
-from app.models.schemas import ReviewRequest, AlertListResponse, AlertItem
+from app.models.schemas import ReviewRequest, AlertListResponse, AlertItem, FeedbackRequest
+
 
 router = APIRouter(prefix="/api", tags=["Alerts"])
 
@@ -113,6 +115,134 @@ async def review_alert(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={"error": {"code": "DATABASE_ERROR", "message": f"Failed to review alert: {str(e)}"}}
+        )
+
+@router.get("/events/history")
+async def get_event_history(
+    household_id: str,
+    severity: Optional[str] = Query(default=None),
+    room: Optional[str] = Query(default=None),
+    from_date: Optional[str] = Query(default=None),
+    to_date: Optional[str] = Query(default=None),
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=100),
+    user: dict = Depends(get_current_user)
+):
+    """
+    GET /api/events/history
+    Retrieves history of events for a household with optional filters and pagination.
+    """
+    user_id = user.get("id")
+    # Verify user is a member of the requested household
+    try:
+        member_res = supabase.table("household_members")\
+            .select("role")\
+            .eq("household_id", household_id)\
+            .eq("user_id", user_id)\
+            .execute()
+        if not member_res.data:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={"error": {"code": "FORBIDDEN", "message": "Bạn không có quyền truy cập thông tin gia đình này"}}
+            )
+            
+        # Build query
+        query = supabase.table("events").select("*", count="exact").eq("household_id", household_id)
+        
+        if severity:
+            query = query.eq("severity", severity)
+        if room:
+            query = query.eq("room", room)
+        if from_date:
+            query = query.gte("timestamp", from_date)
+        if to_date:
+            query = query.lte("timestamp", to_date)
+            
+        # Sort timestamp DESC
+        query = query.order("timestamp", desc=True)
+        
+        # Pagination
+        offset = (page - 1) * page_size
+        query = query.range(offset, offset + page_size - 1)
+        
+        res = query.execute()
+        
+        return {
+            "items": res.data or [],
+            "total": res.count or 0,
+            "page": page,
+            "page_size": page_size
+        }
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        print(f"Error in get_event_history: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={"error": {"code": "DATABASE_ERROR", "message": f"Failed to retrieve event history: {str(e)}"}}
+        )
+
+@router.post("/events/{event_id}/feedback", status_code=status.HTTP_200_OK)
+async def post_event_feedback(
+    event_id: str,
+    req: FeedbackRequest,
+    user: dict = Depends(get_current_user)
+):
+    """
+    POST /api/events/{event_id}/feedback
+    """
+    try:
+        res = supabase.table("events").select("id, household_id").eq("event_id", event_id).execute()
+        if not res.data:
+            res = supabase.table("events").select("id, household_id").eq("id", event_id).execute()
+            if not res.data:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail={"error": {"code": "EVENT_NOT_FOUND", "message": "Cảnh báo không tồn tại"}}
+                )
+        
+        event_data = res.data[0]
+        event_uuid = event_data.get("id")
+        household_id = event_data.get("household_id")
+        
+        member_res = supabase.table("household_members")\
+            .select("role")\
+            .eq("household_id", household_id)\
+            .eq("user_id", user["id"])\
+            .execute()
+            
+        if not member_res.data:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={"error": {"code": "FORBIDDEN", "message": "Bạn không có quyền truy cập cảnh báo của hộ gia đình này"}}
+            )
+            
+        feedback_data = {
+            "event_id": event_uuid,
+            "household_id": household_id,
+            "submitted_by": user["id"],
+            "label": req.label,
+            "note": req.note
+        }
+        
+        insert_res = supabase.table("event_feedback").insert(feedback_data).select("id").execute()
+        if not insert_res.data:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail={"error": {"code": "DATABASE_ERROR", "message": "Không thể lưu phản hồi"}}
+            )
+            
+        return {
+            "status": "received",
+            "feedback_id": insert_res.data[0]["id"]
+        }
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        print(f"Error in post_event_feedback: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={"error": {"code": "DATABASE_ERROR", "message": str(e)}}
         )
 
 @router.get("/events/{event_id}")

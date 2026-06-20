@@ -1,5 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Request
-from app.core.security import get_current_user, require_household_role
+from datetime import datetime
+from fastapi import APIRouter, Depends, HTTPException, status, Query
+from app.core.security import get_current_user
 from app.core.supabase_client import supabase
 from app.services.llm_service import generate_daily_report
 
@@ -7,17 +8,30 @@ router = APIRouter(prefix="/api/reports", tags=["Reports"])
 
 @router.get("/daily")
 async def get_daily_report(
-    request: Request,
-    date: str = "2026-06-13",
+    household_id: str,
+    date: str = Query(default=None),
     user: dict = Depends(get_current_user),
-    _member: dict = Depends(require_household_role(owner_only=False))
 ):
     """
     GET /api/reports/daily
     Ref: Section 4.10 of design doc
     Fetches the daily report or dynamically generates it using Claude if missing.
     """
-    household_id = request.state.household_id
+    # Manual check quyền
+    member_res = supabase.table("household_members")\
+        .select("role")\
+        .eq("household_id", household_id)\
+        .eq("user_id", user["id"])\
+        .execute()
+    if not member_res.data:
+        raise HTTPException(
+            status_code=403,
+            detail={"error": {"code": "FORBIDDEN", "message": "Bạn không có quyền truy cập thông tin gia đình này"}}
+        )
+    
+    # date default = hôm nay nếu không truyền
+    if not date:
+        date = datetime.utcnow().strftime("%Y-%m-%d")
     try:
         # 1. Try to fetch existing report
         res = supabase.table("daily_reports")\

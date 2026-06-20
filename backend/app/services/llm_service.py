@@ -9,7 +9,7 @@ from app.core.config import settings
 
 # Initialize OpenAI Client
 api_key = settings.OPENAI_API_KEY
-is_mock = not api_key or api_key == "xxxx" or "your-openai-key" in api_key or "your-openrouter-key" in api_key or "your-anthropic-key" in api_key
+is_mock = not api_key or api_key in ("xxxx", "your-openai-key", "your-openrouter-key", "your-anthropic-key")
 
 if not is_mock:
     client = OpenAI(

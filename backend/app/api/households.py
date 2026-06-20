@@ -5,7 +5,8 @@ from pydantic import BaseModel
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from app.core.security import get_current_user, require_household_role, verify_owner_role
 from app.core.supabase_client import supabase
-from app.models.schemas import HouseholdCreateRequest, SwitchHouseholdRequest
+from app.models.schemas import HouseholdCreateRequest, SwitchHouseholdRequest, HouseholdUpdateRequest
+
 
 router = APIRouter(prefix="/api/households", tags=["Households"])
 
@@ -229,4 +230,55 @@ async def list_households(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={"error": {"code": "DATABASE_ERROR", "message": f"Failed to list households: {str(e)}"}}
         )
+
+@router.patch("/{household_id}")
+async def update_household(
+    household_id: str,
+    req: HouseholdUpdateRequest,
+    user: dict = Depends(get_current_user)
+):
+    """
+    PATCH /api/households/{household_id}
+    """
+    user_id = user.get("id")
+    verify_owner_role(household_id, user_id)
+    
+    update_data = {}
+    if req.name is not None:
+        update_data["name"] = req.name
+    if req.elderly_name is not None:
+        update_data["elderly_name"] = req.elderly_name
+    if req.address is not None:
+        update_data["address"] = req.address
+        
+    if not update_data:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"error": {"code": "BAD_REQUEST", "message": "Yêu cầu ít nhất một trường để cập nhật"}}
+        )
+        
+    try:
+        res = supabase.table("households").update(update_data).eq("id", household_id).select().execute()
+        if not res.data:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={"error": {"code": "HOUSEHOLD_NOT_FOUND", "message": "Không tìm thấy hộ gia đình"}}
+            )
+        household = res.data[0]
+        return {
+            "id": household["id"],
+            "name": household.get("name"),
+            "elderly_name": household.get("elderly_name"),
+            "address": household.get("address"),
+            "created_at": household.get("created_at")
+        }
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        print(f"Error in update_household: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={"error": {"code": "DATABASE_ERROR", "message": f"Failed to update household: {str(e)}"}}
+        )
+
 

@@ -186,6 +186,31 @@ Gọi khi người nhà xác nhận trạng thái cảnh báo trên App (ví d�
 
 ---
 
+### 3.6a Phản hồi độ chính xác cảnh báo (`POST /api/events/{event_id}/feedback`)
+Gửi phản hồi đánh giá độ chính xác của mô hình phát hiện ngã cho một sự kiện cụ thể. Thành viên hoặc chủ hộ đều có quyền gọi.
+
+- **Headers**:
+```http
+Authorization: Bearer <FIREBASE_ID_TOKEN>
+Content-Type: application/json
+```
+- **Request Body**:
+```json
+{
+  "label": "correct", // Hoặc "incorrect", "uncertain"
+  "note": "Mô hình phát hiện chính xác cú ngã" // (Tùy chọn)
+}
+```
+- **Response 200 OK**:
+```json
+{
+  "status": "received",
+  "feedback_id": "feedback-uuid"
+}
+```
+
+---
+
 ### 3.7 Xem báo cáo ngày (`GET /api/reports/daily`)
 Báo cáo tổng hợp tình trạng sức khỏe/sự cố của người cao tuổi do AI Claude tổng hợp.
 
@@ -497,6 +522,37 @@ Content-Type: application/json
 
 ---
 
+### 3.13d Cập nhật thông tin hộ gia đình (`PATCH /api/households/{household_id}`)
+Cập nhật thông tin hộ gia đình (Partial Update). Chỉ áp dụng cho tài khoản chủ hộ (`owner`).
+
+- **Headers**:
+```http
+Authorization: Bearer <FIREBASE_ID_TOKEN>
+Content-Type: application/json
+```
+- **Request Body**:
+```json
+{
+  "name": "Nha Ong Ba Ngoai",
+  "elderly_name": "Ong Nguyen Van A",
+  "address": "456 Tran Hung Dao"
+}
+```
+*(Các trường đều là tùy chọn. Cần gửi ít nhất 1 trường)*
+
+- **Response 200 OK**:
+```json
+{
+  "id": "household-uuid",
+  "name": "Nha Ong Ba Ngoai",
+  "elderly_name": "Ong Nguyen Van A",
+  "address": "456 Tran Hung Dao",
+  "created_at": "2026-06-19T03:00:00Z"
+}
+```
+
+---
+
 ### 3.14 Đăng ký camera mới (`POST /api/cameras`)
 Đăng ký camera mới cho hộ gia đình. Chỉ áp dụng cho tài khoản chủ hộ (`owner`).
 
@@ -550,6 +606,28 @@ Authorization: Bearer <FIREBASE_ID_TOKEN>
     "created_at": "2026-06-16T09:00:00Z"
   }
 ]
+```
+
+---
+
+### 3.15a Lấy thông tin chi tiết camera (`GET /api/cameras/{camera_id}`)
+Lấy thông tin chi tiết của 1 camera. Thành viên hoặc chủ hộ đều có quyền gọi.
+
+- **Headers**:
+```http
+Authorization: Bearer <FIREBASE_ID_TOKEN>
+```
+- **Response 200 OK**:
+```json
+{
+  "id": "camera-uuid",
+  "name": "Camera Phòng Khách",
+  "room": "living-room",
+  "status": "online",
+  "fps": 15,
+  "last_heartbeat": "2026-06-20T10:00:00Z",
+  "created_at": "2026-06-16T09:00:00Z"
+}
 ```
 
 ---

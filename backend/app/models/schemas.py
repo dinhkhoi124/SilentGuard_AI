@@ -128,3 +128,22 @@ class HouseholdCreateRequest(BaseModel):
 class SwitchHouseholdRequest(BaseModel):
     household_id: str
 
+
+class FeedbackRequest(BaseModel):
+    label: str
+    note: Optional[str] = None
+
+    @field_validator("label")
+    @classmethod
+    def validate_label(cls, v: str) -> str:
+        if v not in ("correct", "incorrect", "uncertain"):
+            raise ValueError("Label must be 'correct', 'incorrect', or 'uncertain'")
+        return v
+
+
+class HouseholdUpdateRequest(BaseModel):
+    name: Optional[str] = None
+    elderly_name: Optional[str] = None
+    address: Optional[str] = None
+
+

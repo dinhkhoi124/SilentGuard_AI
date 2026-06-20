@@ -91,11 +91,10 @@ async def check_pending_escalations() -> None:
     """
     now = datetime.now(timezone.utc).isoformat()
     try:
-        # Query pending events past escalation time
         response = supabase.table("events")\
             .select("*")\
             .eq("status", "pending")\
-            .not_ = {"escalate_after": "is.null"}\
+            .not_.is_("escalate_after", "null")\
             .lte("escalate_after", now)\
             .execute()
             

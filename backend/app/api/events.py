@@ -176,6 +176,11 @@ async def detect_event(
         else:
             inserted_event = event_data
     except Exception as e:
+        if "23505" in str(e) or "unique" in str(e).lower():
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={"error": {"code": "DUPLICATE_EVENT", "message": f"Event {req.event_id} đã tồn tại"}}
+            )
         print(f"Database insertion failed: {e}")
         from app.core.config import settings
         if settings.APP_ENV == "production":

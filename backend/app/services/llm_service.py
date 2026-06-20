@@ -6,17 +6,16 @@ from pydantic import BaseModel, Field, field_validator
 from openai import OpenAI
 from app.core.config import settings
 
-# Initialize OpenRouter Client (OpenAI compatible)
-api_key = settings.OPENROUTER_API_KEY
-is_mock = not api_key or api_key == "xxxx" or "your-openrouter-key" in api_key or "your-anthropic-key" in api_key
+# Initialize OpenAI Client
+api_key = settings.OPENAI_API_KEY
+is_mock = not api_key or api_key == "xxxx" or "your-openai-key" in api_key or "your-openrouter-key" in api_key or "your-anthropic-key" in api_key
 
 if not is_mock:
     client = OpenAI(
-        base_url="https://openrouter.ai/api/v1",
         api_key=api_key,
     )
 else:
-    print("Warning: OPENROUTER_API_KEY is not configured or holds a placeholder value. Running LLM service in mock mode.")
+    print("Warning: OPENAI_API_KEY is not configured or holds a placeholder value. Running LLM service in mock mode.")
     client = None
 
 # Pydantic Schemas for configuration parsing (Section 8)
@@ -67,7 +66,7 @@ async def generate_alert_message(event: dict) -> str:
                 time_str = timestamp
 
     if severity == "LOW":
-        return f"Phát hiện té ngã trong {room} lúc {time_str}. Người thân đã tự đứng dậy sau {duration_sec} giây. Không cần lo lắng."
+        return f"Người thân vừa té ngã trong {room} lúc {time_str} và đã tự đứng dậy sau {duration_sec} giây. Dù vậy, té ngã ở người cao tuổi có thể gây chấn thương không rõ ngay — nên gọi điện hỏi thăm sức khỏe trong hôm nay."
     elif severity == "MEDIUM":
         return f"⚠️ Cảnh báo: Phát hiện té ngã trong {room} lúc {time_str}. Người thân chưa đứng dậy sau {duration_sec} giây. Vui lòng kiểm tra."
     elif severity == "HIGH":
@@ -99,7 +98,7 @@ async def generate_daily_report(events: list) -> str:
 
     try:
         response = client.chat.completions.create(
-            model="meta-llama/llama-3.1-8b-instruct:free",
+            model="gpt-4o-mini",
             max_tokens=300,
             temperature=0.7,
             messages=[{"role": "user", "content": prompt}]
@@ -138,7 +137,7 @@ async def parse_config(message: str) -> ParsedConfig:
 
     try:
         response = client.chat.completions.create(
-            model="meta-llama/llama-3.1-8b-instruct:free",
+            model="gpt-4o-mini",
             max_tokens=200,
             temperature=0.0,
             messages=[{"role": "user", "content": prompt}]

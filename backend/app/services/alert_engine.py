@@ -81,10 +81,7 @@ async def process_event(event_data: dict) -> None:
     else:
         severity = event_data.get("severity") or "HIGH"
     
-    if severity == "LOW":
-        event_data["status"] = "logged_only"
-        await save_event(event_data)
-        return
+
 
     # 4. Push TRƯỚC với default message đến liên hệ chính
     contacts = await get_contacts_sorted(household_id)

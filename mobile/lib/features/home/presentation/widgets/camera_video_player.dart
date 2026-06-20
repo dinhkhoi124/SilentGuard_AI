@@ -11,10 +11,16 @@ import 'package:media_kit_video/media_kit_video.dart' as media_kit_video;
 import 'package:mobile/core/utils/app_colors.dart';
 
 class CameraVideoPlayer extends StatelessWidget {
-  const CameraVideoPlayer({super.key, required this.currentTime, this.rtspUrl});
+  const CameraVideoPlayer({
+    super.key,
+    required this.currentTime,
+    this.rtspUrl,
+    this.onFrameCaptured,
+  });
 
   final String currentTime;
   final String? rtspUrl;
+  final ValueChanged<Uint8List>? onFrameCaptured;
 
   @override
   Widget build(BuildContext context) {
@@ -27,7 +33,10 @@ class CameraVideoPlayer extends StatelessWidget {
           child: Stack(
             fit: StackFit.expand,
             children: [
-              CameraLivePreview(rtspUrl: rtspUrl),
+              CameraLivePreview(
+                rtspUrl: rtspUrl,
+                onFrameCaptured: onFrameCaptured,
+              ),
               Positioned(
                 top: 10,
                 left: 10,
@@ -123,9 +132,10 @@ class CameraVideoPlayer extends StatelessWidget {
 }
 
 class CameraLivePreview extends StatefulWidget {
-  const CameraLivePreview({super.key, this.rtspUrl});
+  const CameraLivePreview({super.key, this.rtspUrl, this.onFrameCaptured});
 
   final String? rtspUrl;
+  final ValueChanged<Uint8List>? onFrameCaptured;
 
   @override
   State<CameraLivePreview> createState() => _CameraLivePreviewState();
@@ -138,6 +148,7 @@ class _CameraLivePreviewState extends State<CameraLivePreview> {
 
   Player? _player;
   media_kit_video.VideoController? _videoController;
+  final List<StreamSubscription<Object?>> _playerSubscriptions = [];
 
   @override
   void initState() {
@@ -149,14 +160,14 @@ class _CameraLivePreviewState extends State<CameraLivePreview> {
   void didUpdateWidget(covariant CameraLivePreview oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.rtspUrl != widget.rtspUrl) {
-      _disposeControllers();
+      unawaited(_disposeControllers(captureFrame: false));
       _initController();
     }
   }
 
   @override
   void dispose() {
-    _disposeControllers();
+    unawaited(_disposeControllers(captureFrame: true));
     super.dispose();
   }
 
@@ -217,34 +228,58 @@ class _CameraLivePreviewState extends State<CameraLivePreview> {
   }
 
   void _listenToPlayerLogs(Player player) {
-    unawaited(
-      player.stream.error.forEach((error) {
+    _playerSubscriptions.addAll([
+      player.stream.error.listen((error) {
         developer.log('media_kit error: $error', name: 'CameraLivePreview');
       }),
-    );
-    unawaited(
-      player.stream.log.forEach((record) {
+      player.stream.log.listen((record) {
         developer.log(record.toString(), name: 'CameraLivePreview.media_kit');
       }),
-    );
-    unawaited(
-      player.stream.width.forEach((width) {
+      player.stream.width.listen((width) {
         developer.log('video width: $width', name: 'CameraLivePreview');
       }),
-    );
-    unawaited(
-      player.stream.height.forEach((height) {
+      player.stream.height.listen((height) {
         developer.log('video height: $height', name: 'CameraLivePreview');
       }),
-    );
+    ]);
   }
 
-  void _disposeControllers() {
+  Future<void> _disposeControllers({required bool captureFrame}) async {
     final player = _player;
+    final subscriptions = List<StreamSubscription<Object?>>.of(
+      _playerSubscriptions,
+    );
+    _playerSubscriptions.clear();
     _player = null;
     _videoController = null;
 
-    if (player != null) unawaited(player.dispose());
+    for (final subscription in subscriptions) {
+      unawaited(subscription.cancel());
+    }
+
+    if (player == null) return;
+
+    if (captureFrame) await _captureLastFrame(player);
+    await player.stop();
+    await player.dispose();
+  }
+
+  Future<void> _captureLastFrame(Player player) async {
+    final onFrameCaptured = widget.onFrameCaptured;
+    if (onFrameCaptured == null) return;
+
+    try {
+      final bytes = await player.screenshot(format: 'image/png');
+      if (bytes == null || bytes.isEmpty) return;
+      onFrameCaptured(bytes);
+    } catch (error, stackTrace) {
+      developer.log(
+        'Khong the chup khung hinh cuoi cua camera.',
+        name: 'CameraLivePreview',
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
   }
 
   @override

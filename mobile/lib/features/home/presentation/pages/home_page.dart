@@ -1,6 +1,7 @@
 // lib/features/home/presentation/pages/home_page.dart
 
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -263,6 +264,7 @@ class _LoadedHome extends StatelessWidget {
                       : _InlineDeviceGrid(
                           key: const ValueKey('grid'),
                           devices: state.devices,
+                          cameraThumbnails: state.cameraThumbnails,
                         ),
                 ),
               ],
@@ -289,9 +291,14 @@ class _EmptyDeviceSection extends StatelessWidget {
 }
 
 class _InlineDeviceGrid extends StatelessWidget {
-  const _InlineDeviceGrid({super.key, required this.devices});
+  const _InlineDeviceGrid({
+    super.key,
+    required this.devices,
+    required this.cameraThumbnails,
+  });
 
   final List<CameraDevice> devices;
+  final Map<String, Uint8List> cameraThumbnails;
 
   @override
   Widget build(BuildContext context) {
@@ -332,11 +339,17 @@ class _InlineDeviceGrid extends StatelessWidget {
               child: CameraCard(
                 key: ValueKey(device.id),
                 device: device,
+                thumbnailBytes: cameraThumbnails[device.id],
                 onDelete: (deviceId) =>
                     context.read<HomeBloc>().add(HomeDeviceDeleted(deviceId)),
                 onToggleAccessory: (deviceId, accessoryIndex) {
                   context.read<HomeBloc>().add(
                     HomeAccessoryToggled(deviceId, accessoryIndex),
+                  );
+                },
+                onThumbnailCaptured: (bytes) {
+                  context.read<HomeBloc>().add(
+                    CameraThumbnailCaptured(deviceId: device.id, bytes: bytes),
                   );
                 },
               ),

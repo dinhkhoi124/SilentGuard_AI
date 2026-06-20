@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:mobile/features/home/domain/entities/camera_device.dart';
 import 'package:mobile/features/home/domain/usecases/delete_camera_device.dart';
@@ -18,6 +20,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     on<AddDeviceTapped>(_onAddDeviceTapped);
     on<HomeDeviceDeleted>(_onDeviceDeleted);
     on<HomeDevicePaired>(_onDevicePaired);
+    on<CameraThumbnailCaptured>(_onCameraThumbnailCaptured);
     on<HomeAccessoryToggled>(_onAccessoryToggled);
     on<NotificationTapped>((event, emit) {});
   }
@@ -80,7 +83,14 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     _activeDevices = _activeDevices
         .where((device) => device.id != event.deviceId)
         .toList();
-    emit(currentState.copyWith(devices: List.unmodifiable(_activeDevices)));
+    final thumbnails = Map<String, Uint8List>.of(currentState.cameraThumbnails)
+      ..remove(event.deviceId);
+    emit(
+      currentState.copyWith(
+        devices: List.unmodifiable(_activeDevices),
+        cameraThumbnails: thumbnails,
+      ),
+    );
   }
 
   void _onDevicePaired(HomeDevicePaired event, Emitter<HomeState> emit) {
@@ -97,6 +107,23 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
       _activeDevices[deviceIndex] = event.device;
     }
     emit(currentState.copyWith(devices: List.unmodifiable(_activeDevices)));
+  }
+
+  void _onCameraThumbnailCaptured(
+    CameraThumbnailCaptured event,
+    Emitter<HomeState> emit,
+  ) {
+    final currentState = state;
+    if (currentState is! HomeLoaded) return;
+
+    emit(
+      currentState.copyWith(
+        cameraThumbnails: {
+          ...currentState.cameraThumbnails,
+          event.deviceId: event.bytes,
+        },
+      ),
+    );
   }
 
   void _onAccessoryToggled(

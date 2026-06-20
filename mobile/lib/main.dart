@@ -43,10 +43,14 @@ Future<void> main() async {
   final binding = WidgetsFlutterBinding.ensureInitialized();
   FlutterNativeSplash.preserve(widgetsBinding: binding);
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  await di.init();
+
+  final appRouter = AppRouter(di.sl());
 
   runApp(
-    const BootstrapApp(
-      initializer: AppInitializer(
+    BootstrapApp(
+      appRouter: appRouter,
+      initializer: const AppInitializer(
         backgroundMessageHandler: _firebaseMessagingBackgroundHandler,
       ),
     ),
@@ -54,8 +58,13 @@ Future<void> main() async {
 }
 
 class BootstrapApp extends StatefulWidget {
-  const BootstrapApp({super.key, required this.initializer});
+  const BootstrapApp({
+    super.key,
+    required this.appRouter,
+    required this.initializer,
+  });
 
+  final AppRouter appRouter;
   final AppInitializer initializer;
 
   @override
@@ -63,8 +72,6 @@ class BootstrapApp extends StatefulWidget {
 }
 
 class _BootstrapAppState extends State<BootstrapApp> {
-  AppInitializationResult? _initializationResult;
-
   @override
   void initState() {
     super.initState();
@@ -75,13 +82,14 @@ class _BootstrapAppState extends State<BootstrapApp> {
 
   Future<void> _initializePostFrame() async {
     try {
-      // Tier 2: plugin setup, DI, local notifications, initial FCM lookup, and
-      // router creation are intentionally post-frame. AppInitializer yields
-      // between platform-channel calls to avoid DartMessenger congestion.
-      final result = await widget.initializer.initializeAfterFirstFrame();
+      // Tier 2: plugin setup, local notifications, and initial FCM lookup stay
+      // post-frame. AppInitializer yields between platform-channel calls to
+      // avoid DartMessenger congestion.
+      final result = await widget.initializer.initializeAfterFirstFrame(
+        appRouter: widget.appRouter,
+      );
       if (!mounted) return;
 
-      setState(() => _initializationResult = result);
       WidgetsBinding.instance.addPostFrameCallback((_) {
         widget.initializer.scheduleMessagingSetup(result);
       });
@@ -97,17 +105,7 @@ class _BootstrapAppState extends State<BootstrapApp> {
 
   @override
   Widget build(BuildContext context) {
-    final result = _initializationResult;
-    if (result == null) {
-      return MaterialApp(
-        title: 'WatchNest',
-        debugShowCheckedModeBanner: false,
-        theme: AppTheme.light,
-        home: const Scaffold(backgroundColor: Color(0xFF2B5CE6)),
-      );
-    }
-
-    return MyApp(appRouter: result.appRouter);
+    return MyApp(appRouter: widget.appRouter);
   }
 }
 

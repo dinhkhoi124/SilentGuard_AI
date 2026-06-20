@@ -1,6 +1,7 @@
 // lib/features/home/presentation/bloc/home_event.dart
 
 import 'package:equatable/equatable.dart';
+import 'package:flutter/foundation.dart';
 import 'package:mobile/features/home/domain/entities/camera_device.dart';
 
 sealed class HomeEvent extends Equatable {
@@ -47,6 +48,16 @@ final class HomeDevicePaired extends HomeEvent {
 
   @override
   List<Object?> get props => [device];
+}
+
+final class CameraThumbnailCaptured extends HomeEvent {
+  const CameraThumbnailCaptured({required this.deviceId, required this.bytes});
+
+  final String deviceId;
+  final Uint8List bytes;
+
+  @override
+  List<Object?> get props => [deviceId, bytes];
 }
 
 final class HomeAccessoryToggled extends HomeEvent {

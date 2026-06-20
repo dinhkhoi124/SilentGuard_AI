@@ -1,6 +1,7 @@
 // lib/features/home/presentation/bloc/home_state.dart
 
 import 'package:equatable/equatable.dart';
+import 'package:flutter/foundation.dart';
 import 'package:mobile/features/home/domain/entities/camera_device.dart';
 import 'package:mobile/features/home/domain/entities/weather_info.dart';
 
@@ -24,30 +25,40 @@ final class HomeLoaded extends HomeState {
     required this.weather,
     required this.devices,
     required this.selectedRoom,
+    this.cameraThumbnails = const {},
     this.openPairingFlow = false,
   });
 
   final WeatherInfo? weather;
   final List<CameraDevice> devices;
   final String selectedRoom;
+  final Map<String, Uint8List> cameraThumbnails;
   final bool openPairingFlow;
 
   HomeLoaded copyWith({
     WeatherInfo? weather,
     List<CameraDevice>? devices,
     String? selectedRoom,
+    Map<String, Uint8List>? cameraThumbnails,
     bool? openPairingFlow,
   }) {
     return HomeLoaded(
       weather: weather ?? this.weather,
       devices: devices ?? this.devices,
       selectedRoom: selectedRoom ?? this.selectedRoom,
+      cameraThumbnails: cameraThumbnails ?? this.cameraThumbnails,
       openPairingFlow: openPairingFlow ?? this.openPairingFlow,
     );
   }
 
   @override
-  List<Object?> get props => [weather, devices, selectedRoom, openPairingFlow];
+  List<Object?> get props => [
+    weather,
+    devices,
+    selectedRoom,
+    cameraThumbnails,
+    openPairingFlow,
+  ];
 }
 
 final class HomeError extends HomeState {

@@ -1,27 +1,39 @@
 // lib/features/home/presentation/widgets/camera_card.dart
 
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mobile/core/utils/app_colors.dart';
 import 'package:mobile/features/home/domain/entities/camera_device.dart';
-import 'package:mobile/features/home/presentation/widgets/camera_video_player.dart';
+import 'package:mobile/features/home/presentation/pages/camera_detail_page.dart';
 
 class CameraCard extends StatelessWidget {
   const CameraCard({
     super.key,
     required this.device,
+    required this.thumbnailBytes,
     required this.onDelete,
     required this.onToggleAccessory,
+    required this.onThumbnailCaptured,
   });
 
   final CameraDevice device;
+  final Uint8List? thumbnailBytes;
   final ValueChanged<String> onDelete;
   final void Function(String deviceId, int accessoryIndex) onToggleAccessory;
+  final ValueChanged<Uint8List> onThumbnailCaptured;
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () => context.push('/camera/${device.id}', extra: device),
+      onTap: () => context.push(
+        '/camera/${device.id}',
+        extra: CameraDetailArgs(
+          device: device,
+          onThumbnailCaptured: onThumbnailCaptured,
+        ),
+      ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(18),
         child: DecoratedBox(
@@ -45,7 +57,10 @@ class CameraCard extends StatelessWidget {
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
-                    CameraLivePreview(rtspUrl: device.rtspUrl),
+                    if (thumbnailBytes case final bytes?)
+                      Image.memory(bytes, fit: BoxFit.cover)
+                    else
+                      const ColoredBox(color: Colors.black),
                     Positioned(
                       top: 0,
                       left: 0,

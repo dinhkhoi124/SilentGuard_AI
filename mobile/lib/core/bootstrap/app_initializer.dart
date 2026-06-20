@@ -28,7 +28,9 @@ class AppInitializer {
 
   final BackgroundMessageHandler backgroundMessageHandler;
 
-  Future<AppInitializationResult> initializeAfterFirstFrame() async {
+  Future<AppInitializationResult> initializeAfterFirstFrame({
+    AppRouter? appRouter,
+  }) async {
     _configureCrashReporting();
     await _yieldToUi();
 
@@ -44,7 +46,6 @@ class AppInitializer {
     }
     await _yieldToUi();
 
-    AppRouter? appRouter;
     final initialCameraId = await _initializeLocalNotifications(
       onCameraTap: (cameraId) {
         appRouter?.router.go('/camera/$cameraId');
@@ -52,7 +53,7 @@ class AppInitializer {
     );
     await _yieldToUi();
 
-    appRouter = AppRouter(
+    appRouter ??= AppRouter(
       di.sl(),
       initialLocation: _initialLocation(
         localCameraId: initialCameraId,

@@ -1,6 +1,7 @@
 // lib/features/home/presentation/pages/camera_detail_page.dart
 
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -17,10 +18,22 @@ import 'package:mobile/features/home/presentation/widgets/camera_top_bar.dart';
 import 'package:mobile/features/home/presentation/widgets/camera_video_player.dart';
 import 'package:mobile/injection_container.dart';
 
-class CameraDetailPage extends StatefulWidget {
-  const CameraDetailPage({super.key, required this.device});
+class CameraDetailArgs {
+  const CameraDetailArgs({required this.device, this.onThumbnailCaptured});
 
   final CameraDevice device;
+  final ValueChanged<Uint8List>? onThumbnailCaptured;
+}
+
+class CameraDetailPage extends StatefulWidget {
+  const CameraDetailPage({
+    super.key,
+    required this.device,
+    this.onThumbnailCaptured,
+  });
+
+  final CameraDevice device;
+  final ValueChanged<Uint8List>? onThumbnailCaptured;
 
   @override
   State<CameraDetailPage> createState() => _CameraDetailPageState();
@@ -62,7 +75,13 @@ class _CameraDetailPageState extends State<CameraDetailPage> {
             SliverToBoxAdapter(
               child: CameraTopBar(
                 device: widget.device,
-                onBack: () => context.go('/home'),
+                onBack: () {
+                  if (context.canPop()) {
+                    context.pop();
+                  } else {
+                    context.go('/home');
+                  }
+                },
                 onSettings: _showCameraOptions,
               ),
             ),
@@ -70,6 +89,7 @@ class _CameraDetailPageState extends State<CameraDetailPage> {
               child: CameraVideoPlayer(
                 rtspUrl: widget.device.rtspUrl,
                 currentTime: _currentTime,
+                onFrameCaptured: widget.onThumbnailCaptured,
               ),
             ),
             const SliverToBoxAdapter(child: SizedBox(height: 12)),

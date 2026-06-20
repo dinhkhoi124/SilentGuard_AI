@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mobile/core/router/auth_notifier.dart';
+import 'package:mobile/core/widgets/wave_text_loader.dart';
 import 'package:mobile/features/auth/presentation/pages/signup_page.dart';
 import 'package:mobile/features/auth/presentation/pages/welcome_page.dart';
 import 'package:mobile/core/utils/app_colors.dart';
@@ -70,8 +71,10 @@ class AppRouter {
     routes: [
       GoRoute(
         path: '/loading',
-        builder: (context, state) =>
-            const Scaffold(backgroundColor: Color(0xFF2B5CE6)),
+        builder: (context, state) => const Scaffold(
+          backgroundColor: AppColors.background,
+          body: WaveTextLoader(),
+        ),
       ),
       GoRoute(
         path: '/onboarding',
@@ -102,6 +105,12 @@ class AppRouter {
         builder: (context, state) {
           final id = state.pathParameters['id']!;
           final extra = state.extra;
+          if (extra is CameraDetailArgs) {
+            return CameraDetailPage(
+              device: extra.device,
+              onThumbnailCaptured: extra.onThumbnailCaptured,
+            );
+          }
           if (extra is CameraDevice) return CameraDetailPage(device: extra);
           return _CameraRouteLoader(cameraId: id);
         },

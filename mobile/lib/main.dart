@@ -5,6 +5,7 @@ import 'dart:developer' as developer;
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
@@ -43,7 +44,19 @@ Future<void> main() async {
   // before runApp. Everything else is delayed until Flutter can paint splash.
   final binding = WidgetsFlutterBinding.ensureInitialized();
   FlutterNativeSplash.preserve(widgetsBinding: binding);
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  Stopwatch? startupStopwatch;
+  if (kDebugMode) {
+    startupStopwatch = Stopwatch()..start();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      debugPrint(
+        '[Startup] First frame rendered in '
+        '${startupStopwatch!.elapsedMilliseconds}ms',
+      );
+    });
+  }
+  await Future.wait([
+    Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform),
+  ]);
   await di.init();
 
   final appRouter = AppRouter(di.sl());

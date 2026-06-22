@@ -1,227 +1,191 @@
 # Smartify App Context
 
-Tai lieu nay tom tat trang thai hien tai cua app Flutter `mobile/` de dung nhu handover note cho cac lan lam tiep theo.
+Tài liệu này tóm tắt trạng thái hiện tại của ứng dụng Flutter `mobile/` để dùng làm handover note cho các lần phát triển tiếp theo.
 
-## 1. App dang lam gi
+## 1. App đang làm gì
 
-Smartify la ung dung Flutter cho gia dinh/caregiver dung de:
+Smartify là ứng dụng Flutter dành cho gia đình/caregiver dùng để:
 
-- Dang nhap bang Firebase Auth
-- Dong bo phien nguoi dung voi backend FastAPI SilentGuard
-- Hien splash startup, onboarding 3 trang, welcome/login, sign up, home, account
-- Xem danh sach camera, chi tiet camera va luong video truc tiep
-- Quet QR de ghep camera moi qua Imou cloud
-- Nhan thong bao FCM va mo man hinh lien quan
-- Quan ly tai khoan, logout, va cac luong lien quan den household
+- Đăng nhập bằng Firebase Auth.
+- Đồng bộ phiên người dùng với backend FastAPI SilentGuard.
+- Hiển thị màn hình khởi động (native splash + loading), onboarding 3 trang, welcome/login, đăng ký (sign up), trang chủ (home) và tài khoản (account).
+- Xem danh sách camera, chi tiết camera và xem luồng video trực tiếp (live stream).
+- Quét mã QR (quét trực tiếp hoặc chọn ảnh từ thư viện) để ghép nối camera mới thông qua Imou Cloud.
+- Nhận thông báo đẩy (push notification) từ FCM, hiển thị thông báo cục bộ (local notification) và chuyển hướng nhanh đến màn hình camera tương ứng khi nhấn vào thông báo.
+- Quản lý tài khoản cá nhân, đăng xuất và quản lý household.
+- **Mới**: Gửi video từ thư viện (gallery) lên máy chủ qua API `POST /api/events/upload-video` để phân tích hành vi/sự kiện bất thường và hiển thị phản hồi từ AI.
 
-Ngon ngu hien thi cho nguoi dung la tieng Viet.
+Ngôn ngữ hiển thị cho người dùng là tiếng Việt.
 
-## 2. Stack va kien truc hien tai
+## 2. Stack và kiến trúc hiện tại
 
 - Flutter 3.x
-- BLoC cho state management
-- GoRouter cho dieu huong
-- GetIt cho DI
-- Clean Architecture theo feature
-- `shared_preferences` de persist `onboarding_completed`
+- BLoC/Cubit cho quản lý trạng thái (state management).
+- GoRouter cho điều hướng ứng dụng (routing).
+- GetIt cho Dependency Injection (DI).
+- Clean Architecture tổ chức theo feature.
+- `shared_preferences` dùng để lưu cờ đã hoàn thành onboarding (`onboarding_completed`).
 
-Nhung diem dang giu vai tro trung tam:
+Những thành phần giữ vai trò trung tâm:
 
-- `AuthNotifier` la source of truth cho router startup/auth state
-- `SessionRepository` la cau noi giua Firebase login va backend session
-- `OnboardingService` giu flag first-run onboarding
-- `HomeBloc` dang giu state cua home va danh sach device hien thi
-- `DevicePairingBloc` xu ly luong quet QR va ghep camera
-- `FcmService` xu ly dang ky token FCM va notification
+- `AuthNotifier`: Nguồn dữ liệu duy nhất (source of truth) cho trạng thái auth và điều hướng của router lúc startup.
+- `SessionRepository`: Cầu nối đồng bộ giữa Firebase Auth và SilentGuard backend session.
+- `OnboardingService`: Lưu trữ cờ kiểm tra khởi chạy lần đầu (first-run onboarding).
+- `HomeBloc`: Quản lý dữ liệu trang chủ bao gồm danh sách thiết bị, thời tiết, bộ lọc phòng, trạng thái thiết bị ngoại vi và ảnh chụp thumbnail camera.
+- `DevicePairingBloc`: Xử lý luồng quét mã QR, kiểm tra trạng thái camera trên Imou Cloud và lưu camera vào hệ thống.
+- `FcmService` & `LocalNotificationService`: Xử lý đăng ký token FCM, nhận thông báo đẩy và kích hoạt thông báo cục bộ.
+- `VideoUploadBloc`: Quản lý việc chọn video từ thư viện thông qua `image_picker` và tải lên backend.
 
-## 3. Startup flow hien tai
+## 3. Startup flow hiện tại
 
-Cold start hien tai di theo thu tu:
+Quy trình khởi động nguội (cold start) được thiết kế tối ưu hai tầng để tránh hiện tượng nháy màn hình (flash) welcome/login khi Firebase đang phục hồi session:
 
-1. App luon vao `/splash`
-2. `AuthNotifier` dong thoi:
-   - nghe event dau tien tu `authStateChanges()`
-   - doc `onboarding_completed`
-   - giu splash toi thieu mot nhip ngan de tranh flash
-3. Neu Firebase restore duoc user:
-   - app goi `SessionRepository.provisionSession()`
-   - sau do dang ky FCM token
-   - router di den destination sau auth (`/home` hoac route camera tu notification)
-4. Neu khong co session:
-   - onboarding chua xong -> vao `/onboarding`
-   - onboarding da xong -> vao `/welcome`
+1. **Tầng 1 (Trước runApp)**:
+   - Đảm bảo Flutter binding được khởi tạo.
+   - Bảo lưu màn hình native splash (`FlutterNativeSplash.preserve()`).
+   - Khởi tạo Firebase Core và đăng ký các dịch vụ DI (`di.init()`).
+   - Ứng dụng luôn đi vào route mặc định ban đầu là `/loading` để hiển thị widget `WaveTextLoader`.
 
-Muc tieu cua flow nay la tranh bug cu: welcome/login bi flash trong luc Firebase dang restore session roi tu redirect vao home.
+2. **Tầng 2 (Sau khung hình đầu tiên - Post-Frame)**:
+   - Gọi `AppInitializer.initializeAfterFirstFrame()` để khởi động `LocalNotificationService` và lấy thông tin notification ban đầu nếu ứng dụng được mở từ thông báo đẩy.
+   - `AuthNotifier` kiểm tra trạng thái auth từ Firebase và thực hiện đồng bộ session với backend (`SessionRepository.provisionSession()`).
+   - Chỉ khi trạng thái auth được xác định xong **VÀ** thời gian hiển thị splash tối thiểu (900ms) đã trôi qua, native splash mới được gỡ bỏ bằng `FlutterNativeSplash.remove()`.
+   - GoRouter tự động chuyển hướng người dùng từ `/loading` tới màn hình đích phù hợp:
+     - Đã đăng nhập: `/home` hoặc `/camera/:id` (nếu mở từ notification).
+     - Chưa đăng nhập: `/onboarding` (nếu chưa xem) hoặc `/welcome` (nếu đã xong onboarding).
 
-## 4. Luong auth hien tai
+3. **Tầng 3 (Deferred Setup)**:
+   - Sau 3 giây kể từ khi kết xuất khung hình đầu tiên, ứng dụng đăng ký FCM background handler và khởi chạy `FcmService.initialize` nhằm tránh nghẽn luồng DartMessenger trong lúc tải giao diện ban đầu.
 
-Luot auth dang chia thanh 2 nhanh:
+## 4. Luồng auth hiện tại
 
-- Email/password:
-  - form login nam truc tiep trong `WelcomePage`
-  - UI dispatch `AuthSignInRequested`
-  - `AuthBloc` goi `AuthRepository.signInWithEmail()`
-  - thanh cong -> `SessionRepository.provisionSession()` -> `AuthSuccess`
+Luồng xác thực chia thành 2 nhánh chính:
 
-- Google:
-  - chi con duy nhat Google social sign-in
-  - UI dispatch `AuthGoogleSignInRequested`
-  - thanh cong -> backend provisioning -> dang ky FCM token
+- **Email/Password**:
+  - Biểu mẫu đăng nhập được tích hợp trực tiếp ngay trong `WelcomePage`.
+  - UI phát sự kiện `AuthSignInRequested`, qua đó `AuthBloc` gọi `AuthRepository.signInWithEmail()`.
+  - Khi thành công, ứng dụng thực hiện `SessionRepository.provisionSession()`.
+- **Google Sign-In**:
+  - Đăng nhập bằng tài khoản Google có sẵn ở cả `WelcomePage` và `SignUpPage`.
+  - Thực hiện xác thực Firebase -> Provisioning session -> Đăng ký token FCM.
 
-Khong con route/man hinh `signin_page.dart` rieng nua.
-Apple, Facebook, X/Twitter da bi bo khoi UI va hien tai khong co auth logic rieng trong data/domain layer.
+Không còn màn hình đăng nhập riêng (`signin_page.dart`). Các cổng đăng nhập xã hội khác như Apple, Facebook, X/Twitter đã bị loại bỏ khỏi giao diện và mã nguồn.
 
-## 5. Man hinh auth/onboarding hien tai
+## 5. Màn hình auth/onboarding hiện tại
 
-- `SplashPage`
-  - nen primary blue
-  - badge Smartify mau trang + wordmark
-  - loader trong luc startup auth/onboarding check chay
+- **Màn hình tải ban đầu (`/loading`)**:
+  - Nền tối (`AppColors.background`).
+  - Sử dụng widget `WaveTextLoader` với hiệu ứng sóng chữ mượt mà.
+  - Màn hình `SplashPage` cũ đã bị loại bỏ hoàn toàn.
+- **Màn hình Onboarding (`OnboardingPage`)**:
+  - Gồm 3 trang trượt PageView mô phỏng ứng dụng.
+  - Nút Skip và Continue ở các trang 1-2. Trang cuối cùng có nút `Let's Get Started` để chuyển hướng sang `/welcome` và lưu trạng thái đã xem.
+- **Màn hình Welcome (`WelcomePage`)**:
+  - Chứa form nhập email/password trực tiếp, nút đăng nhập chính và tuỳ chọn Google Sign-in.
+  - Lối dẫn sang `SignUpPage` dành cho tài khoản mới.
+- **Màn hình Đăng ký (`SignUpPage`)**:
+  - Giao diện đăng ký tài khoản mới bằng Email/Password hoặc Google.
 
-- `OnboardingPage`
-  - 3 trang PageView
-  - mockup screenshot tĩnh de thay bang asset that sau nay
-  - Skip va Continue o trang 1-2
-  - `Let's Get Started` o trang 3
-  - finish/skip se set `onboarding_completed=true` roi vao `/welcome`
+## 6. Router và redirect logic
 
-- `WelcomePage`
-  - chua truc tiep email field, password field, forgot password, primary login button
-  - co Google sign-in ben duoi divider `hoac`
-  - van giu entry point sang `SignUpPage`
+`AppRouter` cấu hình các đường dẫn chính:
 
-- `SignUpPage`
-  - van tach rieng
-  - co email/password sign-up va Google sign-in
+- `/loading`: Màn hình chờ khởi động và xử lý logic auth.
+- `/onboarding`: Màn hình giới thiệu ứng dụng.
+- `/welcome`: Màn hình chào mừng kiêm đăng nhập.
+- `/signup`: Màn hình đăng ký tài khoản.
+- `/home`: Trang chủ (bảng điều khiển thiết bị).
+- `/add-device`: Ghép nối thiết bị camera mới.
+- `/camera/:id`: Chi tiết camera. Nếu truy cập trực tiếp bằng ID mà không có tham số extra, ứng dụng sẽ tự động tải danh sách thiết bị để tìm camera khớp với ID.
 
-## 6. Router va redirect logic
+Redirect logic dựa trên 3 trạng thái từ `AuthNotifier`: `isReady` (đã khởi tạo xong), `isAuthenticated` (đã xác thực), và `onboardingCompleted` (đã hoàn thành giới thiệu).
 
-`AppRouter` hien tai co cac route chinh:
+## 7. Đăng xuất (Logout) hiện tại
 
-- `/splash`
-- `/onboarding`
-- `/welcome`
-- `/signup`
-- `/home`
-- `/add-device`
-- `/camera/:id`
+Quy trình đăng xuất diễn ra tuần tự:
 
-Auth flow redirect da dua tren 3 du lieu tu `AuthNotifier`:
+1. `AccountPage` phát sự kiện `AuthSignOutRequested`.
+2. `AuthRepositoryImpl.signOut()` gửi yêu cầu huỷ session lên backend SilentGuard trước.
+3. Giải phóng session đã cache cục bộ (`SessionRepository.clearCachedSession()`).
+4. Đăng xuất khỏi Firebase Auth.
+5. Router tự động chuyển hướng người dùng về màn hình `/welcome`.
+6. Hiển thị dialog tiến trình (Progress Dialog) trong suốt quá trình đăng xuất để tối ưu trải nghiệm người dùng (UX).
 
-- `isReady`
-- `isAuthenticated`
-- `onboardingCompleted`
+## 8. Luồng camera / thiết bị hiện tại
 
-Y nghia:
+### Ghép nối camera
+1. Quét mã QR trực tiếp qua camera hoặc tải ảnh QR từ thư viện ảnh.
+2. Trích xuất thông tin `{SN:...,SC:...,PID:...}` và lấy số Serial Number (SN).
+3. Gọi Imou Cloud API để kiểm tra trạng thái hoạt động và lấy địa chỉ luồng RTMP/RTSP.
+4. Gửi thông tin đăng ký camera lên backend qua API `POST /api/cameras`.
+5. Cập nhật camera mới vào danh sách đang hiển thị trên trang chủ.
 
-- chua `isReady` -> o lai splash
-- authenticated -> vao post-auth destination
-- unauthenticated + onboarding chua xong -> onboarding
-- unauthenticated + onboarding xong -> welcome
+### Phát video trực tiếp (Live Stream)
+- Sử dụng thư viện `media_kit` để phát video.
+- Bản tin URL stream được gửi trực tiếp vào player.
+- **Khắc phục lỗi xung đột âm thanh trên Android**: Nhằm tránh tình trạng lỗi driver âm thanh hoặc ứng dụng bị crash khi khởi động cùng Firebase/FCM, các plugin của `media_kit` được loại bỏ khỏi cấu hình tự động đăng ký của Flutter Engine tại `MainActivity.kt`. Thay vào đó, chúng được đăng ký động thông qua MethodChannel `smartify/media_kit` khi `CameraLivePreview` bắt đầu tải luồng video thực tế (`_openStreamWhenReady`).
 
-## 7. Logout hien tai
+### Chụp ảnh xem trước (Thumbnail Capture)
+- Khi rời khỏi màn hình chi tiết camera (`CameraDetailPage`), trình phát sẽ chụp lại khung hình cuối cùng của luồng phát trực tiếp (`player.screenshot()`).
+- Bức ảnh này (định dạng `image/png`) được chuyển về và lưu trong `HomeBloc` để hiển thị làm thumbnail cập nhật của camera đó trên Grid trang chủ, thay thế cho logo mặc định.
 
-Logout hien tai di theo thu tu:
+### Xoá camera
+- Thực hiện gọi API `DELETE /api/cameras/{camera_id}` để gỡ bỏ thiết bị khỏi backend.
 
-1. `AccountPage` dispatch `AuthSignOutRequested`
-2. `AuthRepositoryImpl.signOut()` co gang goi backend logout truoc
-3. `SessionRepository.clearCachedSession()`
-4. Firebase sign-out
-5. Router quay ve flow unauthenticated
+## 9. Tích hợp Backend hiện tại
 
-UI logout tren `AccountPage` da doi:
+Ứng dụng kết nối với SilentGuard backend thông qua các nhóm API chính:
 
-- khong con spinner inline ngay icon logout
-- trong luc logout se hien dialog progress rieng
-
-## 8. Luong camera / device hien tai
-
-Luot ghep camera hien tai:
-
-1. Quet QR live hoac chon QR tu gallery
-2. Resolve QR sang `ResolvedDevice`
-3. Parse duoc QR dang `{SN:...,SC:...,PID:...}` va lay `SN`
-4. Goi Imou cloud de kiem tra/truy stream
-5. Lay RTMP URL
-6. Dang ky camera vao backend qua `POST /api/cameras`
-7. Sau pairing, home duoc cap nhat bang object vua pair de giu stream URL trong session hien tai
-
-Video live hien tai:
-
-- dung `media_kit`
-- player da co debug listeners cho `error`, `log`, `playing`, `buffering`
-- RTMP duoc pass as-is vao player
-- backend camera list hien tai chua ro co persist stream URL hay khong, nen behavior sau reload app van la diem can theo doi
-
-Xoa camera hien tai:
-
-- co goi `DELETE /api/cameras/{camera_id}`
-- datasource co log status delete
-
-## 9. Backend integration da co
-
-Theo code hien tai, app dang phu thuoc cac nhom API sau:
-
-- Auth/session
+- **Auth & Session**:
   - `POST /api/users/login`
   - `POST /api/users/logout`
-  - `POST /api/users/device-token`
+  - `POST /api/users/device-token` (Đăng ký FCM token)
   - `GET /api/households/me`
-- Cameras/devices
+- **Quản lý Camera**:
   - `GET /api/cameras`
   - `POST /api/cameras`
   - `DELETE /api/cameras/{camera_id}`
-- Imou cloud
-  - access token + device status + stream URL qua datasource Imou
+- **Sự kiện & Video**:
+  - `POST /api/events/upload-video` (Tải lên video .mp4 để phân tích và đánh giá sự kiện an ninh).
+- **Imou Cloud API**:
+  - Lấy access token, kiểm tra trạng thái thiết bị và lấy địa chỉ stream.
 
-FCM token registration dang duoc goi sau khi backend provisioning thanh cong.
+## 10. Những thứ đang ổn
 
-## 10. Nhung thu dang on
+- Startup và xử lý auth mượt mà, không bị chớp màn hình nhờ cơ chế chặn hiển thị native splash đến khi trạng thái auth sẵn sàng.
+- Khắc phục triệt để lỗi xung đột driver âm thanh / crash trên các thiết bị Android bằng giải pháp trì hoãn nạp thư viện `media_kit`.
+- Luồng gửi video được tích hợp trực tiếp trên thanh điều hướng BottomNavBar, dễ dàng tương tác và tải lên.
+- Thumbnail thẻ camera trên trang chủ được cập nhật trực quan bằng khung hình thực tế chụp từ luồng phát cuối cùng.
+- Quản lý trạng thái bằng BLoC/Cubit rõ ràng, cấu trúc Clean Architecture chuẩn hóa.
 
-- Startup race condition da duoc chan bang splash + first auth event gating
-- Onboarding da co persistence va duoc wire vao router
-- Welcome da gom thang login form, khong con man hinh login trung gian
-- Google sign-in va email/password login van dung chung AuthBloc/SessionRepository
-- Logout da co UX ro hon bang dialog progress
-- Device pairing da co bloc/repository/datasource ro rang
-- `media_kit` da co them logging de debug player tot hon
+## 11. Những chỗ còn vướng
 
-## 11. Nhung cho con vuong
+- `AppConfig.backendAuthToken` đang là dead code (không được sử dụng trong các API Client hiện tại).
+- Tính năng phục hồi mật khẩu (Forgot Password) trên giao diện Welcome chỉ là placeholder, chưa có xử lý logic thật.
+- Các tab "Tự động" (Automation) và "Báo cáo" (Report) hiện tại là giao diện chờ (Coming Soon).
 
-- Trong worktree hien tai con nhieu thay doi chua commit:
-  - splash/onboarding/shared_preferences
-  - welcome merge login
-  - account logout dialog
-- `HomeBloc` van con debug token print `[DEBUG_TOKEN]`
-- co the `FcmService` van con debug FCM token print neu chua duoc go bo sau test
-- `AppConfig.backendAuthToken` da tung bi nghi la dead code, can tiep tuc giu/bo cho ro rang
-- RTMP playback tren Android phu thuoc native media support cua `media_kit`; neu den luc can stream on dinh hon co the phai xem lai protocol/backend contract
+## 12. Những điểm cần xác nhận nếu làm tiếp
 
-## 12. Nhung diem can xac nhan neu lam tiep
+- Có nên loại bỏ hoàn toàn thuộc tính dead code `AppConfig.backendAuthToken` để làm sạch file cấu hình không?
+- Yêu cầu nghiệp vụ cụ thể cho luồng Quên mật khẩu (Forgot Password) để tiến hành tích hợp Firebase Password Reset.
+- Kịch bản hoạt động của các tab Tự động hoá và Báo cáo.
 
-- Sign Up co can duoc merge vao Welcome hay van giu rieng
-- Backend co nen persist stream URL/serial number day du de camera detail sau relaunch khong bi mat thong tin
-- Cac debug log/token print da den luc xoa chua
-- Forgot password hien tai chi la UI placeholder, chua co flow that
-- Response contract cuoi cung cua camera APIs va auth/session APIs co on dinh chua
+## 13. File nên đọc khi làm việc với các luồng này
 
-## 13. File nen doc khi dung vao cac flow nay
+- **Khởi tạo và Điều hướng**:
+  - [app_initializer.dart](file:///d:/AI_TC/C2-App-128/mobile/lib/core/bootstrap/app_initializer.dart)
+  - [auth_notifier.dart](file:///d:/AI_TC/C2-App-128/mobile/lib/core/router/auth_notifier.dart)
+  - [app_router.dart](file:///d:/AI_TC/C2-App-128/mobile/lib/core/router/app_router.dart)
+- **Tải lên Video**:
+  - [video_upload_bloc.dart](file:///d:/AI_TC/C2-App-128/mobile/lib/features/video_upload/presentation/bloc/video_upload_bloc.dart)
+  - [video_upload_remote_datasource.dart](file:///d:/AI_TC/C2-App-128/mobile/lib/features/video_upload/data/datasources/video_upload_remote_datasource.dart)
+- **Cấu hình Native Android**:
+  - [MainActivity.kt](file:///d:/AI_TC/C2-App-128/mobile/android/app/src/main/kotlin/com/example/mobile/MainActivity.kt)
+- **Phát Video và Giao diện Camera**:
+  - [camera_video_player.dart](file:///d:/AI_TC/C2-App-128/mobile/lib/features/home/presentation/widgets/camera_video_player.dart)
+  - [camera_card.dart](file:///d:/AI_TC/C2-App-128/mobile/lib/features/home/presentation/widgets/camera_card.dart)
+  - [home_page.dart](file:///d:/AI_TC/C2-App-128/mobile/lib/features/home/presentation/pages/home_page.dart)
 
-- `lib/core/router/auth_notifier.dart`
-- `lib/core/router/app_router.dart`
-- `lib/core/services/onboarding_service.dart`
-- `lib/features/onboarding/presentation/pages/splash_page.dart`
-- `lib/features/onboarding/presentation/pages/onboarding_page.dart`
-- `lib/features/auth/presentation/pages/welcome_page.dart`
-- `lib/features/auth/presentation/pages/signup_page.dart`
-- `lib/features/session/data/datasources/session_remote_datasource.dart`
-- `lib/features/session/data/repositories/session_repository_impl.dart`
-- `lib/core/services/fcm_service.dart`
-- `lib/features/account/presentation/pages/account_page.dart`
-- `lib/features/devices/presentation/bloc/device_pairing_bloc.dart`
-- `lib/features/devices/data/datasources/imou_cloud_datasource.dart`
-- `lib/features/home/presentation/widgets/camera_video_player.dart`
+## 14. Tóm tắt một câu
 
-## 14. Tom tat mot cau
-
-Smartify hien la app Flutter dang dung splash-auth gate + persisted onboarding, login bang Firebase (email/password va Google), dong bo session voi SilentGuard backend, dang ky FCM token sau provisioning, va dung Imou cloud + media_kit cho luong pairing/live camera.
+Smartify là ứng dụng Flutter tối ưu luồng khởi động (gắn chặt native splash với trạng thái auth), sử dụng Firebase kết hợp đồng bộ session backend, hỗ trợ xem luồng camera live stream qua Imou Cloud bằng `media_kit` (đã sửa lỗi âm thanh Android), tự động chụp thumbnail cập nhật trang chủ, và tích hợp tính năng tải lên video để phân tích sự kiện bất thường.

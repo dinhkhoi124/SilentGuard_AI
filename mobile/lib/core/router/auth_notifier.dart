@@ -11,6 +11,11 @@ import 'package:mobile/features/auth/domain/entities/app_user.dart';
 import 'package:mobile/features/auth/domain/repositories/auth_repository.dart';
 import 'package:mobile/features/session/domain/repositories/session_repository.dart';
 
+// Timeouts for background operations — long enough to succeed on a slow
+// railway.app cold-start, but bounded so they never block the auth flow.
+const Duration _kProvisionTimeout = Duration(seconds: 8);
+const Duration _kFcmTimeout = Duration(seconds: 5);
+
 enum AuthStartupPhase {
   checkingSession,
   provisioningSession,
@@ -18,7 +23,7 @@ enum AuthStartupPhase {
   authenticated,
 }
 
-class AuthNotifier extends ChangeNotifier {
+class AuthNotifier extends ChangeNotifier with WidgetsBindingObserver {
   AuthNotifier(
     this._authRepository,
     this._sessionRepository,
@@ -35,6 +40,7 @@ class AuthNotifier extends ChangeNotifier {
       'onboardingCompleted=$_onboardingCompleted.',
       name: 'AuthNotifier',
     );
+    WidgetsBinding.instance.addObserver(this);
     unawaited(_loadOnboardingStatus());
     unawaited(_completeMinimumSplashDelay());
     _subscription = _authRepository.authStateChanges().listen(
@@ -64,8 +70,10 @@ class AuthNotifier extends ChangeNotifier {
   bool _minimumSplashElapsed = false;
   bool _disposed = false;
   bool _splashRemoved = false;
+  // Set to true when the last background provision attempt failed.
+  // Cleared on next successful provision or on sign-out.
+  bool _provisionFailed = false;
   int _authRevision = 0;
-  int _fcmRegistrationRevision = 0;
   AuthStartupPhase _phase = AuthStartupPhase.checkingSession;
 
   bool get isReady => _isReady;
@@ -113,81 +121,105 @@ class AuthNotifier extends ChangeNotifier {
     );
 
     if (user == null) {
+      _provisionFailed = false;
       _sessionRepository.clearCachedSession();
       _completeAuthCheck(false);
       return;
     }
 
-    _startProvisioning(revision);
+    // Immediately mark the user as authenticated so the router can redirect
+    // to /home without waiting for the backend provision call. The provision
+    // and FCM registration continue in the background.
+    _phase = AuthStartupPhase.authenticated;
+    _completeAuthCheck(true);
+
+    unawaited(_provisionInBackground(revision));
   }
 
-  void _startProvisioning(int revision) {
-    _authResolved = false;
-    _isAuthenticated = false;
-    _phase = AuthStartupPhase.provisioningSession;
-    _publishStartupStatus(force: true);
-
-    unawaited(
-      Future<void>.microtask(() => _provisionSession(revision)).catchError((
-        Object error,
-        StackTrace stackTrace,
-      ) {
-        developer.log(
-          'Backend provisioning crashed in AuthNotifier.',
-          name: 'AuthNotifier',
-          error: error,
-          stackTrace: stackTrace,
-        );
-        if (revision == _authRevision) _completeAuthCheck(false);
-      }),
-    );
-  }
-
-  Future<void> _provisionSession(int revision) async {
-    final result = await _sessionRepository.provisionSession();
+  /// Runs session provision + FCM token registration asynchronously.
+  /// Never throws — any failure is logged and stored in [_provisionFailed]
+  /// so that [didChangeAppLifecycleState] can retry on next foreground resume.
+  Future<void> _provisionInBackground(int revision) async {
     if (_disposed || revision != _authRevision) return;
 
-    result.fold(
-      (failure) {
-        developer.log(
-          '[GoogleAuth] Backend provisioning failed in AuthNotifier: '
-          '${failure.message}.',
-          name: 'AuthNotifier',
-        );
-        _completeAuthCheck(false);
-      },
-      (_) {
-        _completeAuthCheck(true);
-        _scheduleFcmTokenRegistration(revision);
-      },
-    );
-  }
-
-  void _scheduleFcmTokenRegistration(int revision) {
-    if (_fcmRegistrationRevision == revision) return;
-    _fcmRegistrationRevision = revision;
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_disposed || revision != _authRevision) return;
-      unawaited(
-        Future<void>.delayed(
-          const Duration(milliseconds: 500),
-          _registerFcmTokenSilently,
-        ),
-      );
-    });
-  }
-
-  Future<void> _registerFcmTokenSilently() async {
     try {
-      await _fcmService.registerToken();
+      developer.log(
+        'Starting background session provision.',
+        name: 'AuthNotifier',
+      );
+      final result = await _sessionRepository
+          .provisionSession()
+          .timeout(_kProvisionTimeout);
+
+      if (_disposed || revision != _authRevision) return;
+
+      result.fold(
+        (failure) {
+          developer.log(
+            '[AuthNotifier] Background provision failed: ${failure.message}.',
+            name: 'AuthNotifier',
+          );
+          _provisionFailed = true;
+        },
+        (_) {
+          developer.log(
+            'Background session provision succeeded.',
+            name: 'AuthNotifier',
+          );
+          _provisionFailed = false;
+        },
+      );
+    } on TimeoutException {
+      developer.log(
+        '[AuthNotifier] provisionSession timed out — continuing without session.',
+        name: 'AuthNotifier',
+      );
+      _provisionFailed = true;
     } catch (error, stackTrace) {
       developer.log(
-        'FCM token registration failed after AuthNotifier provisioning.',
+        '[AuthNotifier] Background provision error.',
         name: 'AuthNotifier',
         error: error,
         stackTrace: stackTrace,
       );
+      _provisionFailed = true;
+    }
+
+    if (_disposed || revision != _authRevision) return;
+
+    // Always attempt FCM token registration after provision (success or fail),
+    // so the user still receives push notifications even if the session call
+    // timed out on a slow cold-start.
+    try {
+      await _fcmService.registerToken().timeout(_kFcmTimeout);
+    } on TimeoutException {
+      developer.log(
+        '[AuthNotifier] FCM token registration timed out.',
+        name: 'AuthNotifier',
+      );
+    } catch (error, stackTrace) {
+      developer.log(
+        '[AuthNotifier] FCM token registration failed.',
+        name: 'AuthNotifier',
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+  }
+
+  /// Retries background provision when the app returns to the foreground and
+  /// the previous attempt failed (e.g. no network at cold-start).
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed &&
+        _isAuthenticated &&
+        _provisionFailed &&
+        !_disposed) {
+      developer.log(
+        '[AuthNotifier] App resumed with failed provision — retrying.',
+        name: 'AuthNotifier',
+      );
+      unawaited(_provisionInBackground(_authRevision));
     }
   }
 
@@ -239,6 +271,7 @@ class AuthNotifier extends ChangeNotifier {
     _disposed = true;
     _authRevision++;
     _subscription.cancel();
+    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 }

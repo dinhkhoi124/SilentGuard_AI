@@ -40,29 +40,33 @@ class AppInitializer {
     await _yieldToUi();
 
     final notificationsCubit = di.sl<NotificationsCubit>();
-    final initialFcmAlert = await _takeInitialFcmAlert();
-    if (initialFcmAlert != null) {
-      notificationsCubit.receiveOpenedAlert(initialFcmAlert);
-    }
-    await _yieldToUi();
+    final resolvedRouter = appRouter ?? AppRouter(di.sl());
 
-    final initialCameraId = await _initializeLocalNotifications(
-      onCameraTap: (cameraId) {
-        appRouter?.router.go('/camera/$cameraId');
-      },
+    unawaited(
+      Future.microtask(() async {
+        final initialFcmAlert = await _takeInitialFcmAlert();
+        if (initialFcmAlert == null) return;
+
+        notificationsCubit.receiveOpenedAlert(initialFcmAlert);
+        _openNotificationAlert(resolvedRouter, initialFcmAlert);
+      }),
     );
-    await _yieldToUi();
 
-    appRouter ??= AppRouter(
-      di.sl(),
-      initialLocation: _initialLocation(
-        localCameraId: initialCameraId,
-        fcmAlert: initialFcmAlert,
-      ),
+    unawaited(
+      Future.microtask(() async {
+        final initialCameraId = await _initializeLocalNotifications(
+          onCameraTap: (cameraId) {
+            resolvedRouter.router.go('/camera/$cameraId');
+          },
+        );
+        if (initialCameraId != null) {
+          resolvedRouter.router.go('/camera/$initialCameraId');
+        }
+      }),
     );
 
     return AppInitializationResult(
-      appRouter: appRouter,
+      appRouter: resolvedRouter,
       notificationsCubit: notificationsCubit,
     );
   }
@@ -129,20 +133,6 @@ class AppInitializer {
       FirebaseCrashlytics.instance.recordError(error, stackTrace, fatal: true);
       return true;
     };
-  }
-
-  String _initialLocation({
-    required String? localCameraId,
-    required NotificationAlert? fcmAlert,
-  }) {
-    if (localCameraId != null) return '/camera/$localCameraId';
-
-    final fcmCameraId = fcmAlert?.cameraId;
-    if (fcmCameraId != null && fcmCameraId.isNotEmpty) {
-      return '/camera/${Uri.encodeComponent(fcmCameraId)}';
-    }
-
-    return '/home';
   }
 
   void _openNotificationAlert(AppRouter appRouter, NotificationAlert alert) {

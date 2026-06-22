@@ -89,24 +89,31 @@ class SessionRepositoryImpl implements SessionRepository {
   Future<Either<SessionFailure, BackendSession>> _provisionSession({
     String? inviteCode,
   }) async {
+    // Hard cap on each datasource call so that a cold-start backend spin-up
+    // (e.g. Railway.app free tier) never causes an ANR or blocks the auth flow.
+    const perCallTimeout = Duration(seconds: 8);
     final generation = _cacheGeneration;
     try {
-      final backendUser = await _remoteDataSource.login(inviteCode: inviteCode);
-      final household = await _remoteDataSource.getCurrentHousehold();
+      final backendUser = await _remoteDataSource
+          .login(inviteCode: inviteCode)
+          .timeout(perCallTimeout);
+      final household = await _remoteDataSource
+          .getCurrentHousehold()
+          .timeout(perCallTimeout);
       final session = BackendSession(
         backendUser: backendUser,
         household: household,
       );
       if (generation == _cacheGeneration) _cachedSession = session;
       return Right(session);
-    } on ApiException catch (error, stackTrace) {
-      _logFailure(error, stackTrace);
-      return Left(_mapApiException(error));
     } on TimeoutException catch (error, stackTrace) {
       _logFailure(error, stackTrace);
       return const Left(
         SessionFailure('Không thể kết nối máy chủ. Kết nối quá thời gian chờ.'),
       );
+    } on ApiException catch (error, stackTrace) {
+      _logFailure(error, stackTrace);
+      return Left(_mapApiException(error));
     } on SocketException catch (error, stackTrace) {
       _logFailure(error, stackTrace);
       return const Left(

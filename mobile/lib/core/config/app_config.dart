@@ -10,10 +10,6 @@ abstract final class AppConfig {
         '804956207376-l4fp0vs97r8vjg1bcvru7ffub6bjctgn.apps.googleusercontent.com',
   );
 
-  static const String backendAuthToken = String.fromEnvironment(
-    'BACKEND_AUTH_TOKEN',
-  );
-
   static const String imouApiBaseUrl = String.fromEnvironment(
     'IMOU_API_BASE_URL',
     defaultValue: 'https://openapi-sg.easy4ip.com/openapi',

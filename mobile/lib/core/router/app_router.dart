@@ -16,7 +16,6 @@ import 'package:mobile/features/devices/presentation/pages/device_pairing_page.d
 import 'package:mobile/features/home/domain/entities/camera_device.dart';
 import 'package:mobile/features/home/domain/usecases/get_camera_devices.dart';
 import 'package:mobile/features/home/presentation/bloc/home_bloc.dart';
-import 'package:mobile/features/home/presentation/bloc/home_event.dart';
 import 'package:mobile/features/home/presentation/pages/camera_detail_page.dart';
 import 'package:mobile/features/home/presentation/pages/home_page.dart';
 import 'package:mobile/features/onboarding/presentation/pages/onboarding_page.dart';
@@ -88,7 +87,7 @@ class AppRouter {
       GoRoute(
         path: '/home',
         builder: (context, state) => BlocProvider(
-          create: (_) => sl<HomeBloc>()..add(const HomeStarted()),
+          create: (_) => sl<HomeBloc>(),
           child: const HomePage(),
         ),
       ),

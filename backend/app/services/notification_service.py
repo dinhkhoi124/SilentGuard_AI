@@ -11,17 +11,20 @@ async def send_push(user_id: str, event_data: dict) -> bool:
     Sends push notification via Firebase Cloud Messaging.
     Ref: Section 7 of design doc
     """
+    print(f"[Notification Service] Attempting to send push to user: {user_id}")
     try:
         # Fetch user's FCM token from DB
         response = supabase.table("users").select("fcm_token").eq("id", user_id).execute()
         if not response.data or len(response.data) == 0:
-            print(f"User {user_id} not found in database.")
+            print(f"[Notification Service] User {user_id} not found in database.")
             return False
             
         fcm_token = response.data[0].get("fcm_token")
         if not fcm_token:
-            print(f"FCM Token is missing for user {user_id}. Skipping push.")
+            print(f"[Notification Service] FCM Token is missing for user {user_id}. Skipping push.")
             return False
+
+        print(f"[Notification Service] Found FCM token for user {user_id} (length: {len(fcm_token)}). Preparing message...")
 
         # Prepare push payload
         severity = event_data.get("severity", "MEDIUM")
@@ -42,11 +45,12 @@ async def send_push(user_id: str, event_data: dict) -> bool:
         )
         
         # Send message
+        print(f"[Notification Service] Sending message via Firebase SDK...")
         response_id = messaging.send(message)
-        print(f"Push notification sent successfully, msg ID: {response_id}")
+        print(f"[Notification Service] Push notification sent successfully, msg ID: {response_id}")
         return True
     except Exception as e:
-        print(f"Failed to send push notification to user {user_id}: {e}")
+        print(f"[Notification Service] ERROR: Failed to send push notification to user {user_id}: {e}")
         return False
 
 async def trigger_call(contact: dict, event_data: dict) -> bool:

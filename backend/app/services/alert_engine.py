@@ -84,9 +84,11 @@ async def process_event(event_data: dict) -> None:
 
 
     # 4. Push TRƯỚC với default message đến liên hệ chính
+    print(f"[Alert Engine] Fetching contacts for household_id: {household_id}")
     contacts = await get_contacts_sorted(household_id)
     if contacts:
         primary = contacts[0]
+        print(f"[Alert Engine] Found {len(contacts)} contacts. Primary contact is: {primary.get('user_id')} ({primary.get('full_name')})")
         # Set default message
         event_data["llm_message"] = f"Cảnh báo ngã phát hiện tại {event_data.get('room', 'nhà')}."
         await send_push(primary.get("user_id"), event_data)
@@ -102,6 +104,8 @@ async def process_event(event_data: dict) -> None:
             supabase.table("escalations").insert(escalation_entry).execute()
         except Exception as e:
             print(f"Error logging primary escalation trace: {e}")
+    else:
+        print(f"[Alert Engine] WARNING: No emergency contacts found for household_id: {household_id}")
 
     # 5. Set escalate_after cho các sự kiện khẩn cấp
     created_at_str = event_data.get("created_at") or datetime.now().isoformat()

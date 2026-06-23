@@ -11,6 +11,9 @@ import 'package:mobile/features/auth/presentation/pages/signup_page.dart';
 import 'package:mobile/features/auth/presentation/pages/welcome_page.dart';
 import 'package:mobile/core/utils/app_colors.dart';
 import 'package:mobile/features/account/presentation/pages/app_appearance_page.dart';
+import 'package:mobile/features/account/presentation/pages/faq_page.dart';
+import 'package:mobile/features/account/presentation/pages/help_support_page.dart';
+import 'package:mobile/features/account/presentation/pages/privacy_policy_page.dart';
 import 'package:mobile/features/devices/presentation/bloc/device_pairing_bloc.dart';
 import 'package:mobile/features/devices/presentation/bloc/device_pairing_event.dart';
 import 'package:mobile/features/devices/presentation/pages/device_pairing_page.dart';
@@ -81,6 +84,11 @@ class AppRouter {
         path: '/onboarding',
         builder: (context, state) => const OnboardingPage(),
       ),
+      GoRoute(path: '/faq', builder: (context, state) => const FaqPage()),
+      GoRoute(
+        path: '/privacy-policy',
+        builder: (context, state) => const PrivacyPolicyPage(),
+      ),
       GoRoute(
         path: '/welcome',
         builder: (context, state) => const WelcomePage(),
@@ -106,6 +114,11 @@ class AppRouter {
         builder: (context, state) => const AppAppearancePage(),
       ),
       GoRoute(
+        path: '/help-support',
+        builder: (context, state) => const HelpSupportPage(),
+      ),
+      GoRoute(path: '/faq', builder: (context, state) => const FaqPage()),
+      GoRoute(
         path: '/notifications',
         builder: (context, state) => const NotificationsPage(),
       ),
@@ -115,12 +128,20 @@ class AppRouter {
           final id = state.pathParameters['id']!;
           final extra = state.extra;
           if (extra is CameraDetailArgs) {
-            return CameraDetailPage(
-              device: extra.device,
-              onThumbnailCaptured: extra.onThumbnailCaptured,
+            return BlocProvider(
+              create: (_) => sl<HomeBloc>(),
+              child: CameraDetailPage(
+                device: extra.device,
+                onThumbnailCaptured: extra.onThumbnailCaptured,
+              ),
             );
           }
-          if (extra is CameraDevice) return CameraDetailPage(device: extra);
+          if (extra is CameraDevice) {
+            return BlocProvider(
+              create: (_) => sl<HomeBloc>(),
+              child: CameraDetailPage(device: extra),
+            );
+          }
           return _CameraRouteLoader(cameraId: id);
         },
       ),
@@ -151,7 +172,10 @@ class _CameraRouteLoader extends StatelessWidget {
           (devices) {
             for (final device in devices) {
               if (device.id == cameraId) {
-                return CameraDetailPage(device: device);
+                return BlocProvider(
+                  create: (_) => sl<HomeBloc>(),
+                  child: CameraDetailPage(device: device),
+                );
               }
             }
             return const _CameraRouteError(

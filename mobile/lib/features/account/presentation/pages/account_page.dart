@@ -121,9 +121,10 @@ class _AccountPageState extends State<AccountPage> {
                       icon: Iconsax.chart_2,
                       title: 'Dữ liệu & phân tích',
                     ),
-                    const _AccountMenuTile(
+                    _AccountMenuTile(
                       icon: Iconsax.document_text,
                       title: 'Trợ giúp & hỗ trợ',
+                      onTap: () => context.push('/help-support'),
                     ),
                     const SizedBox(height: 12),
                     const _LogoutTile(),
@@ -345,46 +346,30 @@ class _LogoutTile extends StatelessWidget {
   const _LogoutTile();
 
   Future<void> _confirmAndLogout(BuildContext context) async {
-    
     final confirmed = await showDialog<bool>(
-      
-      context: context, 
+      context: context,
       builder: (ctx) => AlertDialog(
-        
-        title: const Text('Đăng xuất'), 
-        content: const Text(
-          'Bạn có chắc muốn đăng xuất không?',
-        ), 
+        title: const Text('Đăng xuất'),
+        content: const Text('Bạn có chắc muốn đăng xuất không?'),
         actions: [
-          
           TextButton(
-            
-            onPressed: () =>
-                Navigator.of(ctx).pop(false), 
-            child: const Text('Không'), 
-          ), 
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Không'),
+          ),
           FilledButton(
-            
             style: FilledButton.styleFrom(
-              
-              backgroundColor: Theme.of(
-                ctx,
-              ).colorScheme.error, 
-            ), 
-            onPressed: () =>
-                Navigator.of(ctx).pop(true), 
-            child: const Text('Có'), 
-          ), 
-        ], 
-      ), 
-    ); 
+              backgroundColor: Theme.of(ctx).colorScheme.error,
+            ),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Có'),
+          ),
+        ],
+      ),
+    );
     if (confirmed == true && context.mounted) {
-      
-      context.read<AuthBloc>().add(
-        const AuthSignOutRequested(),
-      ); 
-    } 
-  } 
+      context.read<AuthBloc>().add(const AuthSignOutRequested());
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -394,9 +379,7 @@ class _LogoutTile extends StatelessWidget {
 
     return InkWell(
       borderRadius: BorderRadius.circular(18),
-      onTap: isLoading
-          ? null
-          : () => _confirmAndLogout(context), // FIX: logout confirmation dialog
+      onTap: isLoading ? null : () => _confirmAndLogout(context),
       child: Row(
         children: [
           SizedBox(

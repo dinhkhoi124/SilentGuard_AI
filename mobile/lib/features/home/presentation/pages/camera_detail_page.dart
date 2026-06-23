@@ -4,11 +4,15 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mobile/core/services/local_notification_service.dart';
 import 'package:mobile/core/utils/app_colors.dart';
 import 'package:mobile/features/home/domain/entities/camera_device.dart';
 import 'package:mobile/features/home/domain/entities/camera_event.dart';
+import 'package:mobile/features/home/presentation/bloc/home_bloc.dart';
+import 'package:mobile/features/home/presentation/bloc/home_event.dart';
+import 'package:mobile/features/home/presentation/bloc/home_state.dart';
 import 'package:mobile/features/home/presentation/widgets/camera_action_buttons.dart';
 import 'package:mobile/features/home/presentation/widgets/camera_event_history_header.dart';
 import 'package:mobile/features/home/presentation/widgets/camera_event_tile.dart';
@@ -42,13 +46,23 @@ class CameraDetailPage extends StatefulWidget {
 class _CameraDetailPageState extends State<CameraDetailPage> {
   Timer? _clockTimer;
   String _currentTime = '';
+  late String? _streamUrl;
+  late bool _isStreamLoading;
+  bool _showLoadingForNextStreamRequest = false;
+  String? _streamErrorMessage;
 
   @override
   void initState() {
     super.initState();
+    _streamUrl = _normalizedUrl(widget.device.rtspUrl);
+    _isStreamLoading = _streamUrl == null;
     _updateTime();
     _clockTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) _updateTime();
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _requestStreamUrl(showLoading: _streamUrl == null);
     });
   }
 
@@ -67,61 +81,133 @@ class _CameraDetailPageState extends State<CameraDetailPage> {
   Widget build(BuildContext context) {
     const events = <CameraEvent>[];
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: SafeArea(
-        child: CustomScrollView(
-          slivers: [
-            SliverToBoxAdapter(
-              child: CameraTopBar(
-                device: widget.device,
-                onBack: () {
-                  if (context.canPop()) {
-                    context.pop();
-                  } else {
-                    context.go('/home');
-                  }
-                },
-                onSettings: _showCameraOptions,
-              ),
-            ),
-            SliverToBoxAdapter(
-              child: CameraVideoPlayer(
-                rtspUrl: widget.device.rtspUrl,
-                currentTime: _currentTime,
-                onFrameCaptured: widget.onThumbnailCaptured,
-              ),
-            ),
-            const SliverToBoxAdapter(child: SizedBox(height: 12)),
-            SliverToBoxAdapter(
-              child: CameraSafetyStatus(
-                device: widget.device,
-                updateTime: TimeOfDay.now().format(context),
-              ),
-            ),
-            const SliverToBoxAdapter(child: SizedBox(height: 10)),
-            if (events.isNotEmpty)
+    return BlocListener<HomeBloc, HomeState>(
+      listenWhen: (_, state) =>
+          state is CameraStreamUrlLoading ||
+          state is CameraStreamUrlLoaded ||
+          state is CameraStreamUrlFailure,
+      listener: (context, state) {
+        if (state is CameraStreamUrlLoading &&
+            state.cameraId == widget.device.id) {
+          setState(() {
+            _isStreamLoading =
+                _streamUrl == null || _showLoadingForNextStreamRequest;
+            _streamErrorMessage = null;
+          });
+          return;
+        }
+        if (state is CameraStreamUrlLoaded &&
+            state.cameraId == widget.device.id) {
+          setState(() {
+            _streamUrl = state.streamUrl;
+            _isStreamLoading = false;
+            _showLoadingForNextStreamRequest = false;
+            _streamErrorMessage = null;
+          });
+          return;
+        }
+        if (state is CameraStreamUrlFailure &&
+            state.cameraId == widget.device.id) {
+          setState(() {
+            _isStreamLoading = false;
+            _showLoadingForNextStreamRequest = false;
+            _streamErrorMessage = state.message;
+          });
+        }
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        body: SafeArea(
+          child: CustomScrollView(
+            slivers: [
               SliverToBoxAdapter(
-                child: CameraLatestEventCard(
+                child: CameraTopBar(
                   device: widget.device,
-                  latestEvent: events.first,
+                  onBack: () {
+                    if (context.canPop()) {
+                      context.pop();
+                    } else {
+                      context.go('/home');
+                    }
+                  },
+                  onSettings: _showCameraOptions,
                 ),
-              )
-            else
-              const SliverToBoxAdapter(child: _NoCameraEventsPanel()),
-            const SliverToBoxAdapter(child: SizedBox(height: 10)),
-            const SliverToBoxAdapter(child: CameraActionButtons()),
-            const SliverToBoxAdapter(child: SizedBox(height: 16)),
-            const SliverToBoxAdapter(child: CameraEventHistoryHeader()),
-            SliverList(
-              delegate: SliverChildBuilderDelegate((_, index) {
-                final event = events[index];
-                return CameraEventTile(event: event);
-              }, childCount: events.length),
-            ),
-            const SliverToBoxAdapter(child: SizedBox(height: 24)),
-          ],
+              ),
+              SliverToBoxAdapter(
+                child: BlocBuilder<HomeBloc, HomeState>(
+                  buildWhen: (_, state) =>
+                      state is CameraStreamUrlLoading ||
+                      state is CameraStreamUrlLoaded ||
+                      state is CameraStreamUrlFailure,
+                  builder: (context, state) {
+                    return CameraVideoPlayer(
+                      rtspUrl: _streamUrl,
+                      currentTime: _currentTime,
+                      onFrameCaptured: widget.onThumbnailCaptured,
+                      isLoading: _isStreamLoading,
+                      errorMessage: _streamErrorMessage,
+                      onRetry: () => _requestStreamUrl(showLoading: true),
+                    );
+                  },
+                ),
+              ),
+              const SliverToBoxAdapter(child: SizedBox(height: 12)),
+              SliverToBoxAdapter(
+                child: CameraSafetyStatus(
+                  device: widget.device,
+                  updateTime: TimeOfDay.now().format(context),
+                ),
+              ),
+              const SliverToBoxAdapter(child: SizedBox(height: 10)),
+              if (events.isNotEmpty)
+                SliverToBoxAdapter(
+                  child: CameraLatestEventCard(
+                    device: widget.device,
+                    latestEvent: events.first,
+                  ),
+                )
+              else
+                const SliverToBoxAdapter(child: _NoCameraEventsPanel()),
+              const SliverToBoxAdapter(child: SizedBox(height: 10)),
+              const SliverToBoxAdapter(child: CameraActionButtons()),
+              const SliverToBoxAdapter(child: SizedBox(height: 16)),
+              const SliverToBoxAdapter(child: CameraEventHistoryHeader()),
+              SliverList(
+                delegate: SliverChildBuilderDelegate((_, index) {
+                  final event = events[index];
+                  return CameraEventTile(event: event);
+                }, childCount: events.length),
+              ),
+              const SliverToBoxAdapter(child: SizedBox(height: 24)),
+            ],
+          ),
         ),
+      ),
+    );
+  }
+
+  void _requestStreamUrl({required bool showLoading}) {
+    final serialNumber = widget.device.serialNumber?.trim() ?? '';
+    if (serialNumber.isEmpty) {
+      setState(() {
+        _streamUrl = null;
+        _showLoadingForNextStreamRequest = false;
+        _isStreamLoading = false;
+        _streamErrorMessage =
+            'Không tìm thấy mã serial của camera. Vui lòng ghép nối lại thiết bị.';
+      });
+      return;
+    }
+
+    setState(() {
+      _showLoadingForNextStreamRequest = showLoading;
+      _isStreamLoading = showLoading || _streamUrl == null;
+      _streamErrorMessage = null;
+    });
+    context.read<HomeBloc>().add(
+      CameraStreamUrlRequested(
+        cameraId: widget.device.id,
+        serialNumber: serialNumber,
       ),
     );
   }
@@ -320,4 +406,9 @@ String _formatTime(DateTime time) {
   return '${time.hour.toString().padLeft(2, '0')}:'
       '${time.minute.toString().padLeft(2, '0')}:'
       '${time.second.toString().padLeft(2, '0')}';
+}
+
+String? _normalizedUrl(String? url) {
+  final trimmed = url?.trim() ?? '';
+  return trimmed.isEmpty ? null : trimmed;
 }

@@ -68,6 +68,19 @@ final class CameraThumbnailCaptured extends HomeEvent {
   List<Object?> get props => [deviceId, bytes];
 }
 
+final class CameraStreamUrlRequested extends HomeEvent {
+  const CameraStreamUrlRequested({
+    required this.cameraId,
+    required this.serialNumber,
+  });
+
+  final String cameraId;
+  final String serialNumber;
+
+  @override
+  List<Object?> get props => [cameraId, serialNumber];
+}
+
 final class HomeAccessoryToggled extends HomeEvent {
   const HomeAccessoryToggled(this.deviceId, this.accessoryIndex);
 

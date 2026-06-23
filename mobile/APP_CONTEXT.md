@@ -219,6 +219,7 @@ Backend Render free tier co the warm-up cham, nen:
 - thumbnail capture
 - warm-up state khi backend chua san sang
 - unauthorized state khi session that bai thuc su
+- yeu cau lay duong dan luong phat truc tiep (`CameraStreamUrlRequested` event, cac trang thai: `CameraStreamUrlLoading`, `CameraStreamUrlLoaded`, `CameraStreamUrlFailure`) qua `ImouStreamRepository`
 
 Home UI gom:
 
@@ -239,9 +240,11 @@ Home UI gom:
 
 ### 8.2 Camera detail
 
-- mo route `/camera/:id`
-- live stream qua `media_kit`
-- co callback chup thumbnail tra ve `HomeBloc`
+- mo route `/camera/:id` (yeu cau `BlocProvider` cho `HomeBloc` duoc cung cap trong `app_router.dart` de gui nhan event)
+- gui event `CameraStreamUrlRequested` den `HomeBloc` de lay luong phat dynamic tu Imou Cloud qua repository
+- lang nghe URL stream qua `BlocListener`/`BlocBuilder` cua `HomeBloc` de cap nhat giao dien loading/error/success dynamic
+- live stream qua `media_kit` (su dung widget `CameraVideoPlayer` / `CameraLivePreview` ho tro loading indicator, hien thi thong bao loi va nut "Tai lai" khi ket noi stream that bai)
+- co callback chup thumbnail tra ve `HomeBloc` va tu dong dispose controller/player subscriptions
 
 ### 8.3 Device CRUD
 
@@ -304,10 +307,10 @@ Nhung khoi quan trong dang duoc dang ky trong `injection_container.dart`:
 - `LocalNotificationService`
 - `NotificationsCubit`
 - `AuthBloc`
-- `HomeBloc`
+- `HomeBloc` (lay getWeather, getCameraDevices, deleteCameraDevice, imouStreamRepository, sessionRepository)
 - `VideoUploadBloc`
 - `DevicePairingBloc`
-- session, home, device, upload repositories va use cases
+- session, home, device (bao gom `ImouStreamRepository`), upload repositories va use cases
 
 ## 14. Backend/API dang dung
 
@@ -359,6 +362,7 @@ Neu lam home/camera:
 - `lib/features/home/presentation/pages/home_page.dart`
 - `lib/features/home/presentation/widgets/camera_card.dart`
 - `lib/features/home/presentation/pages/camera_detail_page.dart`
+- `lib/features/home/presentation/widgets/camera_video_player.dart`
 - `lib/features/devices/**`
 
 Neu lam giao dien/toi uu theme:

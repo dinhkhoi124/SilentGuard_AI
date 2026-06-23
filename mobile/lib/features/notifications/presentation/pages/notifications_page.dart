@@ -283,57 +283,57 @@ class _NotificationCard extends StatelessWidget {
   }
 }
 
-class _MetaPill extends StatelessWidget {
-  const _MetaPill({required this.icon, required this.label});
+// class _MetaPill extends StatelessWidget {
+//   const _MetaPill({required this.icon, required this.label});
 
-  final IconData icon;
-  final String label;
+//   final IconData icon;
+//   final String label;
 
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 14, color: AppColors.mutedText),
-        const SizedBox(width: 4),
-        Text(
-          label,
-          style: const TextStyle(
-            color: AppColors.mutedText,
-            fontSize: 12,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-      ],
-    );
-  }
-}
+//   @override
+//   Widget build(BuildContext context) {
+//     return Row(
+//       mainAxisSize: MainAxisSize.min,
+//       children: [
+//         Icon(icon, size: 14, color: AppColors.mutedText),
+//         const SizedBox(width: 4),
+//         Text(
+//           label,
+//           style: const TextStyle(
+//             color: AppColors.mutedText,
+//             fontSize: 12,
+//             fontWeight: FontWeight.w700,
+//           ),
+//         ),
+//       ],
+//     );
+//   }
+// }
 
-class _SeverityBadge extends StatelessWidget {
-  const _SeverityBadge({required this.label, required this.color});
+// class _SeverityBadge extends StatelessWidget {
+//   const _SeverityBadge({required this.label, required this.color});
 
-  final String label;
-  final Color color;
+//   final String label;
+//   final Color color;
 
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          color: color,
-          fontSize: 12,
-          fontWeight: FontWeight.w800,
-        ),
-      ),
-    );
-  }
-}
+//   @override
+//   Widget build(BuildContext context) {
+//     return Container(
+//       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+//       decoration: BoxDecoration(
+//         color: color.withValues(alpha: 0.12),
+//         borderRadius: BorderRadius.circular(999),
+//       ),
+//       child: Text(
+//         label,
+//         style: TextStyle(
+//           color: color,
+//           fontSize: 12,
+//           fontWeight: FontWeight.w800,
+//         ),
+//       ),
+//     );
+//   }
+// }
 
 class _EmptyNotifications extends StatelessWidget {
   const _EmptyNotifications();

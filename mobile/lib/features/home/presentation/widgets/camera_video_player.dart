@@ -16,11 +16,17 @@ class CameraVideoPlayer extends StatelessWidget {
     required this.currentTime,
     this.rtspUrl,
     this.onFrameCaptured,
+    this.isLoading = false,
+    this.errorMessage,
+    this.onRetry,
   });
 
   final String currentTime;
   final String? rtspUrl;
   final ValueChanged<Uint8List>? onFrameCaptured;
+  final bool isLoading;
+  final String? errorMessage;
+  final VoidCallback? onRetry;
 
   @override
   Widget build(BuildContext context) {
@@ -36,6 +42,9 @@ class CameraVideoPlayer extends StatelessWidget {
               CameraLivePreview(
                 rtspUrl: rtspUrl,
                 onFrameCaptured: onFrameCaptured,
+                isLoading: isLoading,
+                errorMessage: errorMessage,
+                onRetry: onRetry,
               ),
               Positioned(
                 top: 10,
@@ -132,10 +141,20 @@ class CameraVideoPlayer extends StatelessWidget {
 }
 
 class CameraLivePreview extends StatefulWidget {
-  const CameraLivePreview({super.key, this.rtspUrl, this.onFrameCaptured});
+  const CameraLivePreview({
+    super.key,
+    this.rtspUrl,
+    this.onFrameCaptured,
+    this.isLoading = false,
+    this.errorMessage,
+    this.onRetry,
+  });
 
   final String? rtspUrl;
   final ValueChanged<Uint8List>? onFrameCaptured;
+  final bool isLoading;
+  final String? errorMessage;
+  final VoidCallback? onRetry;
 
   @override
   State<CameraLivePreview> createState() => _CameraLivePreviewState();
@@ -149,6 +168,8 @@ class _CameraLivePreviewState extends State<CameraLivePreview> {
   Player? _player;
   media_kit_video.VideoController? _videoController;
   final List<StreamSubscription<Object?>> _playerSubscriptions = [];
+  bool _isOpening = false;
+  String? _errorMessage;
 
   @override
   void initState() {
@@ -159,21 +180,35 @@ class _CameraLivePreviewState extends State<CameraLivePreview> {
   @override
   void didUpdateWidget(covariant CameraLivePreview oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if ((widget.errorMessage?.trim().isNotEmpty ?? false) || widget.isLoading) {
+      unawaited(_disposeControllers(captureFrame: false, notify: true));
+      return;
+    }
     if (oldWidget.rtspUrl != widget.rtspUrl) {
-      unawaited(_disposeControllers(captureFrame: false));
+      unawaited(_disposeControllers(captureFrame: false, notify: true));
       _initController();
     }
   }
 
   @override
   void dispose() {
-    unawaited(_disposeControllers(captureFrame: true));
+    unawaited(_disposeControllers(captureFrame: true, notify: false));
     super.dispose();
   }
 
   void _initController() {
     final streamUrl = widget.rtspUrl?.trim();
-    if (streamUrl == null || streamUrl.isEmpty) return;
+    if (streamUrl == null || streamUrl.isEmpty) {
+      setState(() {
+        _isOpening = false;
+        _errorMessage = 'Chưa có đường dẫn phát trực tiếp cho camera này.';
+      });
+      return;
+    }
+    setState(() {
+      _isOpening = true;
+      _errorMessage = null;
+    });
     unawaited(
       _openStreamWhenReady(streamUrl).catchError((
         Object error,
@@ -185,6 +220,12 @@ class _CameraLivePreviewState extends State<CameraLivePreview> {
           error: error,
           stackTrace: stackTrace,
         );
+        if (!mounted || widget.rtspUrl?.trim() != streamUrl) return;
+        setState(() {
+          _isOpening = false;
+          _errorMessage =
+              'Không thể mở luồng camera. Vui lòng kiểm tra kết nối và thử lại.';
+        });
       }),
     );
   }
@@ -218,19 +259,30 @@ class _CameraLivePreviewState extends State<CameraLivePreview> {
     _player = player;
     _videoController = videoController;
     _listenToPlayerLogs(player);
-    setState(() {});
+    setState(() {
+      _isOpening = true;
+      _errorMessage = null;
+    });
 
     await player.stop();
     // Imou currently returns RTMP URLs. media_kit receives the URL as-is;
     // RTMP playback on Android depends on the bundled native media support.
     if (!mounted || !identical(_player, player)) return;
     await player.open(Media(streamUrl), play: true);
+    if (!mounted || !identical(_player, player)) return;
+    setState(() => _isOpening = false);
   }
 
   void _listenToPlayerLogs(Player player) {
     _playerSubscriptions.addAll([
       player.stream.error.listen((error) {
         developer.log('media_kit error: $error', name: 'CameraLivePreview');
+        if (!mounted || !identical(_player, player)) return;
+        setState(() {
+          _isOpening = false;
+          _errorMessage =
+              'Không thể phát trực tiếp camera. Vui lòng thử tải lại.';
+        });
       }),
       player.stream.log.listen((record) {
         developer.log(record.toString(), name: 'CameraLivePreview.media_kit');
@@ -244,7 +296,10 @@ class _CameraLivePreviewState extends State<CameraLivePreview> {
     ]);
   }
 
-  Future<void> _disposeControllers({required bool captureFrame}) async {
+  Future<void> _disposeControllers({
+    required bool captureFrame,
+    required bool notify,
+  }) async {
     final player = _player;
     final subscriptions = List<StreamSubscription<Object?>>.of(
       _playerSubscriptions,
@@ -252,6 +307,9 @@ class _CameraLivePreviewState extends State<CameraLivePreview> {
     _playerSubscriptions.clear();
     _player = null;
     _videoController = null;
+    if (notify && mounted) {
+      setState(() {});
+    }
 
     for (final subscription in subscriptions) {
       unawaited(subscription.cancel());
@@ -285,15 +343,96 @@ class _CameraLivePreviewState extends State<CameraLivePreview> {
   @override
   Widget build(BuildContext context) {
     final videoController = _videoController;
+    final parentErrorMessage = widget.errorMessage?.trim();
 
-    if (videoController != null) {
+    if (parentErrorMessage != null && parentErrorMessage.isNotEmpty) {
+      return _VideoErrorView(
+        message: parentErrorMessage,
+        onRetry: _retryStream,
+      );
+    }
+
+    if (widget.isLoading) {
+      return const _VideoLoadingView();
+    }
+
+    if (videoController != null && _errorMessage == null) {
       return media_kit_video.Video(
         controller: videoController,
         fit: BoxFit.cover,
       );
     }
 
-    return const ColoredBox(color: Colors.black);
+    final errorMessage = _errorMessage;
+    if (errorMessage != null) {
+      return _VideoErrorView(message: errorMessage, onRetry: _retryStream);
+    }
+
+    if (_isOpening) {
+      return const _VideoLoadingView();
+    }
+
+    return const _VideoLoadingView();
+  }
+
+  Future<void> _retryStream() async {
+    await _disposeControllers(captureFrame: false, notify: true);
+    if (!mounted) return;
+    widget.onRetry?.call();
+  }
+}
+
+class _VideoLoadingView extends StatelessWidget {
+  const _VideoLoadingView();
+
+  @override
+  Widget build(BuildContext context) {
+    return const ColoredBox(
+      color: Colors.black,
+      child: Center(child: CircularProgressIndicator(color: AppColors.primary)),
+    );
+  }
+}
+
+class _VideoErrorView extends StatelessWidget {
+  const _VideoErrorView({required this.message, required this.onRetry});
+
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return ColoredBox(
+      color: Colors.black,
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.videocam_off_outlined,
+                color: Colors.white70,
+                size: 30,
+              ),
+              const SizedBox(height: 10),
+              Text(
+                message,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 13,
+                  height: 1.35,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 12),
+              FilledButton(onPressed: onRetry, child: const Text('Tải lại')),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 

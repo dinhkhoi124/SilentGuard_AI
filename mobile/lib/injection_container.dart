@@ -110,6 +110,7 @@ Future<void> init() async {
         getWeather: sl(),
         getCameraDevices: sl(),
         deleteCameraDevice: sl(),
+        imouStreamRepository: sl(),
         sessionRepository:
             sl(), // FIX: HomeBloc reads cached startup session instead of refetching blindly.
       ),

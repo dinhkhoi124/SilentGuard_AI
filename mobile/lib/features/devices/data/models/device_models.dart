@@ -124,6 +124,8 @@ class PairedDeviceModel {
       'name': resolvedDevice.displayName,
       'room': resolvedDevice.location ?? 'Camera IP',
       'fps': 15,
+      if (resolvedDevice.serialNumber.trim().isNotEmpty)
+        'serial_number': resolvedDevice.serialNumber.trim(),
     };
   }
 }

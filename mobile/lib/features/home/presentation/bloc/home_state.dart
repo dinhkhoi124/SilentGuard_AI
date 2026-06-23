@@ -76,6 +76,38 @@ final class HomeLoaded extends HomeState {
   ];
 }
 
+final class CameraStreamUrlLoading extends HomeState {
+  const CameraStreamUrlLoading(this.cameraId);
+
+  final String cameraId;
+
+  @override
+  List<Object?> get props => [cameraId];
+}
+
+final class CameraStreamUrlLoaded extends HomeState {
+  const CameraStreamUrlLoaded({
+    required this.cameraId,
+    required this.streamUrl,
+  });
+
+  final String cameraId;
+  final String streamUrl;
+
+  @override
+  List<Object?> get props => [cameraId, streamUrl];
+}
+
+final class CameraStreamUrlFailure extends HomeState {
+  const CameraStreamUrlFailure({required this.cameraId, required this.message});
+
+  final String cameraId;
+  final String message;
+
+  @override
+  List<Object?> get props => [cameraId, message];
+}
+
 final class HomeError extends HomeState {
   const HomeError(this.message);
 

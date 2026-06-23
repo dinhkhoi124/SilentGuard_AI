@@ -65,8 +65,14 @@ class ImouCloudDataSourceImpl implements ImouCloudDataSource {
     try {
       data = await _request(createRtmpMethod, params);
     } on ImouCloudException catch (error) {
+      if (_isAuthError(error)) _cachedToken = null;
       if (error.code != 'LV1001') rethrow;
-      data = await _request(queryRtmpMethod, params);
+      try {
+        data = await _request(queryRtmpMethod, params);
+      } on ImouCloudException catch (queryError) {
+        if (_isAuthError(queryError)) _cachedToken = null;
+        rethrow;
+      }
     }
 
     final url = _selectRtmpUrl(data);
@@ -260,6 +266,17 @@ class ImouCloudDataSourceImpl implements ImouCloudDataSource {
       if (parsed != null) return parsed;
     }
     return null;
+  }
+
+  bool _isAuthError(ImouCloudException error) {
+    final code = error.code?.toLowerCase() ?? '';
+    final message = error.message.toLowerCase();
+    return code.contains('auth') ||
+        code.contains('token') ||
+        code.contains('sign') ||
+        code.contains('0002') ||
+        message.contains('token') ||
+        message.contains('sign');
   }
 }
 

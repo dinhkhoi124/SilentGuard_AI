@@ -2,6 +2,7 @@ import 'dart:async'; // FIX: HomeBloc needs a timer for silent backend warm-up r
 import 'dart:typed_data';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:mobile/features/devices/domain/repositories/imou_stream_repository.dart';
 import 'package:mobile/features/home/domain/entities/camera_device.dart';
 import 'package:mobile/features/home/domain/usecases/delete_camera_device.dart';
 import 'package:mobile/features/home/domain/usecases/get_camera_devices.dart';
@@ -17,6 +18,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     required this.getCameraDevices,
     required this.deleteCameraDevice,
     required this.sessionRepository,
+    required this.imouStreamRepository,
   }) : super(const HomeInitial()) {
     on<HomeStarted>((event, emit) => _loadHome(emit));
     on<HomeRetryRequested>(
@@ -30,6 +32,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     on<HomeDeviceDeleted>(_onDeviceDeleted);
     on<HomeDevicePaired>(_onDevicePaired);
     on<CameraThumbnailCaptured>(_onCameraThumbnailCaptured);
+    on<CameraStreamUrlRequested>(_onCameraStreamUrlRequested);
     on<HomeAccessoryToggled>(_onAccessoryToggled);
     on<NotificationTapped>((event, emit) {});
   }
@@ -37,6 +40,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
   final GetWeather getWeather;
   final GetCameraDevices getCameraDevices;
   final DeleteCameraDevice deleteCameraDevice;
+  final ImouStreamRepository imouStreamRepository;
   final SessionRepository
   sessionRepository; // FIX: Home reads the session cache populated by AuthNotifier.
   List<CameraDevice> _activeDevices = [];
@@ -261,6 +265,53 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
           event.deviceId: event.bytes,
         },
       ),
+    );
+  }
+
+  Future<void> _onCameraStreamUrlRequested(
+    CameraStreamUrlRequested event,
+    Emitter<HomeState> emit,
+  ) async {
+    final serialNumber = event.serialNumber.trim();
+    if (serialNumber.isEmpty) {
+      emit(
+        CameraStreamUrlFailure(
+          cameraId: event.cameraId,
+          message: 'Không tìm thấy mã thiết bị để lấy luồng phát.',
+        ),
+      );
+      return;
+    }
+
+    emit(CameraStreamUrlLoading(event.cameraId));
+    final result = await imouStreamRepository.getStreamUrl(serialNumber);
+    result.fold(
+      (failure) {
+        emit(
+          CameraStreamUrlFailure(
+            cameraId: event.cameraId,
+            message: failure.message,
+          ),
+        );
+      },
+      (streamUrl) {
+        final trimmedUrl = streamUrl.trim();
+        if (trimmedUrl.isEmpty) {
+          emit(
+            CameraStreamUrlFailure(
+              cameraId: event.cameraId,
+              message: 'Imou Cloud chưa trả về đường dẫn phát trực tiếp.',
+            ),
+          );
+          return;
+        }
+        emit(
+          CameraStreamUrlLoaded(
+            cameraId: event.cameraId,
+            streamUrl: trimmedUrl,
+          ),
+        );
+      },
     );
   }
 

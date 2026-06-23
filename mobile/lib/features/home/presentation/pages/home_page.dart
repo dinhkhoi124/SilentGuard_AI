@@ -12,7 +12,9 @@ import 'package:mobile/core/utils/app_colors.dart';
 import 'package:mobile/core/widgets/wave_text_loader.dart';
 import 'package:mobile/features/auth/presentation/bloc/auth_bloc.dart'; // FIX: session-expired UI needs to trigger sign-out.
 import 'package:mobile/features/auth/presentation/bloc/auth_event.dart'; // FIX: reuse existing logout event instead of changing router/auth logic.
+import 'package:mobile/features/automation/presentation/pages/automation_page.dart';
 import 'package:mobile/features/account/presentation/pages/account_page.dart';
+import 'package:mobile/features/reports/presentation/pages/reports_page.dart';
 import 'package:mobile/features/home/domain/entities/camera_device.dart';
 import 'package:mobile/features/home/presentation/bloc/home_bloc.dart';
 import 'package:mobile/features/home/presentation/bloc/home_event.dart';
@@ -141,18 +143,8 @@ class _HomePageState extends State<HomePage> {
                       index: _selectedTab,
                       children: const [
                         _HomeTab(),
-                        _ComingSoonTab(
-                          icon: Iconsax.task_square,
-                          title: 'Tự động hóa',
-                          message:
-                              'Các kịch bản thông minh sẽ sớm xuất hiện tại đây.',
-                        ),
-                        _ComingSoonTab(
-                          icon: Iconsax.chart,
-                          title: 'Báo cáo',
-                          message:
-                              'Theo dõi dữ liệu nhà thông minh trong phiên bản tới.',
-                        ),
+                        AutomationPage(),
+                        ReportsPage(),
                         AccountPage(),
                       ],
                     ),
@@ -232,81 +224,12 @@ class _HomeTab extends StatelessWidget {
             message: message,
           ), // FIX: show session-expired UI only for auth failures.
           HomeError(:final message) => _ErrorView(message: message),
+          CameraStreamUrlLoading() ||
+          CameraStreamUrlLoaded() ||
+          CameraStreamUrlFailure() => const WaveTextLoader(),
           HomeLoaded() => _LoadedHome(state: state),
         };
       },
-    );
-  }
-}
-
-class _ComingSoonTab extends StatelessWidget {
-  const _ComingSoonTab({
-    required this.icon,
-    required this.title,
-    required this.message,
-  });
-
-  final IconData icon;
-  final String title;
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final iconBackground = isDark
-        ? theme.colorScheme.surfaceContainerHighest
-        : AppColors.lightBlue;
-    final titleColor = isDark
-        ? theme.colorScheme.onSurface
-        : AppColors.darkText;
-    final messageColor = isDark
-        ? theme.colorScheme.onSurfaceVariant
-        : AppColors.mutedText;
-    return SafeArea(
-      top: false,
-      child: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(28),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              DecoratedBox(
-                decoration: BoxDecoration(
-                  color: iconBackground,
-                  borderRadius: BorderRadius.circular(22),
-                ),
-                child: SizedBox(
-                  width: 72,
-                  height: 72,
-                  child: Icon(icon, color: AppColors.primary, size: 32),
-                ),
-              ),
-              const SizedBox(height: 20),
-              Text(
-                title,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: titleColor,
-                  fontSize: 20,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                message,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: messageColor,
-                  fontSize: 14,
-                  height: 1.45,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }

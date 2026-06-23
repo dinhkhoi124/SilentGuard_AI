@@ -15,11 +15,15 @@ class CameraCreateRequest(BaseModel):
     name: str
     room: str
     fps: int = 15
+    serial_number: Optional[str] = None
+
 
 class CameraUpdateRequest(BaseModel):
     name: Optional[str] = None
     room: Optional[str] = None
     fps: Optional[int] = None
+    serial_number: Optional[str] = None
+
 
 @router.post("", status_code=status.HTTP_201_CREATED)
 async def create_camera(
@@ -41,7 +45,8 @@ async def create_camera(
         "room": req.room,
         "fps": req.fps,
         "device_api_key_hash": hashed_key,
-        "status": "unknown"
+        "status": "unknown",
+        "serial_number": req.serial_number
     }
     
     try:
@@ -56,6 +61,7 @@ async def create_camera(
             "camera_id": camera["id"],
             "name": camera["name"],
             "room": camera["room"],
+            "serial_number": camera.get("serial_number"),
             "device_api_key": plain_key,
             "warning": "Lưu lại key này ngay — sẽ không hiển thị lại được"
         }
@@ -89,6 +95,7 @@ async def list_cameras(
                 "room": cam["room"],
                 "status": cam["status"],
                 "fps": cam["fps"],
+                "serial_number": cam.get("serial_number"),
                 "last_heartbeat": cam.get("last_heartbeat"),
                 "created_at": cam["created_at"]
             })
@@ -137,6 +144,7 @@ async def get_camera_detail(
             "room": camera["room"],
             "status": camera["status"],
             "fps": camera["fps"],
+            "serial_number": camera.get("serial_number"),
             "last_heartbeat": camera.get("last_heartbeat"),
             "created_at": camera["created_at"]
         }
@@ -247,6 +255,8 @@ async def update_camera_details(
             update_data["room"] = req.room
         if req.fps is not None:
             update_data["fps"] = req.fps
+        if req.serial_number is not None:
+            update_data["serial_number"] = req.serial_number
             
         if update_data:
             supabase.table("cameras").update(update_data).eq("id", camera_id).execute()

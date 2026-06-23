@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:mobile/core/utils/app_colors.dart';
+import 'package:mobile/core/theme/app_spacing.dart';
 import 'package:mobile/features/notifications/domain/entities/notification_alert.dart';
 import 'package:mobile/features/notifications/presentation/cubit/notifications_cubit.dart';
 import 'package:mobile/features/notifications/presentation/cubit/notifications_state.dart';
@@ -38,7 +39,12 @@ class _NotificationsPageState extends State<NotificationsPage> {
                   child: state.notifications.isEmpty
                       ? const _EmptyNotifications()
                       : ListView.separated(
-                          padding: const EdgeInsets.fromLTRB(20, 10, 20, 28),
+                          padding: const EdgeInsets.fromLTRB(
+                            AppSpacing.pagePadding,
+                            10,
+                            AppSpacing.pagePadding,
+                            28,
+                          ),
                           itemBuilder: (context, index) {
                             final notification = state.notifications[index];
                             return _NotificationCard(
@@ -103,11 +109,9 @@ class _NotificationsHeader extends StatelessWidget {
               Text(
                 'Thông báo',
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.darkText,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.headlineLarge?.copyWith(color: AppColors.darkText),
               ),
               const Spacer(),
               TextButton(
@@ -125,9 +129,8 @@ class _NotificationsHeader extends StatelessWidget {
               hasUnread
                   ? 'Bạn có $unreadCount thông báo chưa đọc.'
                   : 'Tất cả thông báo đã được đọc.',
-              style: const TextStyle(
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 color: AppColors.mutedText,
-                fontSize: 14,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -183,10 +186,8 @@ class _NotificationCard extends StatelessWidget {
                         notification.displayTitle,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
                           color: AppColors.darkText,
-                          fontSize: 16,
-                          height: 1.25,
                           fontWeight: notification.isRead
                               ? FontWeight.w700
                               : FontWeight.w800,
@@ -197,20 +198,15 @@ class _NotificationCard extends StatelessWidget {
                         notification.displayBody,
                         maxLines: 3,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           color: AppColors.mutedText,
-                          fontSize: 14,
-                          height: 1.4,
-                          fontWeight: FontWeight.w500,
                         ),
                       ),
                       const SizedBox(height: 6),
                       Text(
                         _formatReceivedAt(notification.receivedAt),
-                        style: const TextStyle(
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: AppColors.mutedText,
-                          fontSize: 12,
-                          height: 1.2,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -234,7 +230,6 @@ class _NotificationCard extends StatelessWidget {
                       ),
                       const SizedBox(width: 14),
                     ],
-
                   ],
                 ),
               ),
@@ -360,25 +355,21 @@ class _EmptyNotifications extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 20),
-            const Text(
+            Text(
               'Chưa có thông báo',
               textAlign: TextAlign.center,
-              style: TextStyle(
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
                 color: AppColors.darkText,
-                fontSize: 20,
                 fontWeight: FontWeight.w800,
               ),
             ),
             const SizedBox(height: 8),
-            const Text(
+            Text(
               'Các cảnh báo từ hệ thống sẽ xuất hiện tại đây.',
               textAlign: TextAlign.center,
-              style: TextStyle(
-                color: AppColors.mutedText,
-                fontSize: 14,
-                height: 1.45,
-                fontWeight: FontWeight.w500,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: AppColors.mutedText),
             ),
           ],
         ),

@@ -35,9 +35,8 @@ class LegalDocumentHeader extends StatelessWidget {
           ),
           Text(
             title,
-            style: TextStyle(
+            style: theme.textTheme.titleMedium?.copyWith(
               color: textColor,
-              fontSize: 18,
               fontWeight: FontWeight.w700,
               letterSpacing: -0.5,
             ),

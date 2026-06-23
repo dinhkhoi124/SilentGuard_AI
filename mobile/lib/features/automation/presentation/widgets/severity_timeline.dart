@@ -120,22 +120,19 @@ class _SeverityStep extends StatelessWidget {
                 children: [
                   Text(
                     level,
-                    style: TextStyle(
+                    style: theme.textTheme.titleSmall?.copyWith(
                       color: color,
-                      fontSize: 15,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     description,
-                    style: TextStyle(
+                    style: theme.textTheme.bodyMedium?.copyWith(
                       color: isDark
                           ? theme.colorScheme.onSurfaceVariant
                           : AppColors.mutedText,
-                      fontSize: 14,
                       fontWeight: FontWeight.w400,
-                      height: 1.4,
                     ),
                   ),
                 ],

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:mobile/core/utils/app_colors.dart';
+import 'package:mobile/core/theme/app_spacing.dart';
 import 'package:mobile/features/reports/presentation/widgets/ai_daily_summary_card.dart';
 import 'package:mobile/features/reports/presentation/widgets/recent_events_section.dart';
 import 'package:mobile/features/reports/presentation/widgets/report_metric_grid.dart';
@@ -24,7 +25,12 @@ class ReportsPage extends StatelessWidget {
       child: CustomScrollView(
         slivers: [
           SliverPadding(
-            padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.pagePadding,
+              24,
+              AppSpacing.pagePadding,
+              20,
+            ),
             sliver: SliverList.list(
               children: [
                 ReportsHeader(

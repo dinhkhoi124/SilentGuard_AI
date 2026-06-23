@@ -9,6 +9,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:mobile/core/utils/app_colors.dart';
+import 'package:mobile/core/theme/app_spacing.dart';
 import 'package:mobile/core/widgets/wave_text_loader.dart';
 import 'package:mobile/features/auth/presentation/bloc/auth_bloc.dart'; // FIX: session-expired UI needs to trigger sign-out.
 import 'package:mobile/features/auth/presentation/bloc/auth_event.dart'; // FIX: reuse existing logout event instead of changing router/auth logic.
@@ -105,10 +106,8 @@ class _HomePageState extends State<HomePage> {
                 children: [
                   Text(
                     _tabTitles[_selectedTab],
-                    style: TextStyle(
+                    style: theme.textTheme.headlineLarge?.copyWith(
                       color: titleColor,
-                      fontSize: 22,
-                      fontWeight: FontWeight.w700,
                     ),
                   ),
                   const SizedBox(width: 7),
@@ -246,7 +245,12 @@ class _LoadedHome extends StatelessWidget {
       child: CustomScrollView(
         slivers: [
           SliverPadding(
-            padding: const EdgeInsets.fromLTRB(20, 6, 20, 120),
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.pagePadding,
+              6,
+              AppSpacing.pagePadding,
+              120,
+            ),
             sliver: SliverList.list(
               children: [
                 WeatherCard(weather: state.weather),
@@ -309,6 +313,7 @@ class _InlineDeviceGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Column(
       children: [
         GridView.builder(
@@ -374,10 +379,7 @@ class _InlineDeviceGrid extends StatelessWidget {
             elevation: 0,
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
             shape: const StadiumBorder(),
-            textStyle: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-            ),
+            textStyle: theme.textTheme.titleSmall,
           ),
         ),
       ],
@@ -400,11 +402,7 @@ class _DevicesHeader extends StatelessWidget {
         Expanded(
           child: Text(
             'Tất cả thiết bị',
-            style: TextStyle(
-              color: titleColor,
-              fontSize: 19,
-              fontWeight: FontWeight.w700,
-            ),
+            style: theme.textTheme.titleLarge?.copyWith(color: titleColor),
           ),
         ),
         IconButton(
@@ -581,12 +579,7 @@ class _BackendWarmingView extends StatelessWidget {
             Text(
               'Đang kết nối máy chủ, vui lòng chờ giây lát…',
               textAlign: TextAlign.center,
-              style: TextStyle(
-                color: textColor,
-                fontSize: 16,
-                height: 1.45,
-                fontWeight: FontWeight.w700,
-              ),
+              style: theme.textTheme.bodyLarge?.copyWith(color: textColor),
             ),
           ],
         ),
@@ -617,7 +610,7 @@ class _SessionExpiredView extends StatelessWidget {
             Text(
               message,
               textAlign: TextAlign.center,
-              style: TextStyle(color: textColor),
+              style: theme.textTheme.bodyMedium?.copyWith(color: textColor),
             ),
             const SizedBox(height: 18),
             FilledButton(

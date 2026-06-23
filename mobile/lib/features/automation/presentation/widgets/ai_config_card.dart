@@ -47,11 +47,10 @@ class AiConfigCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   'Nhờ AI gợi ý quy tắc',
-                  style: TextStyle(
+                  style: theme.textTheme.titleMedium?.copyWith(
                     color: isDark
                         ? theme.colorScheme.onSurface
                         : AppColors.darkText,
-                    fontSize: 16,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -61,13 +60,11 @@ class AiConfigCard extends StatelessWidget {
           const SizedBox(height: 12),
           Text(
             'Ví dụ: "Ba tôi hay ngủ trưa dưới sàn từ 1 giờ đến 3 giờ chiều, đừng báo động mạnh trong thời gian đó."',
-            style: TextStyle(
+            style: theme.textTheme.bodyMedium?.copyWith(
               color: isDark
                   ? theme.colorScheme.onSurfaceVariant
                   : AppColors.mutedText,
-              fontSize: 14,
               fontStyle: FontStyle.italic,
-              height: 1.5,
             ),
           ),
           const SizedBox(height: 20),
@@ -85,9 +82,11 @@ class AiConfigCard extends StatelessWidget {
                 ),
                 padding: const EdgeInsets.symmetric(vertical: 14),
               ),
-              child: const Text(
+              child: Text(
                 'Thử sau',
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                style: theme.textTheme.titleSmall?.copyWith(
+                  color: Colors.white,
+                ),
               ),
             ),
           ),

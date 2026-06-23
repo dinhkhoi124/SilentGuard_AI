@@ -48,11 +48,10 @@ class ReportSummaryCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   title,
-                  style: TextStyle(
+                  style: theme.textTheme.bodyMedium?.copyWith(
                     color: isDark
                         ? theme.colorScheme.onSurfaceVariant
                         : AppColors.mutedText,
-                    fontSize: 14,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -74,11 +73,10 @@ class ReportSummaryCard extends StatelessWidget {
             children: [
               Text(
                 mainValue,
-                style: TextStyle(
+                style: theme.textTheme.headlineMedium?.copyWith(
                   color: isDark
                       ? theme.colorScheme.onSurface
                       : AppColors.darkText,
-                  fontSize: 28,
                   fontWeight: FontWeight.w800,
                   letterSpacing: -1,
                 ),
@@ -87,11 +85,10 @@ class ReportSummaryCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   unitLabel,
-                  style: TextStyle(
+                  style: theme.textTheme.labelSmall?.copyWith(
                     color: isDark
                         ? theme.colorScheme.onSurfaceVariant
                         : AppColors.mutedText,
-                    fontSize: 12,
                     fontWeight: FontWeight.w500,
                   ),
                   maxLines: 1,
@@ -103,12 +100,10 @@ class ReportSummaryCard extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             subtitle,
-            style: TextStyle(
+            style: theme.textTheme.bodySmall?.copyWith(
               color: isDark
                   ? theme.colorScheme.onSurfaceVariant
                   : AppColors.mutedText,
-              fontSize: 12,
-              height: 1.3,
             ),
           ),
         ],

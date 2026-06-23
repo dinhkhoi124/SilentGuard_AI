@@ -23,11 +23,10 @@ class LegalDocumentBlockWidget extends StatelessWidget {
           padding: const EdgeInsets.only(bottom: 32),
           child: Text(
             block.text,
-            style: TextStyle(
+            style: theme.textTheme.bodyMedium?.copyWith(
               color: isDark
                   ? theme.colorScheme.onSurfaceVariant
                   : AppColors.mutedText,
-              fontSize: 14,
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -38,9 +37,8 @@ class LegalDocumentBlockWidget extends StatelessWidget {
           padding: const EdgeInsets.only(top: 24, bottom: 16),
           child: Text(
             block.text,
-            style: TextStyle(
+            style: theme.textTheme.titleLarge?.copyWith(
               color: primaryColor,
-              fontSize: 20,
               fontWeight: FontWeight.w800,
             ),
           ),
@@ -51,9 +49,8 @@ class LegalDocumentBlockWidget extends StatelessWidget {
           padding: const EdgeInsets.only(top: 16, bottom: 12),
           child: Text(
             block.text,
-            style: TextStyle(
+            style: theme.textTheme.titleMedium?.copyWith(
               color: textColor,
-              fontSize: 18,
               fontWeight: FontWeight.w700,
             ),
           ),
@@ -63,7 +60,7 @@ class LegalDocumentBlockWidget extends StatelessWidget {
       case LegalDocumentBlockType.contact:
         return Padding(
           padding: const EdgeInsets.only(bottom: 16),
-          child: _buildRichText(block.text, textColor),
+          child: _buildRichText(context, block.text, textColor),
         );
 
       case LegalDocumentBlockType.bullet:
@@ -74,7 +71,8 @@ class LegalDocumentBlockWidget extends StatelessWidget {
     }
   }
 
-  Widget _buildRichText(String text, Color textColor) {
+  Widget _buildRichText(BuildContext context, String text, Color textColor) {
+    final theme = Theme.of(context);
     final parts = text.split('**');
     final spans = <InlineSpan>[];
 
@@ -85,11 +83,9 @@ class LegalDocumentBlockWidget extends StatelessWidget {
       spans.add(
         TextSpan(
           text: parts[i],
-          style: TextStyle(
+          style: theme.textTheme.bodyLarge?.copyWith(
             color: textColor,
-            fontSize: 16,
             fontWeight: isBold ? FontWeight.w700 : FontWeight.w400,
-            height: 1.6,
           ),
         ),
       );

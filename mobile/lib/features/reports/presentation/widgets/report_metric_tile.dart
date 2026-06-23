@@ -42,11 +42,10 @@ class ReportMetricTile extends StatelessWidget {
             children: [
               Text(
                 value,
-                style: TextStyle(
+                style: theme.textTheme.headlineSmall?.copyWith(
                   color: isDark
                       ? theme.colorScheme.onSurface
                       : AppColors.darkText,
-                  fontSize: 22,
                   fontWeight: FontWeight.w700,
                 ),
               ),
@@ -60,11 +59,10 @@ class ReportMetricTile extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             label,
-            style: TextStyle(
+            style: theme.textTheme.bodyMedium?.copyWith(
               color: isDark
                   ? theme.colorScheme.onSurfaceVariant
                   : AppColors.mutedText,
-              fontSize: 13,
               fontWeight: FontWeight.w500,
             ),
           ),

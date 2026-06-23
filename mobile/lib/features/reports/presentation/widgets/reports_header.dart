@@ -17,13 +17,11 @@ class ReportsHeader extends StatelessWidget {
         Expanded(
           child: Text(
             'Theo dõi tình hình an toàn và phản hồi của gia đình.',
-            style: TextStyle(
+            style: theme.textTheme.bodyMedium?.copyWith(
               color: isDark
                   ? theme.colorScheme.onSurfaceVariant
                   : AppColors.mutedText,
-              fontSize: 14,
               fontWeight: FontWeight.w500,
-              height: 1.4,
             ),
           ),
         ),
@@ -41,11 +39,10 @@ class ReportsHeader extends StatelessWidget {
             ),
             child: Text(
               '7 ngày',
-              style: TextStyle(
+              style: theme.textTheme.labelLarge?.copyWith(
                 color: isDark
                     ? theme.colorScheme.onSurface
                     : AppColors.darkText,
-                fontSize: 13,
                 fontWeight: FontWeight.w600,
               ),
             ),

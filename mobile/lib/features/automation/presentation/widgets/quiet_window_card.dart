@@ -57,34 +57,30 @@ class QuietWindowCard extends StatelessWidget {
                     children: [
                       Text(
                         'Giờ nghỉ trưa',
-                        style: TextStyle(
+                        style: theme.textTheme.titleMedium?.copyWith(
                           color: isDark
                               ? theme.colorScheme.onSurface
                               : AppColors.darkText,
-                          fontSize: 16,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
                       const SizedBox(height: 4),
                       Text(
                         '13:00 - 15:00',
-                        style: TextStyle(
+                        style: theme.textTheme.titleSmall?.copyWith(
                           color: isDark
                               ? theme.colorScheme.primary
                               : AppColors.primary,
-                          fontSize: 15,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
                       const SizedBox(height: 6),
                       Text(
                         'Giảm cảnh báo không cần thiết nếu người thân thường nghỉ ngơi trong khung giờ này.',
-                        style: TextStyle(
+                        style: theme.textTheme.bodyMedium?.copyWith(
                           color: isDark
                               ? theme.colorScheme.onSurfaceVariant
                               : AppColors.mutedText,
-                          fontSize: 13,
-                          height: 1.4,
                         ),
                       ),
                     ],

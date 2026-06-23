@@ -21,9 +21,8 @@ class AutomationStatusChip extends StatelessWidget {
       ),
       child: Text(
         label,
-        style: TextStyle(
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(
           color: color,
-          fontSize: 12,
           fontWeight: FontWeight.w700,
         ),
       ),
@@ -55,11 +54,10 @@ class AutomationStatusBadge extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 6),
-          const Text(
+          Text(
             'Đang bảo vệ',
-            style: TextStyle(
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
               color: AppColors.safe,
-              fontSize: 12,
               fontWeight: FontWeight.w700,
             ),
           ),

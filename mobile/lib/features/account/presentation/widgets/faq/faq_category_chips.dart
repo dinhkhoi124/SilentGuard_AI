@@ -54,9 +54,8 @@ class FaqCategoryChips extends StatelessWidget {
                 ),
                 child: Text(
                   category,
-                  style: TextStyle(
+                  style: theme.textTheme.bodyMedium?.copyWith(
                     color: textColor,
-                    fontSize: 14,
                     fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
                   ),
                 ),

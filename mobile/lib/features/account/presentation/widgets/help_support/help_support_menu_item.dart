@@ -32,9 +32,8 @@ class HelpSupportMenuItem extends StatelessWidget {
             Expanded(
               child: Text(
                 label,
-                style: TextStyle(
+                style: theme.textTheme.titleMedium?.copyWith(
                   color: textColor,
-                  fontSize: 17,
                   fontWeight: FontWeight.w500,
                   letterSpacing: -0.3,
                 ),

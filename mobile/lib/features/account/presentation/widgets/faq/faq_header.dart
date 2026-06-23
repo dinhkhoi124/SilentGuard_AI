@@ -33,9 +33,8 @@ class FaqHeader extends StatelessWidget {
           ),
           Text(
             'FAQ',
-            style: TextStyle(
+            style: theme.textTheme.titleLarge?.copyWith(
               color: textColor,
-              fontSize: 20,
               fontWeight: FontWeight.w800,
               letterSpacing: -0.5,
             ),

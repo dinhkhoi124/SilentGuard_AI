@@ -30,11 +30,10 @@ class SafetyTrendChart extends StatelessWidget {
               ),
               child: Text(
                 'Tuần này',
-                style: TextStyle(
+                style: theme.textTheme.labelMedium?.copyWith(
                   color: isDark
                       ? theme.colorScheme.onSurface
                       : AppColors.darkText,
-                  fontSize: 12,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -87,11 +86,10 @@ class SafetyTrendChart extends StatelessWidget {
               const SizedBox(height: 20),
               Text(
                 'Không có cảnh báo khẩn cấp trong tuần này.',
-                style: TextStyle(
+                style: theme.textTheme.bodyMedium?.copyWith(
                   color: isDark
                       ? theme.colorScheme.onSurfaceVariant
                       : AppColors.mutedText,
-                  fontSize: 13,
                 ),
               ),
             ],
@@ -137,9 +135,8 @@ class _ChartBar extends StatelessWidget {
             padding: const EdgeInsets.only(bottom: 4),
             child: Text(
               '$value cảnh báo',
-              style: TextStyle(
+              style: theme.textTheme.labelSmall?.copyWith(
                 color: AppColors.primary,
-                fontSize: 10,
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -162,11 +159,10 @@ class _ChartBar extends StatelessWidget {
         const SizedBox(height: 8),
         Text(
           day,
-          style: TextStyle(
+          style: theme.textTheme.labelMedium?.copyWith(
             color: isDark
                 ? theme.colorScheme.onSurfaceVariant
                 : AppColors.mutedText,
-            fontSize: 12,
             fontWeight: FontWeight.w600,
           ),
         ),

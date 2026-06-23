@@ -24,16 +24,14 @@ class FaqSearchField extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: TextField(
         onChanged: onChanged,
-        style: TextStyle(
+        style: theme.textTheme.bodyLarge?.copyWith(
           color: textColor,
-          fontSize: 16,
           fontWeight: FontWeight.w500,
         ),
         decoration: InputDecoration(
           hintText: 'Tìm kiếm',
-          hintStyle: TextStyle(
+          hintStyle: theme.textTheme.bodyLarge?.copyWith(
             color: hintColor,
-            fontSize: 16,
             fontWeight: FontWeight.w400,
           ),
           prefixIcon: Icon(Iconsax.search_normal, color: hintColor, size: 20),

@@ -48,11 +48,10 @@ class AiDailySummaryCard extends StatelessWidget {
                   Expanded(
                     child: Text(
                       'Tình hình hôm nay ổn định',
-                      style: TextStyle(
+                      style: theme.textTheme.titleMedium?.copyWith(
                         color: isDark
                             ? theme.colorScheme.onSurface
                             : AppColors.darkText,
-                        fontSize: 16,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
@@ -62,12 +61,10 @@ class AiDailySummaryCard extends StatelessWidget {
               const SizedBox(height: 12),
               Text(
                 'Hệ thống ghi nhận 2 sự kiện mức thấp và trung bình. Không có cảnh báo khẩn cấp. Camera phòng ngủ và phòng khách hoạt động bình thường.',
-                style: TextStyle(
+                style: theme.textTheme.bodyMedium?.copyWith(
                   color: isDark
                       ? theme.colorScheme.onSurfaceVariant
                       : AppColors.mutedText,
-                  fontSize: 14,
-                  height: 1.5,
                 ),
               ),
               const SizedBox(height: 16),
@@ -83,11 +80,10 @@ class AiDailySummaryCard extends StatelessWidget {
                   const SizedBox(width: 6),
                   Text(
                     'Cập nhật lúc 21:00',
-                    style: TextStyle(
+                    style: theme.textTheme.bodySmall?.copyWith(
                       color: isDark
                           ? theme.colorScheme.onSurfaceVariant
                           : AppColors.mutedText,
-                      fontSize: 12,
                     ),
                   ),
                 ],

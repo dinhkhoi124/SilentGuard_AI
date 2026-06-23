@@ -47,11 +47,10 @@ class AutomationStatusCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   'Bảo vệ tự động đang bật',
-                  style: TextStyle(
+                  style: theme.textTheme.titleMedium?.copyWith(
                     color: isDark
                         ? theme.colorScheme.onSurface
                         : AppColors.darkText,
-                    fontSize: 18,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -61,13 +60,11 @@ class AutomationStatusCard extends StatelessWidget {
           const SizedBox(height: 12),
           Text(
             'AI sẽ theo dõi camera đã kết nối và gửi cảnh báo khi phát hiện dấu hiệu té ngã hoặc bất thường.',
-            style: TextStyle(
+            style: theme.textTheme.bodyMedium?.copyWith(
               color: isDark
                   ? theme.colorScheme.onSurfaceVariant
                   : AppColors.mutedText,
-              fontSize: 14,
               fontWeight: FontWeight.w500,
-              height: 1.5,
             ),
           ),
           const SizedBox(height: 16),
@@ -122,11 +119,10 @@ class _MetaChip extends StatelessWidget {
           const SizedBox(width: 6),
           Text(
             label,
-            style: TextStyle(
+            style: theme.textTheme.bodySmall?.copyWith(
               color: isDark
                   ? theme.colorScheme.onSurfaceVariant
                   : AppColors.mutedText,
-              fontSize: 12,
               fontWeight: FontWeight.w600,
             ),
           ),

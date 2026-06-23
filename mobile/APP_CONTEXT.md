@@ -73,17 +73,18 @@ Kien truc tong quan:
 ### 3.3 `features/`
 
 - `account/`
-  - trang tai khoan
-  - trang giao dien ung dung / dark mode
+  - trang tai khoan (`AccountPage`)
+  - trang giao dien ung dung / dark mode (`AppAppearancePage`)
+  - trang ho tro, FAQ, va Privacy Policy (`HelpSupportPage`, `FaqPage`, `PrivacyPolicyPage`)
 - `auth/`
   - Firebase auth datasource/repository
   - `AuthBloc`
   - `WelcomePage`, `SignUpPage`
 - `devices/`
-  - pairing flow
-  - QR decode
-  - Imou Cloud datasource
-  - backend camera datasource/repository
+  - pairing flow (`DevicePairingPage`, `DevicePairingBloc`)
+  - permission, gallery image, va QR decode datasources (`DevicePermissionDataSource`, `GalleryImageDataSource`, `QrCodeDataSource`)
+  - Imou Cloud datasource va repository (`ImouCloudDataSource`, `ImouStreamRepository`)
+  - backend camera datasource/repository (`DeviceRemoteDataSource`, `DeviceRepository`)
 - `home/`
   - `HomeBloc`
   - home page, weather card, camera card, camera detail
@@ -292,6 +293,9 @@ Feature upload video:
 - `/home`
 - `/add-device`
 - `/app-appearance`
+- `/help-support`
+- `/faq`
+- `/privacy-policy`
 - `/notifications`
 - `/camera/:id`
 
@@ -310,7 +314,7 @@ Nhung khoi quan trong dang duoc dang ky trong `injection_container.dart`:
 - `HomeBloc` (lay getWeather, getCameraDevices, deleteCameraDevice, imouStreamRepository, sessionRepository)
 - `VideoUploadBloc`
 - `DevicePairingBloc`
-- session, home, device (bao gom `ImouStreamRepository`), upload repositories va use cases
+- session, home (bao gom `AlertReviewRepository`), device (bao gom `ImouStreamRepository`), upload repositories va use cases
 
 ## 14. Backend/API dang dung
 

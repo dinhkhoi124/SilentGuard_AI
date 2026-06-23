@@ -100,8 +100,7 @@ class DeviceRemoteDataSourceImpl implements DeviceRemoteDataSource {
       'ip_address': ipAddress,
       'rtsp_url': rtspUrl,
       'status': 'unknown',
-      if (resolvedDevice.serialNumber.trim().isNotEmpty)
-        'serial_number': resolvedDevice.serialNumber.trim(),
+      'serial_number': resolvedDevice.serialNumber.trim(),
     }).toEntity();
   }
 

@@ -42,9 +42,8 @@ class FaqEmptyState extends StatelessWidget {
           const SizedBox(height: 24),
           Text(
             title,
-            style: TextStyle(
+            style: theme.textTheme.titleMedium?.copyWith(
               color: titleColor,
-              fontSize: 18,
               fontWeight: FontWeight.w700,
             ),
             textAlign: TextAlign.center,
@@ -52,11 +51,9 @@ class FaqEmptyState extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             subtitle,
-            style: TextStyle(
+            style: theme.textTheme.bodyMedium?.copyWith(
               color: subtitleColor,
-              fontSize: 14,
               fontWeight: FontWeight.w500,
-              height: 1.5,
             ),
             textAlign: TextAlign.center,
           ),

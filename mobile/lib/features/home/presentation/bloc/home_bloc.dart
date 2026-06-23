@@ -1,4 +1,4 @@
-import 'dart:async'; // FIX: HomeBloc needs a timer for silent backend warm-up retries.
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -20,12 +20,13 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     required this.sessionRepository,
     required this.imouStreamRepository,
   }) : super(const HomeInitial()) {
+    // Đăng ký các sự kiện (events) với các hàm xử lý tương ứng
     on<HomeStarted>((event, emit) => _loadHome(emit));
     on<HomeRetryRequested>(
       (event, emit) => _loadHome(
         emit,
         silent: event.silent,
-      ), // FIX: silent retries keep the warming-up UI stable.
+      ),
     );
     on<RoomFilterChanged>(_onRoomFilterChanged);
     on<AddDeviceTapped>(_onAddDeviceTapped);
@@ -41,52 +42,46 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
   final GetCameraDevices getCameraDevices;
   final DeleteCameraDevice deleteCameraDevice;
   final ImouStreamRepository imouStreamRepository;
-  final SessionRepository
-  sessionRepository; // FIX: Home reads the session cache populated by AuthNotifier.
+  final SessionRepository sessionRepository;
+  
   List<CameraDevice> _activeDevices = [];
   int _loadGeneration = 0;
-  Timer?
-  _backendRetryTimer; // FIX: auto-retry backend availability without user interaction.
+  Timer? _backendRetryTimer;
 
+  /// Tải dữ liệu chính cho trang chủ bao gồm thời tiết, danh sách camera, và kiểm tra session
   Future<void> _loadHome(
     Emitter<HomeState> emit, {
-    bool silent =
-        false, // FIX: backend warm-up retries should not replace the warming UI with HomeLoading.
+    bool silent = false,
   }) async {
     final generation = ++_loadGeneration;
-    _backendRetryTimer
-        ?.cancel(); // FIX: each load attempt owns the next retry decision.
-    _backendRetryTimer = null; // FIX: prevent duplicate retry timers.
+    _backendRetryTimer?.cancel();
+    _backendRetryTimer = null;
+    
     if (!silent) {
-      emit(
-        const HomeLoading(),
-      ); // FIX: manual loads still show the normal loading state.
+      emit(const HomeLoading());
     }
 
     final sessionReady = await _ensureSessionReady(emit);
     if (!sessionReady || generation != _loadGeneration) {
-      return; // FIX: stop before data calls when backend session is still warming or auth failed.
+      return;
     }
 
     final weatherFuture = getWeather();
     final deviceResult = await getCameraDevices();
     var devicesLoaded = false;
+    
     deviceResult.fold(
       (failure) {
         if (_isBackendUnavailable(failure)) {
-          // FIX: network/timeout/5xx should warm up and auto-retry.
-          emit(const HomeBackendWarmingUp()); // FIX: show non-error waiting UI.
-          _scheduleBackendRetry(); // FIX: retry every 5 seconds silently.
+          emit(const HomeBackendWarmingUp());
+          _scheduleBackendRetry();
           return;
         }
         if (_isUnauthorized(failure)) {
-          // FIX: only definitive auth failures show session-expired UI.
           emit(HomeUnauthorized(failure));
           return;
         }
-        emit(
-          HomeError(failure),
-        ); // FIX: preserve generic error handling for non-auth/non-warm-up failures.
+        emit(HomeError(failure));
       },
       (devices) {
         devicesLoaded = true;
@@ -114,77 +109,63 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     });
   }
 
+  /// Đảm bảo phiên đăng nhập với backend đã sẵn sàng
   Future<bool> _ensureSessionReady(Emitter<HomeState> emit) async {
     if (sessionRepository.currentSession != null) {
-      return true; // FIX: cached session is enough; do not call backend login again.
+      return true;
     }
 
-    final sessionResult = await sessionRepository
-        .provisionSession(); // FIX: reuse the repository in-flight login instead of starting a second round-trip.
+    final sessionResult = await sessionRepository.provisionSession();
     var sessionReady = false;
+    
     sessionResult.fold(
       (failure) {
         if (failure.kind == SessionFailureKind.backendUnavailable) {
-          emit(
-            const HomeBackendWarmingUp(),
-          ); // FIX: Render cold start is a waiting state, not session expiration.
-          _scheduleBackendRetry(); // FIX: retry every 5 seconds silently while backend wakes.
+          emit(const HomeBackendWarmingUp());
+          _scheduleBackendRetry();
           return;
         }
         if (failure.kind == SessionFailureKind.unauthorized ||
             failure.kind == SessionFailureKind.forbidden) {
-          emit(
-            HomeUnauthorized(failure.message),
-          ); // FIX: only 401/403 should show the expired-session UI.
+          emit(HomeUnauthorized(failure.message));
           return;
         }
-        emit(
-          HomeError(failure.message),
-        ); // FIX: non-auth/non-warm-up session failures remain generic errors.
+        emit(HomeError(failure.message));
       },
       (_) {
-        sessionReady =
-            true; // FIX: cache is now populated for downstream home usecases.
+        sessionReady = true;
       },
     );
     return sessionReady;
   }
 
+  /// Lên lịch thử lại (retry) khi backend chưa sẵn sàng
   void _scheduleBackendRetry() {
     if (_backendRetryTimer?.isActive ?? false) {
-      return; // FIX: avoid stacking retries while backend is cold.
+      return;
     }
     _backendRetryTimer = Timer(const Duration(seconds: 5), () {
-      // FIX: auto-retry backend warm-up every 5 seconds.
-      add(
-        const HomeRetryRequested(silent: true),
-      ); // FIX: retry without showing a dismissable error or button.
+      add(const HomeRetryRequested(silent: true));
     });
   }
 
+  /// Kiểm tra xem lỗi có phải do máy chủ không phản hồi hay không
   bool _isBackendUnavailable(String failure) {
     final normalized = failure.toLowerCase();
-    return normalized.contains(
-          'máy chủ đang gặp lỗi',
-        ) || // FIX: classify 5xx as backend unavailable.
+    return normalized.contains('máy chủ đang gặp lỗi') ||
         normalized.contains('may chu dang gap loi') ||
-        normalized.contains(
-          'không thể kết nối',
-        ) || // FIX: classify network errors as backend unavailable.
+        normalized.contains('không thể kết nối') ||
         normalized.contains('khong the ket noi') ||
-        normalized.contains(
-          'quá thời gian',
-        ) || // FIX: classify timeout as backend unavailable.
+        normalized.contains('quá thời gian') ||
         normalized.contains('qua thoi gian') ||
         normalized.contains('network') ||
         normalized.contains('timeout');
   }
 
+  /// Kiểm tra xem lỗi có phải do chưa xác thực / hết phiên đăng nhập hay không
   bool _isUnauthorized(String failure) {
     final normalized = failure.toLowerCase();
-    return normalized.contains(
-          'phiên đăng nhập',
-        ) || // FIX: classify localized session-expired failures as unauthorized.
+    return normalized.contains('phiên đăng nhập') ||
         normalized.contains('phien dang nhap') ||
         normalized.contains('chưa được thiết lập') ||
         normalized.contains('chua duoc thiet lap') ||
@@ -193,12 +174,14 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
         normalized.contains('403');
   }
 
+  /// Xử lý sự kiện khi người dùng thay đổi bộ lọc phòng
   void _onRoomFilterChanged(RoomFilterChanged event, Emitter<HomeState> emit) {
     final currentState = state;
     if (currentState is! HomeLoaded) return;
     emit(currentState.copyWith(selectedRoom: event.roomName));
   }
 
+  /// Xử lý sự kiện khi bấm nút thêm thiết bị mới
   void _onAddDeviceTapped(AddDeviceTapped event, Emitter<HomeState> emit) {
     final currentState = state;
     if (currentState is! HomeLoaded) return;
@@ -207,6 +190,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     emit(currentState.copyWith(openPairingFlow: false));
   }
 
+  /// Xử lý xoá thiết bị camera
   Future<void> _onDeviceDeleted(
     HomeDeviceDeleted event,
     Emitter<HomeState> emit,
@@ -235,6 +219,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     );
   }
 
+  /// Cập nhật lại danh sách sau khi thiết bị mới được ghép nối
   void _onDevicePaired(HomeDevicePaired event, Emitter<HomeState> emit) {
     final currentState = state;
     if (currentState is! HomeLoaded) return;
@@ -251,6 +236,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     emit(currentState.copyWith(devices: List.unmodifiable(_activeDevices)));
   }
 
+  /// Xử lý sự kiện khi chụp và lưu trữ ảnh thumbnail của camera
   void _onCameraThumbnailCaptured(
     CameraThumbnailCaptured event,
     Emitter<HomeState> emit,
@@ -268,6 +254,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     );
   }
 
+  /// Yêu cầu lấy URL luồng phát trực tiếp (live stream) từ dịch vụ Imou
   Future<void> _onCameraStreamUrlRequested(
     CameraStreamUrlRequested event,
     Emitter<HomeState> emit,
@@ -315,6 +302,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     );
   }
 
+  /// Chuyển đổi trạng thái bật/tắt (toggle) của các phụ kiện đi kèm camera
   void _onAccessoryToggled(
     HomeAccessoryToggled event,
     Emitter<HomeState> emit,
@@ -339,10 +327,10 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     emit(currentState.copyWith(devices: List.unmodifiable(_activeDevices)));
   }
 
+  /// Hủy và dọn dẹp các tài nguyên (như timer) khi bloc đóng
   @override
   Future<void> close() {
-    _backendRetryTimer
-        ?.cancel(); // FIX: stop silent retries when HomeBloc is disposed.
+    _backendRetryTimer?.cancel();
     return super.close();
   }
 }

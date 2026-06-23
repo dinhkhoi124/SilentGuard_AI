@@ -33,12 +33,10 @@ class EmergencyContactsPreview extends StatelessWidget {
             padding: const EdgeInsets.all(20),
             child: Text(
               'Danh sách này sẽ được dùng khi cảnh báo mức cao không được phản hồi.',
-              style: TextStyle(
+              style: theme.textTheme.bodyMedium?.copyWith(
                 color: isDark
                     ? theme.colorScheme.onSurfaceVariant
                     : AppColors.mutedText,
-                fontSize: 13,
-                height: 1.4,
               ),
             ),
           ),
@@ -91,9 +89,9 @@ class EmergencyContactsPreview extends StatelessWidget {
                   ),
                   padding: const EdgeInsets.symmetric(vertical: 14),
                 ),
-                child: const Text(
+                child: Text(
                   'Quản lý liên hệ',
-                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                  style: theme.textTheme.titleSmall,
                 ),
               ),
             ),
@@ -136,11 +134,10 @@ class _ContactPreviewTile extends StatelessWidget {
             ),
             child: Text(
               number,
-              style: TextStyle(
+              style: theme.textTheme.bodyMedium?.copyWith(
                 color: isDark
                     ? theme.colorScheme.onSurfaceVariant
                     : AppColors.mutedText,
-                fontSize: 14,
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -152,22 +149,20 @@ class _ContactPreviewTile extends StatelessWidget {
               children: [
                 Text(
                   name,
-                  style: TextStyle(
+                  style: theme.textTheme.titleSmall?.copyWith(
                     color: isDark
                         ? theme.colorScheme.onSurface
                         : AppColors.darkText,
-                    fontSize: 15,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   role,
-                  style: TextStyle(
+                  style: theme.textTheme.bodyMedium?.copyWith(
                     color: isDark
                         ? theme.colorScheme.onSurfaceVariant
                         : AppColors.mutedText,
-                    fontSize: 13,
                   ),
                 ),
               ],

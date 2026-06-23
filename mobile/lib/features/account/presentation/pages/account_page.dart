@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:mobile/core/utils/app_colors.dart';
+import 'package:mobile/core/theme/app_spacing.dart';
 import 'package:mobile/features/auth/domain/entities/app_user.dart';
 import 'package:mobile/features/auth/domain/repositories/auth_repository.dart';
 import 'package:mobile/features/auth/presentation/bloc/auth_bloc.dart';
@@ -78,7 +79,12 @@ class _AccountPageState extends State<AccountPage> {
           return CustomScrollView(
             slivers: [
               SliverPadding(
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.pagePadding,
+                  8,
+                  AppSpacing.pagePadding,
+                  20,
+                ),
                 sliver: SliverList.list(
                   children: [
                     _ProfileHeader(user: user),
@@ -182,9 +188,8 @@ class _ProfileHeader extends StatelessWidget {
                     name,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
+                    style: theme.textTheme.titleMedium?.copyWith(
                       color: nameColor,
-                      fontSize: 18,
                       fontWeight: FontWeight.w800,
                     ),
                   ),
@@ -193,10 +198,8 @@ class _ProfileHeader extends StatelessWidget {
                     email == null || email.isEmpty ? 'Chưa có email' : email,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
+                    style: theme.textTheme.bodyMedium?.copyWith(
                       color: emailColor,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
                     ),
                   ),
                 ],
@@ -232,6 +235,7 @@ class _Avatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final photoUrl = user?.photoUrl?.trim();
     if (photoUrl != null && photoUrl.isNotEmpty) {
       return CircleAvatar(
@@ -246,9 +250,8 @@ class _Avatar extends StatelessWidget {
       backgroundColor: AppColors.lightBlue,
       child: Text(
         _initials(displayName),
-        style: const TextStyle(
+        style: theme.textTheme.titleLarge?.copyWith(
           color: AppColors.primary,
-          fontSize: 20,
           fontWeight: FontWeight.w800,
         ),
       ),
@@ -287,9 +290,8 @@ class _SectionLabel extends StatelessWidget {
       children: [
         Text(
           label,
-          style: TextStyle(
+          style: theme.textTheme.bodyMedium?.copyWith(
             color: labelColor,
-            fontSize: 14,
             fontWeight: FontWeight.w600,
           ),
         ),
@@ -327,9 +329,8 @@ class _AccountMenuTile extends StatelessWidget {
             Expanded(
               child: Text(
                 title,
-                style: TextStyle(
+                style: theme.textTheme.bodyLarge?.copyWith(
                   color: itemColor,
-                  fontSize: 16,
                   fontWeight: FontWeight.w700,
                 ),
               ),
@@ -373,6 +374,7 @@ class _LogoutTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final isLoading = context.select<AuthBloc, bool>(
       (bloc) => bloc.state is AuthLoading,
     );
@@ -396,11 +398,10 @@ class _LogoutTile extends StatelessWidget {
           Expanded(
             child: Text(
               'Đăng xuất',
-              style: TextStyle(
+              style: theme.textTheme.bodyLarge?.copyWith(
                 color: AppColors.destructive.withValues(
                   alpha: isLoading ? 0.55 : 1,
                 ),
-                fontSize: 16,
                 fontWeight: FontWeight.w800,
               ),
             ),
@@ -416,6 +417,7 @@ class _LogoutProgressDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return PopScope(
       canPop: false,
       child: Dialog(
@@ -442,22 +444,18 @@ class _LogoutProgressDialog extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 18),
-              const Text(
+              Text(
                 'Đang đăng xuất',
-                style: TextStyle(
+                style: theme.textTheme.titleLarge?.copyWith(
                   color: AppColors.darkText,
-                  fontSize: 20,
                   fontWeight: FontWeight.w800,
                 ),
               ),
               const SizedBox(height: 8),
-              const Text(
+              Text(
                 'SlientGuard đang kết thúc phiên làm việc của bạn.',
-                style: TextStyle(
+                style: theme.textTheme.bodyMedium?.copyWith(
                   color: AppColors.mutedText,
-                  fontSize: 14,
-                  height: 1.4,
-                  fontWeight: FontWeight.w500,
                 ),
               ),
               const SizedBox(height: 18),

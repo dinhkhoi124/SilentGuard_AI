@@ -58,11 +58,9 @@ class FaqQuestionCard extends StatelessWidget {
                     Expanded(
                       child: Text(
                         item.question,
-                        style: TextStyle(
+                        style: theme.textTheme.titleMedium?.copyWith(
                           color: textColor,
-                          fontSize: 16,
                           fontWeight: FontWeight.w700,
-                          height: 1.4,
                         ),
                       ),
                     ),
@@ -95,11 +93,9 @@ class FaqQuestionCard extends StatelessWidget {
                       padding: const EdgeInsets.all(20),
                       child: Text(
                         item.answer,
-                        style: TextStyle(
+                        style: theme.textTheme.bodyLarge?.copyWith(
                           color: answerColor,
-                          fontSize: 15,
                           fontWeight: FontWeight.w500,
-                          height: 1.6,
                         ),
                       ),
                     ),

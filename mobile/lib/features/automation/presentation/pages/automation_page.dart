@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mobile/core/theme/app_spacing.dart';
 import 'package:mobile/features/automation/presentation/widgets/ai_config_card.dart';
 import 'package:mobile/features/automation/presentation/widgets/automation_header.dart';
 import 'package:mobile/features/automation/presentation/widgets/automation_rules_section.dart';
@@ -24,7 +25,12 @@ class AutomationPage extends StatelessWidget {
       child: CustomScrollView(
         slivers: [
           SliverPadding(
-            padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.pagePadding,
+              24,
+              AppSpacing.pagePadding,
+              20,
+            ),
             sliver: SliverList.list(
               children: [
                 const AutomationHeader(),

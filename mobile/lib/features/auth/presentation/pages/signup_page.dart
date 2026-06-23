@@ -104,7 +104,11 @@ class _SignUpPageState extends State<SignUpPage> {
                         ),
                       ),
                       SizedBox(width: 8),
-                      Icon(Icons.person, color: AppColors.primaryLight, size: 28),
+                      Icon(
+                        Icons.person,
+                        color: AppColors.primaryLight,
+                        size: 28,
+                      ),
                     ],
                   ),
                   const SizedBox(height: 6),

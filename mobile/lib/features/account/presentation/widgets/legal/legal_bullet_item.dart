@@ -30,16 +30,17 @@ class LegalBulletItem extends StatelessWidget {
               ),
             ),
           ),
-          Expanded(child: _buildRichText(text, textColor)),
+          Expanded(child: _buildRichText(context, text, textColor)),
         ],
       ),
     );
   }
 
-  Widget _buildRichText(String text, Color textColor) {
+  Widget _buildRichText(BuildContext context, String text, Color textColor) {
     // Basic bold parsing: **bold text**
     final parts = text.split('**');
     final spans = <InlineSpan>[];
+    final theme = Theme.of(context);
 
     for (var i = 0; i < parts.length; i++) {
       if (parts[i].isEmpty) continue;
@@ -48,11 +49,9 @@ class LegalBulletItem extends StatelessWidget {
       spans.add(
         TextSpan(
           text: parts[i],
-          style: TextStyle(
+          style: theme.textTheme.bodyLarge?.copyWith(
             color: textColor,
-            fontSize: 16,
             fontWeight: isBold ? FontWeight.w700 : FontWeight.w400,
-            height: 1.6,
           ),
         ),
       );

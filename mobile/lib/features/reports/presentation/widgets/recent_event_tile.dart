@@ -35,11 +35,10 @@ class RecentEventTile extends StatelessWidget {
               width: 44,
               child: Text(
                 time,
-                style: TextStyle(
+                style: theme.textTheme.bodyMedium?.copyWith(
                   color: isDark
                       ? theme.colorScheme.onSurfaceVariant
                       : AppColors.mutedText,
-                  fontSize: 13,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -65,22 +64,20 @@ class RecentEventTile extends StatelessWidget {
                 children: [
                   Text(
                     title,
-                    style: TextStyle(
+                    style: theme.textTheme.titleSmall?.copyWith(
                       color: isDark
                           ? theme.colorScheme.onSurface
                           : AppColors.darkText,
-                      fontSize: 15,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     subtitle,
-                    style: TextStyle(
+                    style: theme.textTheme.bodyMedium?.copyWith(
                       color: isDark
                           ? theme.colorScheme.onSurfaceVariant
                           : AppColors.mutedText,
-                      fontSize: 13,
                     ),
                   ),
                 ],
@@ -97,11 +94,10 @@ class RecentEventTile extends StatelessWidget {
               ),
               child: Text(
                 statusBadge,
-                style: TextStyle(
+                style: theme.textTheme.labelSmall?.copyWith(
                   color: isDark
                       ? theme.colorScheme.onSurfaceVariant
                       : AppColors.mutedText,
-                  fontSize: 11,
                   fontWeight: FontWeight.w600,
                 ),
               ),

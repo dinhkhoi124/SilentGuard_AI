@@ -60,9 +60,8 @@ class LegalTableCard extends StatelessWidget {
           if (title.isNotEmpty)
             Text(
               title,
-              style: TextStyle(
+              style: theme.textTheme.titleMedium?.copyWith(
                 color: titleColor,
-                fontSize: 16,
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -78,9 +77,8 @@ class LegalTableCard extends StatelessWidget {
                       width: 80,
                       child: Text(
                         headers[i],
-                        style: TextStyle(
+                        style: theme.textTheme.labelMedium?.copyWith(
                           color: labelColor,
-                          fontSize: 13,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -88,11 +86,9 @@ class LegalTableCard extends StatelessWidget {
                   Expanded(
                     child: Text(
                       row[i],
-                      style: TextStyle(
+                      style: theme.textTheme.bodyMedium?.copyWith(
                         color: valueColor,
-                        fontSize: 14,
                         fontWeight: FontWeight.w500,
-                        height: 1.4,
                       ),
                     ),
                   ),

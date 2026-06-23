@@ -225,21 +225,19 @@ class _CameraDetailPageState extends State<CameraDetailPage> {
             children: [
               const _SheetHandle(),
               const SizedBox(height: 18),
-              const Text(
+              Text(
                 'Tùy chọn camera',
-                style: TextStyle(
+                style: Theme.of(sheetContext).textTheme.titleLarge?.copyWith(
                   color: AppColors.darkText,
-                  fontSize: 20,
                   fontWeight: FontWeight.w700,
                 ),
               ),
               const SizedBox(height: 6),
               Text(
                 widget.device.location,
-                style: const TextStyle(
-                  color: AppColors.mutedText,
-                  fontSize: 13,
-                ),
+                style: Theme.of(
+                  sheetContext,
+                ).textTheme.bodyMedium?.copyWith(color: AppColors.mutedText),
               ),
               const SizedBox(height: 18),
               InkWell(
@@ -264,8 +262,8 @@ class _CameraDetailPageState extends State<CameraDetailPage> {
                     color: AppColors.surfaceSoft,
                     borderRadius: BorderRadius.circular(20),
                   ),
-                  child: const Padding(
-                    padding: EdgeInsets.all(16),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
                     child: Row(
                       children: [
                         DecoratedBox(
@@ -289,24 +287,26 @@ class _CameraDetailPageState extends State<CameraDetailPage> {
                             children: [
                               Text(
                                 'Giả lập cảnh báo té ngã',
-                                style: TextStyle(
-                                  color: AppColors.darkText,
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w700,
-                                ),
+                                style: Theme.of(sheetContext)
+                                    .textTheme
+                                    .titleSmall
+                                    ?.copyWith(
+                                      color: AppColors.darkText,
+                                      fontWeight: FontWeight.w700,
+                                    ),
                               ),
-                              SizedBox(height: 4),
+                              const SizedBox(height: 4),
                               Text(
                                 'Gửi thông báo sau 5 giây.',
-                                style: TextStyle(
-                                  color: AppColors.mutedText,
-                                  fontSize: 13,
-                                ),
+                                style: Theme.of(sheetContext)
+                                    .textTheme
+                                    .bodyMedium
+                                    ?.copyWith(color: AppColors.mutedText),
                               ),
                             ],
                           ),
                         ),
-                        Icon(
+                        const Icon(
                           Icons.chevron_right_rounded,
                           color: AppColors.mutedText,
                         ),
@@ -352,8 +352,8 @@ class _NoCameraEventsPanel extends StatelessWidget {
           color: AppColors.surface,
           borderRadius: BorderRadius.circular(20),
         ),
-        child: const Padding(
-          padding: EdgeInsets.all(18),
+        child: Padding(
+          padding: const EdgeInsets.all(18),
           child: Row(
             children: [
               DecoratedBox(
@@ -376,19 +376,16 @@ class _NoCameraEventsPanel extends StatelessWidget {
                   children: [
                     Text(
                       'Chưa có sự kiện',
-                      style: TextStyle(
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
                         color: AppColors.darkText,
-                        fontSize: 15,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
-                    SizedBox(height: 4),
+                    const SizedBox(height: 4),
                     Text(
                       'Sự kiện mới từ camera sẽ xuất hiện tại đây.',
-                      style: TextStyle(
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: AppColors.mutedText,
-                        fontSize: 13,
-                        height: 1.35,
                       ),
                     ),
                   ],

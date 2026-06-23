@@ -33,9 +33,8 @@ class HelpSupportHeader extends StatelessWidget {
           ),
           Text(
             'Trợ giúp và hỗ trợ',
-            style: TextStyle(
+            style: theme.textTheme.titleLarge?.copyWith(
               color: textColor,
-              fontSize: 20,
               fontWeight: FontWeight.w700,
               letterSpacing: -0.5,
             ),

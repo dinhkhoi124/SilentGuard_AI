@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:mobile/core/utils/app_colors.dart';
+import 'package:mobile/core/theme/app_text_styles.dart';
 
 abstract final class AppTheme {
   static ThemeData get light => ThemeData(
@@ -13,27 +14,21 @@ abstract final class AppTheme {
       surface: AppColors.surface,
       error: AppColors.destructive,
     ),
-    textTheme: const TextTheme(
-      titleLarge: TextStyle(
-        fontSize: 20,
-        fontWeight: FontWeight.w700,
+    textTheme: TextTheme(
+      displayLarge: AppTextStyles.displayLarge.copyWith(
         color: AppColors.darkText,
       ),
-      bodyLarge: TextStyle(
-        fontSize: 16,
-        fontWeight: FontWeight.w600,
+      headlineLarge: AppTextStyles.headlineLarge.copyWith(
         color: AppColors.darkText,
       ),
-      bodyMedium: TextStyle(
-        fontSize: 14,
-        fontWeight: FontWeight.w400,
+      titleLarge: AppTextStyles.titleLarge.copyWith(color: AppColors.darkText),
+      titleMedium: AppTextStyles.titleMedium.copyWith(
         color: AppColors.darkText,
       ),
-      bodySmall: TextStyle(
-        fontSize: 12,
-        fontWeight: FontWeight.w400,
-        color: AppColors.mutedText,
-      ),
+      titleSmall: AppTextStyles.titleSmall.copyWith(color: AppColors.darkText),
+      bodyLarge: AppTextStyles.bodyLarge.copyWith(color: AppColors.darkText),
+      bodyMedium: AppTextStyles.bodyMedium.copyWith(color: AppColors.darkText),
+      bodySmall: AppTextStyles.bodySmall.copyWith(color: AppColors.mutedText),
     ),
     appBarTheme: const AppBarTheme(
       backgroundColor: AppColors.background,
@@ -234,27 +229,15 @@ abstract final class AppTheme {
         brightness: Brightness.dark,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(99)),
       ),
-      textTheme: const TextTheme(
-        titleLarge: TextStyle(
-          fontSize: 20,
-          fontWeight: FontWeight.w700,
-          color: onSurface,
-        ),
-        bodyLarge: TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.w600,
-          color: onSurface,
-        ),
-        bodyMedium: TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w400,
-          color: onSurface,
-        ),
-        bodySmall: TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w400,
-          color: onSurfaceVariant,
-        ),
+      textTheme: TextTheme(
+        displayLarge: AppTextStyles.displayLarge.copyWith(color: onSurface),
+        headlineLarge: AppTextStyles.headlineLarge.copyWith(color: onSurface),
+        titleLarge: AppTextStyles.titleLarge.copyWith(color: onSurface),
+        titleMedium: AppTextStyles.titleMedium.copyWith(color: onSurface),
+        titleSmall: AppTextStyles.titleSmall.copyWith(color: onSurface),
+        bodyLarge: AppTextStyles.bodyLarge.copyWith(color: onSurface),
+        bodyMedium: AppTextStyles.bodyMedium.copyWith(color: onSurface),
+        bodySmall: AppTextStyles.bodySmall.copyWith(color: onSurfaceVariant),
       ),
       appBarTheme: const AppBarTheme(
         backgroundColor: background,

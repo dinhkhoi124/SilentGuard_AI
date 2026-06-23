@@ -57,22 +57,20 @@ class AutomationRuleTile extends StatelessWidget {
                 children: [
                   Text(
                     title,
-                    style: TextStyle(
+                    style: theme.textTheme.titleSmall?.copyWith(
                       color: isDark
                           ? theme.colorScheme.onSurface
                           : AppColors.darkText,
-                      fontSize: 15,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
                   const SizedBox(height: 2),
                   Text(
                     subtitle,
-                    style: TextStyle(
+                    style: theme.textTheme.bodyMedium?.copyWith(
                       color: isDark
                           ? theme.colorScheme.onSurfaceVariant
                           : AppColors.mutedText,
-                      fontSize: 13,
                       fontWeight: FontWeight.w400,
                     ),
                   ),

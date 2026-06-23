@@ -15,13 +15,10 @@ class AutomationHeader extends StatelessWidget {
         Expanded(
           child: Text(
             'Thiết lập cách SilentGuard phản ứng khi phát hiện sự cố.',
-            style: TextStyle(
+            style: theme.textTheme.bodyMedium?.copyWith(
               color: isDark
                   ? theme.colorScheme.onSurfaceVariant
                   : AppColors.mutedText,
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-              height: 1.4,
             ),
           ),
         ),

@@ -13,9 +13,8 @@ class AutomationSectionHeader extends StatelessWidget {
 
     return Text(
       title,
-      style: TextStyle(
+      style: theme.textTheme.titleMedium?.copyWith(
         color: isDark ? theme.colorScheme.onSurface : AppColors.darkText,
-        fontSize: 18,
         fontWeight: FontWeight.w700,
         letterSpacing: -0.3,
       ),

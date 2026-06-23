@@ -103,6 +103,50 @@ async def check_pending_escalations() -> None:
     except Exception as e:
         print(f"Error querying pending escalations: {e}")
 
+async def retry_critical_calls():
+    """
+    Chạy mỗi 2 phút. Tìm event CRITICAL còn pending 
+    (chưa được acknowledge) và gọi lại.
+    """
+    try:
+        now = datetime.utcnow().isoformat()
+        # Tìm event CRITICAL còn pending, đã tạo > 2 phút trước
+        two_min_ago = (datetime.utcnow() - timedelta(minutes=2)).isoformat()
+        
+        response = supabase.table("events")\
+            .select("*")\
+            .eq("severity", "CRITICAL")\
+            .eq("status", "pending")\
+            .lte("created_at", two_min_ago)\
+            .execute()
+
+        for event in response.data:
+            household_id = event["household_id"]
+            
+            # Lấy contacts
+            contacts_res = supabase.table("contacts")\
+                .select("phone")\
+                .eq("household_id", household_id)\
+                .execute()
+            
+            phone_numbers = [
+                c["phone"] for c in contacts_res.data 
+                if c.get("phone")
+            ]
+            
+            if phone_numbers:
+                from app.services.call_service import make_calls
+                make_calls(
+                    phone_numbers=phone_numbers,
+                    event_id=event["event_id"],
+                    room=event.get("room", "không xác định")
+                )
+                print(f"[scheduler] Retry call for CRITICAL event {event['event_id']}")
+
+    except Exception as e:
+        print(f"Error in retry_critical_calls: {e}")
+
+
 async def run_escalation(event: dict) -> None:
     """
     Escalate the alert to backup contacts in order of priority.

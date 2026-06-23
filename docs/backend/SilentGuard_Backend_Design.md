@@ -999,14 +999,15 @@ async def run_escalation(event):
         await notification_service.trigger_call(next_contact, event)
         await log_escalation(event.id, next_contact.id, channel="call")
 
-    # Xóa escalate_after để job không chạy lại lần sau
+     # Xóa escalate_after để job không chạy lại lần sau
     await update_event_escalate_after(event.id, None)
     await update_event_status(event.id, "escalated")
 ```
 
-> "Auto-call" thật cần tích hợp Twilio hoặc tương đương — để như interface `trigger_call()` implement sau (out of scope Sprint 1).
+> **Tích hợp Twilio Auto-call (Đã triển khai)**: Hệ thống đã tích hợp Twilio cho luồng cảnh báo `CRITICAL`. Khi sự cố `CRITICAL` xảy ra, hệ thống sẽ thực hiện cuộc gọi đồng thời tới tất cả số điện thoại liên hệ trong hộ gia đình (sử dụng TwiML với văn bản không dấu để hỗ trợ Text-to-Speech tốt nhất).
 
 ---
+
 
 ## 7. Notification Service (FCM)
 
@@ -1102,9 +1103,10 @@ async def parse_config(message: str) -> ParsedConfig:
 | Job | Tần suất | Nhiệm vụ |
 |---|---|---|
 | `periodic_check_job` | mỗi 1 phút | ① Kiểm tra `cameras.last_heartbeat` offline > 5 phút; ② Check `events.escalate_after <= now()` và escalate nếu cần |
+| `retry_critical_calls` | mỗi 2 phút | Tìm kiếm sự kiện `CRITICAL` đang ở trạng thái `pending` được tạo > 2 phút trước và tự động thực hiện cuộc gọi lại qua Twilio nếu chưa được xác nhận (Acknowledge) |
 | `daily_report_job` | 1 lần/ngày (23:00) | Tổng hợp `events` trong ngày → gọi LLM → lưu `daily_reports` |
 
-Dùng **APScheduler** (chạy trong cùng FastAPI process cho MVP) với 2 interval jobs.
+Dùng **APScheduler** (chạy trong cùng FastAPI process cho MVP) với các interval jobs.
 
 ---
 
@@ -1155,6 +1157,9 @@ FIREBASE_SERVICE_ACCOUNT_JSON={"type":"service_account",...}
 FIREBASE_SERVICE_ACCOUNT_PATH=./firebase-service-account.json
 OPENAI_API_KEY=xxxx
 APP_ENV=development
+TWILIO_ACCOUNT_SID=ACxxxxxxxxxxxx
+TWILIO_AUTH_TOKEN=xxxxxxxxxxxx
+TWILIO_PHONE_NUMBER=+1xxxxxxxxxx
 ```
 
 ---

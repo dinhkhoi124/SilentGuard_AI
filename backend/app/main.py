@@ -16,7 +16,7 @@ from app.api.users import router as users_router
 from app.api.settings import router as settings_router
 from app.api.reports import router as reports_router
 from app.api.households import router as households_router
-from app.services.scheduler import periodic_check_job
+from app.services.scheduler import periodic_check_job, retry_critical_calls
 
 # Load environment variables
 load_dotenv()
@@ -25,6 +25,7 @@ load_dotenv()
 async def lifespan(app: FastAPI):
     scheduler = AsyncIOScheduler()
     scheduler.add_job(periodic_check_job, 'interval', minutes=1)
+    scheduler.add_job(retry_critical_calls, 'interval', minutes=2)
     scheduler.start()
     yield
     scheduler.shutdown()

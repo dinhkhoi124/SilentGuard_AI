@@ -749,3 +749,18 @@ Khi API gặp lỗi xử lý, Backend sẽ trả về định dạng JSON chuẩ
   }
 }
 ```
+
+---
+
+## 5. Cơ Chế Cuộc Gọi Khẩn Cấp Tự Động (Auto-Call) & Leo Thang Cảnh Báo
+
+Để đảm bảo an toàn tối đa cho người cao tuổi, hệ thống tích hợp cơ chế tự động gọi điện thoại qua Twilio đối với các cảnh báo khẩn cấp:
+
+### 5.1 Xử lý đối với sự kiện CRITICAL (Cực kỳ nguy hiểm)
+1. **Cuộc gọi tự động tức thì**: Ngay khi hệ thống phát hiện sự cố `CRITICAL` (ví dụ: bất động trên 5 phút), backend sẽ tự động thực hiện cuộc gọi Twilio đồng thời tới số điện thoại của **tất cả thành viên liên hệ (contacts)** trong gia đình.
+2. **Cơ chế gọi lại tự động (Retry Job)**: Nếu sự kiện vẫn ở trạng thái `pending` (người nhà chưa bấm Xác nhận hoặc Bỏ qua trên ứng dụng), sau mỗi 2 phút, backend sẽ tự động thực hiện cuộc gọi lại cho toàn bộ liên hệ trong gia đình cho đến khi cảnh báo được xử lý.
+
+### 5.2 Xử lý leo thang đối với sự kiện HIGH (Nguy hiểm)
+1. **Thông báo đẩy (Push Notification)**: Gửi cảnh báo tức thì tới người liên hệ chính (Primary Contact).
+2. **Leo thang sau 3 phút**: Nếu sau 3 phút kể từ khi phát hiện sự kiện mà người liên hệ chính chưa xác nhận, hệ thống sẽ thực hiện cuộc gọi VoIP (Twilio) tới người liên hệ phụ tiếp theo (contacts[1]) để cảnh báo.
+

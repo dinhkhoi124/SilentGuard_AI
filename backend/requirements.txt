@@ -7,3 +7,5 @@ apscheduler
 openai
 pydantic
 python-multipart
+twilio
+

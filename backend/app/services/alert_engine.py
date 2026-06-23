@@ -107,6 +107,26 @@ async def process_event(event_data: dict) -> None:
     else:
         print(f"[Alert Engine] WARNING: No emergency contacts found for household_id: {household_id}")
 
+    if severity == "CRITICAL":
+        # Lấy số điện thoại của tất cả contacts trong household
+        contacts_res = supabase.table("contacts")\
+            .select("phone")\
+            .eq("household_id", household_id)\
+            .execute()
+        
+        phone_numbers = [
+            c["phone"] for c in contacts_res.data 
+            if c.get("phone")
+        ]
+        
+        if phone_numbers:
+            from app.services.call_service import make_calls
+            make_calls(
+                phone_numbers=phone_numbers,
+                event_id=event_data["event_id"],
+                room=event_data.get("room", "không xác định")
+            )
+
     # 5. Set escalate_after cho các sự kiện khẩn cấp
     created_at_str = event_data.get("created_at") or datetime.now().isoformat()
     try:

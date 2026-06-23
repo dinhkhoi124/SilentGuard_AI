@@ -14,6 +14,7 @@ class Settings:
     TWILIO_ACCOUNT_SID: str = os.getenv("TWILIO_ACCOUNT_SID", "")
     TWILIO_AUTH_TOKEN: str = os.getenv("TWILIO_AUTH_TOKEN", "")
     TWILIO_PHONE_NUMBER: str = os.getenv("TWILIO_PHONE_NUMBER", "")
+    TWILIO_FLOW_SID: str = os.getenv("TWILIO_FLOW_SID", "")
 
 settings = Settings()
 

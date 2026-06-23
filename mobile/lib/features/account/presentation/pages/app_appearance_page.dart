@@ -21,7 +21,7 @@ class AppAppearancePage extends StatelessWidget {
             child: Column(
               children: [
                 _AppearanceHeader(onBack: () => context.pop()),
-                const SizedBox(height: 34),
+                const SizedBox(height: 22),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 24),
                   child: Column(
@@ -178,7 +178,7 @@ class _SettingRow extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: SizedBox(
-        height: 82,
+        height: 42,
         child: Row(
           children: [
             Expanded(

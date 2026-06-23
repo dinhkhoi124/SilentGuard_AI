@@ -150,36 +150,21 @@ class _NotificationCard extends StatelessWidget {
 
     return Material(
       color: AppColors.surface,
-      borderRadius: BorderRadius.circular(22),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(22),
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(
-              color: notification.isRead
-                  ? AppColors.border.withValues(alpha: 0.55)
-                  : accent.withValues(alpha: 0.25),
-            ),
-            boxShadow: const [
-              BoxShadow(
-                color: AppColors.shadow,
-                blurRadius: 20,
-                offset: Offset(0, 10),
-              ),
-            ],
-          ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
-                width: 44,
-                height: 44,
+                width: 52,
+                height: 52,
                 decoration: BoxDecoration(
-                  color: accent.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(16),
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: AppColors.border.withValues(alpha: 0.75),
+                  ),
                 ),
                 child: Icon(
                   _severityIcon(notification),
@@ -189,67 +174,67 @@ class _NotificationCard extends StatelessWidget {
               ),
               const SizedBox(width: 14),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: Text(
-                            notification.displayTitle,
-                            style: TextStyle(
-                              color: AppColors.darkText,
-                              fontSize: 16,
-                              height: 1.25,
-                              fontWeight: notification.isRead
-                                  ? FontWeight.w700
-                                  : FontWeight.w800,
-                            ),
-                          ),
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        notification.displayTitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: AppColors.darkText,
+                          fontSize: 16,
+                          height: 1.25,
+                          fontWeight: notification.isRead
+                              ? FontWeight.w700
+                              : FontWeight.w800,
                         ),
-                        if (!notification.isRead) ...[
-                          const SizedBox(width: 8),
-                          const DecoratedBox(
-                            decoration: BoxDecoration(
-                              color: AppColors.badgeRed,
-                              shape: BoxShape.circle,
-                            ),
-                            child: SizedBox(width: 9, height: 9),
-                          ),
-                        ],
-                      ],
-                    ),
-                    const SizedBox(height: 7),
-                    Text(
-                      notification.displayBody,
-                      style: const TextStyle(
-                        color: AppColors.mutedText,
-                        fontSize: 14,
-                        height: 1.38,
-                        fontWeight: FontWeight.w500,
                       ),
-                    ),
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        _MetaPill(
-                          icon: Iconsax.clock,
-                          label: _formatReceivedAt(notification.receivedAt),
+                      const SizedBox(height: 6),
+                      Text(
+                        notification.displayBody,
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: AppColors.mutedText,
+                          fontSize: 14,
+                          height: 1.4,
+                          fontWeight: FontWeight.w500,
                         ),
-                        _MetaPill(
-                          icon: Iconsax.location,
-                          label: notification.displayRoom,
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        _formatReceivedAt(notification.receivedAt),
+                        style: const TextStyle(
+                          color: AppColors.mutedText,
+                          fontSize: 12,
+                          height: 1.2,
+                          fontWeight: FontWeight.w600,
                         ),
-                        _SeverityBadge(
-                          label: notification.displaySeverity,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Padding(
+                padding: const EdgeInsets.only(top: 5),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (!notification.isRead) ...[
+                      DecoratedBox(
+                        decoration: BoxDecoration(
                           color: accent,
+                          shape: BoxShape.circle,
                         ),
-                      ],
-                    ),
+                        child: const SizedBox(width: 9, height: 9),
+                      ),
+                      const SizedBox(width: 14),
+                    ],
+
                   ],
                 ),
               ),

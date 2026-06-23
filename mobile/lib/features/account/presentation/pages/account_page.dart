@@ -344,6 +344,48 @@ class _AccountMenuTile extends StatelessWidget {
 class _LogoutTile extends StatelessWidget {
   const _LogoutTile();
 
+  Future<void> _confirmAndLogout(BuildContext context) async {
+    
+    final confirmed = await showDialog<bool>(
+      
+      context: context, 
+      builder: (ctx) => AlertDialog(
+        
+        title: const Text('Đăng xuất'), 
+        content: const Text(
+          'Bạn có chắc muốn đăng xuất không?',
+        ), 
+        actions: [
+          
+          TextButton(
+            
+            onPressed: () =>
+                Navigator.of(ctx).pop(false), 
+            child: const Text('Không'), 
+          ), 
+          FilledButton(
+            
+            style: FilledButton.styleFrom(
+              
+              backgroundColor: Theme.of(
+                ctx,
+              ).colorScheme.error, 
+            ), 
+            onPressed: () =>
+                Navigator.of(ctx).pop(true), 
+            child: const Text('Có'), 
+          ), 
+        ], 
+      ), 
+    ); 
+    if (confirmed == true && context.mounted) {
+      
+      context.read<AuthBloc>().add(
+        const AuthSignOutRequested(),
+      ); 
+    } 
+  } 
+
   @override
   Widget build(BuildContext context) {
     final isLoading = context.select<AuthBloc, bool>(
@@ -354,7 +396,7 @@ class _LogoutTile extends StatelessWidget {
       borderRadius: BorderRadius.circular(18),
       onTap: isLoading
           ? null
-          : () => context.read<AuthBloc>().add(const AuthSignOutRequested()),
+          : () => _confirmAndLogout(context), // FIX: logout confirmation dialog
       child: Row(
         children: [
           SizedBox(

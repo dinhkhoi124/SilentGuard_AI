@@ -125,13 +125,15 @@ async def retry_critical_calls():
             
             # Lấy contacts
             contacts_res = supabase.table("contacts")\
-                .select("phone")\
+                .select("user_id, priority_order, users(phone)")\
                 .eq("household_id", household_id)\
+                .order("priority_order")\
                 .execute()
             
             phone_numbers = [
-                c["phone"] for c in contacts_res.data 
-                if c.get("phone")
+                c["users"]["phone"] 
+                for c in contacts_res.data 
+                if c.get("users") and c["users"].get("phone")
             ]
             
             if phone_numbers:

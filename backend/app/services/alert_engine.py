@@ -110,13 +110,15 @@ async def process_event(event_data: dict) -> None:
     if severity == "CRITICAL":
         # Lấy số điện thoại của tất cả contacts trong household
         contacts_res = supabase.table("contacts")\
-            .select("phone")\
+            .select("user_id, priority_order, users(phone)")\
             .eq("household_id", household_id)\
+            .order("priority_order")\
             .execute()
         
         phone_numbers = [
-            c["phone"] for c in contacts_res.data 
-            if c.get("phone")
+            c["users"]["phone"] 
+            for c in contacts_res.data 
+            if c.get("users") and c["users"].get("phone")
         ]
         
         if phone_numbers:
@@ -126,6 +128,7 @@ async def process_event(event_data: dict) -> None:
                 event_id=event_data["event_id"],
                 room=event_data.get("room", "không xác định")
             )
+
 
     # 5. Set escalate_after cho các sự kiện khẩn cấp
     created_at_str = event_data.get("created_at") or datetime.now().isoformat()

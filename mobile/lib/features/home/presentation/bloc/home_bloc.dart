@@ -29,25 +29,37 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
   final GetCameraDevices getCameraDevices;
   final DeleteCameraDevice deleteCameraDevice;
   List<CameraDevice> _activeDevices = [];
+  int _loadGeneration = 0;
 
   Future<void> _loadHome(Emitter<HomeState> emit) async {
+    final generation = ++_loadGeneration;
     emit(const HomeLoading());
-    final weatherResult = await getWeather();
 
-    await weatherResult.fold((failure) async => emit(HomeError(failure)), (
-      weather,
-    ) async {
-      final deviceResult = await getCameraDevices();
-      deviceResult.fold((failure) => emit(HomeError(failure)), (devices) {
-        _activeDevices = List.of(devices);
-        emit(
-          HomeLoaded(
-            weather: weather,
-            devices: List.unmodifiable(_activeDevices),
-            selectedRoom: 'All Rooms',
-          ),
-        );
-      });
+    final weatherFuture = getWeather();
+    final deviceResult = await getCameraDevices();
+    var devicesLoaded = false;
+    deviceResult.fold((failure) => emit(HomeError(failure)), (devices) {
+      devicesLoaded = true;
+      _activeDevices = List.of(devices);
+      emit(
+        HomeLoaded(
+          weather: null,
+          devices: List.unmodifiable(_activeDevices),
+          selectedRoom: 'All Rooms',
+        ),
+      );
+    });
+
+    if (!devicesLoaded || generation != _loadGeneration) return;
+
+    final weatherResult = await weatherFuture;
+    if (generation != _loadGeneration) return;
+
+    weatherResult.fold((_) {}, (weather) {
+      if (weather == null) return;
+      final currentState = state;
+      if (currentState is! HomeLoaded) return;
+      emit(currentState.copyWith(weather: weather));
     });
   }
 

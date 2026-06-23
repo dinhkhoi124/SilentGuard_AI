@@ -1,14 +1,20 @@
 import 'package:dartz/dartz.dart';
 import 'package:mobile/features/devices/domain/repositories/device_repository.dart';
+import 'package:mobile/features/home/data/datasources/weather_remote_data_source.dart';
 import 'package:mobile/features/home/domain/entities/camera_device.dart';
 import 'package:mobile/features/home/domain/entities/device.dart';
 import 'package:mobile/features/home/domain/entities/weather_info.dart';
 import 'package:mobile/features/home/domain/repositories/home_repository.dart';
 
 class HomeRepositoryImpl implements HomeRepository {
-  const HomeRepositoryImpl(this._deviceRepository);
+  const HomeRepositoryImpl({
+    required DeviceRepository deviceRepository,
+    required WeatherRemoteDataSource weatherRemoteDataSource,
+  }) : _deviceRepository = deviceRepository,
+       _weatherRemoteDataSource = weatherRemoteDataSource;
 
   final DeviceRepository _deviceRepository;
+  final WeatherRemoteDataSource _weatherRemoteDataSource;
 
   @override
   Future<Either<String, List<Device>>> getDevices() async {
@@ -32,6 +38,7 @@ class HomeRepositoryImpl implements HomeRepository {
 
   @override
   Future<Either<String, WeatherInfo?>> getWeather() async {
-    return const Right(null);
+    final weather = await _weatherRemoteDataSource.getCurrentWeather();
+    return Right(weather);
   }
 }

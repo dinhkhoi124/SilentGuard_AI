@@ -118,7 +118,7 @@ class ApiClient {
     return {
       'Accept': 'application/json',
       'Content-Type': 'application/json',
-      if (extraHeaders != null) ...extraHeaders,
+      ...?extraHeaders,
     };
   }
 

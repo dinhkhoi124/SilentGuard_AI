@@ -131,6 +131,6 @@ class MainActivity : FlutterActivity() {
 
     private companion object {
         const val TAG = "MainActivity"
-        const val MEDIA_KIT_CHANNEL = "smartify/media_kit"
+        const val MEDIA_KIT_CHANNEL = "SlientGuard/media_kit"
     }
 }

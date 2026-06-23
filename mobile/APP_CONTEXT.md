@@ -1,10 +1,10 @@
-# Smartify App Context
+# SlientGuard App Context
 
 Tài liệu này tóm tắt trạng thái hiện tại của ứng dụng Flutter `mobile/` để dùng làm handover note cho các lần phát triển tiếp theo.
 
 ## 1. App đang làm gì
 
-Smartify là ứng dụng Flutter dành cho gia đình/caregiver dùng để:
+SlientGuard là ứng dụng Flutter dành cho gia đình/caregiver dùng để:
 
 - Đăng nhập bằng Firebase Auth.
 - Đồng bộ phiên người dùng với backend FastAPI SilentGuard.
@@ -123,7 +123,7 @@ Quy trình đăng xuất diễn ra tuần tự:
 ### Phát video trực tiếp (Live Stream)
 - Sử dụng thư viện `media_kit` để phát video.
 - Bản tin URL stream được gửi trực tiếp vào player.
-- **Khắc phục lỗi xung đột âm thanh trên Android**: Nhằm tránh tình trạng lỗi driver âm thanh hoặc ứng dụng bị crash khi khởi động cùng Firebase/FCM, các plugin của `media_kit` được loại bỏ khỏi cấu hình tự động đăng ký của Flutter Engine tại `MainActivity.kt`. Thay vào đó, chúng được đăng ký động thông qua MethodChannel `smartify/media_kit` khi `CameraLivePreview` bắt đầu tải luồng video thực tế (`_openStreamWhenReady`).
+- **Khắc phục lỗi xung đột âm thanh trên Android**: Nhằm tránh tình trạng lỗi driver âm thanh hoặc ứng dụng bị crash khi khởi động cùng Firebase/FCM, các plugin của `media_kit` được loại bỏ khỏi cấu hình tự động đăng ký của Flutter Engine tại `MainActivity.kt`. Thay vào đó, chúng được đăng ký động thông qua MethodChannel `SlientGuard/media_kit` khi `CameraLivePreview` bắt đầu tải luồng video thực tế (`_openStreamWhenReady`).
 
 ### Chụp ảnh xem trước (Thumbnail Capture)
 - Khi rời khỏi màn hình chi tiết camera (`CameraDetailPage`), trình phát sẽ chụp lại khung hình cuối cùng của luồng phát trực tiếp (`player.screenshot()`).
@@ -188,4 +188,4 @@ Quy trình đăng xuất diễn ra tuần tự:
 
 ## 14. Tóm tắt một câu
 
-Smartify là ứng dụng Flutter tối ưu luồng khởi động (gắn chặt native splash với trạng thái auth), sử dụng Firebase kết hợp đồng bộ session backend, hỗ trợ xem luồng camera live stream qua Imou Cloud bằng `media_kit` (đã sửa lỗi âm thanh Android), tự động chụp thumbnail cập nhật trang chủ, và tích hợp tính năng tải lên video để phân tích sự kiện bất thường.
+SlientGuard là ứng dụng Flutter tối ưu luồng khởi động (gắn chặt native splash với trạng thái auth), sử dụng Firebase kết hợp đồng bộ session backend, hỗ trợ xem luồng camera live stream qua Imou Cloud bằng `media_kit` (đã sửa lỗi âm thanh Android), tự động chụp thumbnail cập nhật trang chủ, và tích hợp tính năng tải lên video để phân tích sự kiện bất thường.

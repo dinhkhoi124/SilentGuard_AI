@@ -43,7 +43,7 @@ class FcmService {
         'cameraId=${alert.cameraId}.',
         name: 'FcmService',
       );
-      notificationsCubit.receiveForegroundAlert(alert);
+      notificationsCubit.receiveForegroundMessage(message);
     });
 
     _openedSubscription = FirebaseMessaging.onMessageOpenedApp.listen((
@@ -55,7 +55,7 @@ class FcmService {
         'cameraId=${alert.cameraId}.',
         name: 'FcmService',
       );
-      notificationsCubit.receiveOpenedAlert(alert);
+      notificationsCubit.receiveOpenedMessage(message);
       onNotificationTap(alert);
     });
 
@@ -177,8 +177,10 @@ class FcmService {
   NotificationAlert _alertFromMessage(RemoteMessage message) {
     return NotificationAlert.fromPayload(
       Map<String, dynamic>.from(message.data),
+      messageId: message.messageId,
       title: message.notification?.title,
       body: message.notification?.body,
+      receivedAt: message.sentTime,
     );
   }
 

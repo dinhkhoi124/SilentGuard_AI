@@ -238,7 +238,7 @@ class CameraCard extends StatelessWidget {
           ),
           SizedBox(height: 4),
           Text(
-            'SmartiFy',
+            'SlientGuard',
             style: TextStyle(
               fontFamily: 'Syne Mono',
               fontSize: 11,

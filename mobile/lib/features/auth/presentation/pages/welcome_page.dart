@@ -9,6 +9,8 @@ import 'package:mobile/features/auth/presentation/bloc/auth_event.dart';
 import 'package:mobile/features/auth/presentation/bloc/auth_state.dart';
 import 'package:mobile/features/auth/presentation/widgets/app_logo.dart';
 
+enum _AuthLoadingAction { email, google }
+
 class WelcomePage extends StatefulWidget {
   const WelcomePage({super.key});
 
@@ -20,6 +22,7 @@ class _WelcomePageState extends State<WelcomePage> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
+  _AuthLoadingAction? _loadingAction;
 
   @override
   void dispose() {
@@ -29,6 +32,7 @@ class _WelcomePageState extends State<WelcomePage> {
   }
 
   void _handleSignIn() {
+    setState(() => _loadingAction = _AuthLoadingAction.email);
     context.read<AuthBloc>().add(
       AuthSignInRequested(
         email: _emailController.text,
@@ -41,6 +45,9 @@ class _WelcomePageState extends State<WelcomePage> {
   Widget build(BuildContext context) {
     return BlocConsumer<AuthBloc, AuthState>(
       listener: (context, state) {
+        if (state is! AuthLoading && state is! AuthProvisioning) {
+          setState(() => _loadingAction = null);
+        }
         if (state is AuthFailure) {
           ScaffoldMessenger.of(context)
             ..hideCurrentSnackBar()
@@ -54,6 +61,10 @@ class _WelcomePageState extends State<WelcomePage> {
       },
       builder: (context, state) {
         final isLoading = state is AuthLoading || state is AuthProvisioning;
+        final isEmailLoading =
+            isLoading && _loadingAction == _AuthLoadingAction.email;
+        final isGoogleLoading =
+            isLoading && _loadingAction == _AuthLoadingAction.google;
 
         return Scaffold(
           backgroundColor: AppColors.surface,
@@ -156,7 +167,7 @@ class _WelcomePageState extends State<WelcomePage> {
                                   vertical: 18,
                                 ),
                               ),
-                              child: isLoading
+                              child: isEmailLoading
                                   ? const SizedBox.square(
                                       dimension: 22,
                                       child: CircularProgressIndicator(
@@ -171,12 +182,18 @@ class _WelcomePageState extends State<WelcomePage> {
                           const _DividerLabel('hoặc'),
                           const SizedBox(height: 16),
                           _GoogleButton(
-                            isLoading: isLoading,
+                            isLoading: isGoogleLoading,
                             onPressed: isLoading
                                 ? null
-                                : () => context.read<AuthBloc>().add(
-                                    const AuthGoogleSignInRequested(),
-                                  ),
+                                : () {
+                                    setState(
+                                      () => _loadingAction =
+                                          _AuthLoadingAction.google,
+                                    );
+                                    context.read<AuthBloc>().add(
+                                      const AuthGoogleSignInRequested(),
+                                    );
+                                  },
                           ),
                           const SizedBox(height: 26),
                           Row(

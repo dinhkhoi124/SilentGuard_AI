@@ -115,13 +115,12 @@ class _HomePageState extends State<HomePage> {
                 _TopBarButton(
                   icon: Iconsax.notification,
                   tooltip: 'Thông báo',
-                  hasBadge: context.select(
-                    (NotificationsCubit cubit) => cubit.state.hasUnread,
-                  ),
-                  onPressed: () {
-                    context.read<NotificationsCubit>().markAllRead();
-                    context.read<HomeBloc>().add(const NotificationTapped());
-                  },
+                  badgeLabel: context.select((NotificationsCubit cubit) {
+                    final count = cubit.state.unreadCount;
+                    if (count == 0) return null;
+                    return count > 9 ? '9+' : count.toString();
+                  }),
+                  onPressed: () => context.push('/notifications'),
                 ),
                 const SizedBox(width: 14),
               ],
@@ -194,7 +193,7 @@ class _HomePageState extends State<HomePage> {
                   label: 'Xem',
                   textColor: Colors.white,
                   onPressed: () {
-                    context.read<NotificationsCubit>().markAllRead();
+                    context.read<NotificationsCubit>().markRead(alert.id);
                     context.go('/camera/${Uri.encodeComponent(cameraId)}');
                   },
                 ),
@@ -473,13 +472,13 @@ class _TopBarButton extends StatelessWidget {
     required this.icon,
     required this.tooltip,
     required this.onPressed,
-    this.hasBadge = false,
+    this.badgeLabel,
   });
 
   final IconData icon;
   final String tooltip;
   final VoidCallback onPressed;
-  final bool hasBadge;
+  final String? badgeLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -496,19 +495,31 @@ class _TopBarButton extends StatelessWidget {
         clipBehavior: Clip.none,
         children: [
           Icon(icon, size: 21),
-          if (hasBadge)
-            const Positioned(
-              right: -2,
-              top: -2,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
+          if (badgeLabel != null)
+            Positioned(
+              right: -8,
+              top: -8,
+              child: Container(
+                constraints: const BoxConstraints(minWidth: 18),
+                height: 18,
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                alignment: Alignment.center,
+                decoration: const BoxDecoration(
                   color: AppColors.badgeRed,
-                  shape: BoxShape.circle,
+                  borderRadius: BorderRadius.all(Radius.circular(9)),
                   border: Border.fromBorderSide(
                     BorderSide(color: Colors.white, width: 1.5),
                   ),
                 ),
-                child: SizedBox(width: 9, height: 9),
+                child: Text(
+                  badgeLabel!,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 9,
+                    fontWeight: FontWeight.w800,
+                    height: 1,
+                  ),
+                ),
               ),
             ),
         ],

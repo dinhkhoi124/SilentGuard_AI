@@ -142,7 +142,7 @@ class CameraLivePreview extends StatefulWidget {
 }
 
 class _CameraLivePreviewState extends State<CameraLivePreview> {
-  static const _mediaKitChannel = MethodChannel('smartify/media_kit');
+  static const _mediaKitChannel = MethodChannel('SlientGuard/media_kit');
   static bool _mediaKitInitialized = false;
   static bool _nativeMediaKitRegistered = false;
 

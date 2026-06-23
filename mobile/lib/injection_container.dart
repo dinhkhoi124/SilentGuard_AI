@@ -11,6 +11,7 @@ import 'package:mobile/core/router/auth_notifier.dart';
 import 'package:mobile/core/services/fcm_service.dart';
 import 'package:mobile/core/services/local_notification_service.dart';
 import 'package:mobile/core/services/onboarding_service.dart';
+import 'package:mobile/core/theme/theme_controller.dart';
 import 'package:mobile/features/auth/data/datasources/firebase_auth_datasource.dart';
 import 'package:mobile/features/auth/data/repositories/auth_repository_impl.dart';
 import 'package:mobile/features/auth/domain/repositories/auth_repository.dart';
@@ -27,6 +28,7 @@ import 'package:mobile/features/devices/domain/repositories/imou_stream_reposito
 import 'package:mobile/features/devices/presentation/bloc/device_pairing_bloc.dart';
 import 'package:mobile/features/home/data/repositories/home_repository_impl.dart';
 import 'package:mobile/features/home/data/datasources/alert_review_remote_data_source.dart';
+import 'package:mobile/features/home/data/datasources/weather_remote_data_source.dart';
 import 'package:mobile/features/home/data/repositories/alert_review_repository_impl.dart';
 import 'package:mobile/features/home/domain/repositories/home_repository.dart';
 import 'package:mobile/features/home/domain/repositories/alert_review_repository.dart';
@@ -37,6 +39,7 @@ import 'package:mobile/features/home/domain/usecases/get_weather.dart';
 import 'package:mobile/features/home/domain/usecases/review_alert.dart';
 import 'package:mobile/features/home/presentation/bloc/home_bloc.dart';
 import 'package:mobile/features/home/presentation/cubit/alert_review_cubit.dart';
+import 'package:mobile/features/notifications/data/datasources/notification_local_data_source.dart';
 import 'package:mobile/features/notifications/presentation/cubit/notifications_cubit.dart';
 import 'package:mobile/features/session/data/datasources/session_remote_datasource.dart';
 import 'package:mobile/features/session/data/repositories/session_repository_impl.dart';
@@ -62,6 +65,7 @@ Future<void> init() async {
     ..registerLazySingleton(() => ApiClient(client: sl()))
     ..registerLazySingleton(SharedPreferencesAsync.new)
     ..registerLazySingleton(() => OnboardingService(sl()))
+    ..registerLazySingleton(() => ThemeController(sl()))
     ..registerLazySingleton(() => GoogleSignIn.instance)
     ..registerLazySingleton<FirebaseAuthDataSource>(
       () => FirebaseAuthDataSourceImpl(firebaseAuth: sl(), googleSignIn: sl()),
@@ -87,7 +91,8 @@ Future<void> init() async {
     ..registerLazySingleton(
       () => FcmService(apiClient: sl(), firebaseAuth: sl(), messaging: sl()),
     )
-    ..registerLazySingleton(NotificationsCubit.new)
+    ..registerLazySingleton(() => NotificationLocalDataSource(sl()))
+    ..registerLazySingleton(() => NotificationsCubit(sl()))
     ..registerFactory(
       () => AuthBloc(
         authRepository: sl(),
@@ -138,7 +143,15 @@ Future<void> init() async {
     ..registerLazySingleton(() => GetCameraDevices(sl()))
     ..registerLazySingleton(() => DeleteCameraDevice(sl()))
     ..registerLazySingleton(() => GetWeather(sl()))
-    ..registerLazySingleton<HomeRepository>(() => HomeRepositoryImpl(sl()));
+    ..registerLazySingleton<WeatherRemoteDataSource>(
+      OpenMeteoWeatherRemoteDataSource.new,
+    )
+    ..registerLazySingleton<HomeRepository>(
+      () => HomeRepositoryImpl(
+        deviceRepository: sl(),
+        weatherRemoteDataSource: sl(),
+      ),
+    );
   sl
     ..registerLazySingleton<AlertReviewRemoteDataSource>(
       () => AlertReviewRemoteDataSourceImpl(sl()),

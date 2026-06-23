@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:mobile/core/utils/app_colors.dart';
 import 'package:mobile/features/auth/domain/entities/app_user.dart';
@@ -104,9 +105,10 @@ class _AccountPageState extends State<AccountPage> {
                       icon: Iconsax.link,
                       title: 'Tài khoản liên kết',
                     ),
-                    const _AccountMenuTile(
+                    _AccountMenuTile(
                       icon: Iconsax.eye,
                       title: 'Giao diện ứng dụng',
+                      onTap: () => context.push('/app-appearance'),
                     ),
                     const _AccountMenuTile(
                       icon: Iconsax.setting_2,
@@ -214,7 +216,7 @@ class _ProfileHeader extends StatelessWidget {
       if (localPart.isNotEmpty) return localPart;
     }
 
-    return 'Người dùng Smartify';
+    return 'Người dùng SlientGuard';
   }
 }
 
@@ -287,16 +289,17 @@ class _SectionLabel extends StatelessWidget {
 }
 
 class _AccountMenuTile extends StatelessWidget {
-  const _AccountMenuTile({required this.icon, required this.title});
+  const _AccountMenuTile({required this.icon, required this.title, this.onTap});
 
   final IconData icon;
   final String title;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     return InkWell(
       borderRadius: BorderRadius.circular(18),
-      onTap: () {},
+      onTap: onTap,
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 15),
         child: Row(
@@ -417,7 +420,7 @@ class _LogoutProgressDialog extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               const Text(
-                'Smartify đang kết thúc phiên làm việc của bạn.',
+                'SlientGuard đang kết thúc phiên làm việc của bạn.',
                 style: TextStyle(
                   color: AppColors.mutedText,
                   fontSize: 14,

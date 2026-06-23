@@ -12,7 +12,9 @@ import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:mobile/core/bootstrap/app_initializer.dart';
 import 'package:mobile/core/router/app_router.dart';
 import 'package:mobile/core/theme/app_theme.dart';
+import 'package:mobile/core/theme/theme_controller.dart';
 import 'package:mobile/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:mobile/features/notifications/data/datasources/notification_local_data_source.dart';
 import 'package:mobile/features/notifications/presentation/cubit/notifications_cubit.dart';
 import 'package:mobile/features/video_upload/presentation/bloc/video_upload_bloc.dart';
 import 'package:mobile/firebase_options.dart';
@@ -24,6 +26,7 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     ).timeout(const Duration(seconds: 5));
+    await NotificationLocalDataSource.saveBackgroundMessage(message);
     developer.log(
       'Background FCM received: messageId=${message.messageId}, '
       'data=${message.data}.',
@@ -58,6 +61,7 @@ Future<void> main() async {
     Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform),
   ]);
   await di.init();
+  await di.sl<ThemeController>().load();
 
   final appRouter = AppRouter(di.sl());
 
@@ -130,17 +134,27 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final themeController = di.sl<ThemeController>();
+
     return MultiBlocProvider(
       providers: [
         BlocProvider(create: (_) => di.sl<AuthBloc>()),
         BlocProvider(create: (_) => di.sl<VideoUploadBloc>()),
         BlocProvider.value(value: di.sl<NotificationsCubit>()),
       ],
-      child: MaterialApp.router(
-        title: 'WatchNest',
-        debugShowCheckedModeBanner: false,
-        theme: AppTheme.light,
-        routerConfig: appRouter.router,
+      child: AnimatedBuilder(
+        animation: themeController,
+        builder: (context, _) {
+          return MaterialApp.router(
+            title: 'WatchNest',
+            debugShowCheckedModeBanner: false,
+            theme: AppTheme.light,
+            darkTheme: AppTheme.dark,
+            themeMode: themeController.themeMode,
+            locale: const Locale('vi', 'VN'),
+            routerConfig: appRouter.router,
+          );
+        },
       ),
     );
   }

@@ -269,7 +269,7 @@ class _DotIndicator extends StatelessWidget {
             margin: const EdgeInsets.symmetric(horizontal: 4),
             decoration: BoxDecoration(
               color: index == selectedIndex
-                  ? AppColors.destructive
+                  ? AppColors.primary
                   : AppColors.mutedText,
               borderRadius: BorderRadius.circular(3),
             ),

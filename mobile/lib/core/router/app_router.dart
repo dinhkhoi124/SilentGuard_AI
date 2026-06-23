@@ -10,6 +10,7 @@ import 'package:mobile/core/widgets/wave_text_loader.dart';
 import 'package:mobile/features/auth/presentation/pages/signup_page.dart';
 import 'package:mobile/features/auth/presentation/pages/welcome_page.dart';
 import 'package:mobile/core/utils/app_colors.dart';
+import 'package:mobile/features/account/presentation/pages/app_appearance_page.dart';
 import 'package:mobile/features/devices/presentation/bloc/device_pairing_bloc.dart';
 import 'package:mobile/features/devices/presentation/bloc/device_pairing_event.dart';
 import 'package:mobile/features/devices/presentation/pages/device_pairing_page.dart';
@@ -18,6 +19,7 @@ import 'package:mobile/features/home/domain/usecases/get_camera_devices.dart';
 import 'package:mobile/features/home/presentation/bloc/home_bloc.dart';
 import 'package:mobile/features/home/presentation/pages/camera_detail_page.dart';
 import 'package:mobile/features/home/presentation/pages/home_page.dart';
+import 'package:mobile/features/notifications/presentation/pages/notifications_page.dart';
 import 'package:mobile/features/onboarding/presentation/pages/onboarding_page.dart';
 import 'package:mobile/injection_container.dart';
 
@@ -98,6 +100,14 @@ class AppRouter {
               sl<DevicePairingBloc>()..add(const DevicePairingStarted()),
           child: const DevicePairingPage(),
         ),
+      ),
+      GoRoute(
+        path: '/app-appearance',
+        builder: (context, state) => const AppAppearancePage(),
+      ),
+      GoRoute(
+        path: '/notifications',
+        builder: (context, state) => const NotificationsPage(),
       ),
       GoRoute(
         path: '/camera/:id',

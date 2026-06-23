@@ -44,13 +44,13 @@ class DevicePairingPage extends StatelessWidget {
               DevicePairingScanning() => const _ScannerView(),
               DevicePairingResolving() => const _ProgressView(
                 title: 'Đang xác minh thiết bị',
-                message: 'Smartify đang gửi mã QR đến máy chủ AI.',
+                message: 'SlientGuard đang gửi mã QR đến máy chủ AI.',
                 activeStep: 1,
               ),
               DevicePairingCheckingImou(:final resolvedDevice) => _ProgressView(
                 title: 'Đang kiểm tra Imou Cloud',
                 message:
-                    'Thiết bị ${resolvedDevice.displayName} đã được xác minh bởi Smartify.',
+                    'Thiết bị ${resolvedDevice.displayName} đã được xác minh bởi SlientGuard.',
                 activeStep: 2,
               ),
               DevicePairingObtainingStream(:final imouStatus) => _ProgressView(
@@ -89,7 +89,7 @@ class DevicePairingPage extends StatelessWidget {
                   title: 'Đã thêm camera',
                   message:
                       warningMessage ??
-                      '${device.name} đã sẵn sàng phát luồng trực tiếp trong Smartify.',
+                      '${device.name} đã sẵn sàng phát luồng trực tiếp trong SlientGuard.',
                   primaryLabel: 'Hoàn tất',
                   onPrimary: () => context.pop(device.toCameraDevice()),
                 ),

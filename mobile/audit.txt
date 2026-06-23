@@ -96,7 +96,7 @@ class _SignUpPageState extends State<SignUpPage> {
                     children: [
                       Flexible(
                         child: Text(
-                          'Tham gia Smartify',
+                          'Tham gia SlientGuard',
                           style: TextStyle(
                             color: AppColors.darkText,
                             fontSize: 26,
@@ -178,7 +178,7 @@ class _SignUpPageState extends State<SignUpPage> {
                                     decoration: TextDecoration.underline,
                                   ),
                                 ),
-                                TextSpan(text: ' của Smartify.'),
+                                TextSpan(text: ' của SlientGuard.'),
                               ],
                             ),
                           ),
@@ -2766,7 +2766,7 @@ class _ProfileHeader extends StatelessWidget {
       if (localPart.isNotEmpty) return localPart;
     }
 
-    return 'Người dùng Smartify';
+    return 'Người dùng SlientGuard';
   }
 }
 
@@ -2969,7 +2969,7 @@ class _LogoutProgressDialog extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               const Text(
-                'Smartify đang kết thúc phiên làm việc của bạn.',
+                'SlientGuard đang kết thúc phiên làm việc của bạn.',
                 style: TextStyle(
                   color: AppColors.mutedText,
                   fontSize: 14,
@@ -4206,7 +4206,7 @@ class CameraLivePreview extends StatefulWidget {
 }
 
 class _CameraLivePreviewState extends State<CameraLivePreview> {
-  static const _mediaKitChannel = MethodChannel('smartify/media_kit');
+  static const _mediaKitChannel = MethodChannel('SlientGuard/media_kit');
   static bool _mediaKitInitialized = false;
   static bool _nativeMediaKitRegistered = false;
 
@@ -6569,13 +6569,13 @@ class DevicePairingPage extends StatelessWidget {
               DevicePairingScanning() => const _ScannerView(),
               DevicePairingResolving() => const _ProgressView(
                 title: 'Đang xác minh thiết bị',
-                message: 'Smartify đang gửi mã QR đến máy chủ AI.',
+                message: 'SlientGuard đang gửi mã QR đến máy chủ AI.',
                 activeStep: 1,
               ),
               DevicePairingCheckingImou(:final resolvedDevice) => _ProgressView(
                 title: 'Đang kiểm tra Imou Cloud',
                 message:
-                    'Thiết bị ${resolvedDevice.displayName} đã được xác minh bởi Smartify.',
+                    'Thiết bị ${resolvedDevice.displayName} đã được xác minh bởi SlientGuard.',
                 activeStep: 2,
               ),
               DevicePairingObtainingStream(:final imouStatus) => _ProgressView(
@@ -6614,7 +6614,7 @@ class DevicePairingPage extends StatelessWidget {
                   title: 'Đã thêm camera',
                   message:
                       warningMessage ??
-                      '${device.name} đã sẵn sàng phát luồng trực tiếp trong Smartify.',
+                      '${device.name} đã sẵn sàng phát luồng trực tiếp trong SlientGuard.',
                   primaryLabel: 'Hoàn tất',
                   onPrimary: () => context.pop(device.toCameraDevice()),
                 ),

@@ -22,8 +22,16 @@ def make_calls(phone_numbers: list[str], event_id: str, room: str) -> dict:
 
     for phone in phone_numbers:
         try:
+            twiml = """
+<Response>
+    <Say language="vi-VN" voice="Google.vi-VN-Standard-A">{message}</Say>
+    <Pause length="1"/>
+    <Say language="vi-VN" voice="Google.vi-VN-Standard-A">{message}</Say>
+</Response>
+""".format(message=message)
+
             call = client.calls.create(
-                twiml=f"<Response><Say language='vi-VN'>{message}</Say><Pause length='2'/><Say language='vi-VN'>{message}</Say></Response>",
+                twiml=twiml,
                 to=phone,
                 from_=settings.TWILIO_PHONE_NUMBER,
                 timeout=30,

@@ -22,18 +22,26 @@ def make_calls(phone_numbers: list[str], event_id: str, room: str) -> dict:
 
     for phone in phone_numbers:
         try:
-            if not settings.TWILIO_FLOW_SID:
-                print("[call_service] TWILIO_FLOW_SID chưa được cấu hình, bỏ qua gọi")
-                continue
+            twiml = (
+                "<Response>"
+                "<Say language=\"vi-VN\" voice=\"Google.vi-VN-Standard-A\">"
+                f"{message}"
+                "</Say>"
+                "<Pause length=\"1\"/>"
+                "<Say language=\"vi-VN\" voice=\"Google.vi-VN-Standard-A\">"
+                f"{message}"
+                "</Say>"
+                "</Response>"
+            )
 
-            execution = client.studio.v2.flows(settings.TWILIO_FLOW_SID)\
-                .executions\
-                .create(
-                    to=phone,
-                    from_=settings.TWILIO_PHONE_NUMBER,
-                )
-            results[phone] = execution.sid
-            print(f"[call_service] Calling {phone}: {execution.sid}")
+            call = client.calls.create(
+                twiml=twiml,
+                to=phone,
+                from_=settings.TWILIO_PHONE_NUMBER,
+                timeout=30,
+            )
+            results[phone] = call.sid
+            print(f"[call_service] Calling {phone}: {call.sid}")
         except Exception as e:
             print(f"[call_service] Failed to call {phone}: {e}")
 

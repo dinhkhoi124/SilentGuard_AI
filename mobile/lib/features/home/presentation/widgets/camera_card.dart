@@ -26,6 +26,20 @@ class CameraCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final surfaceColor = isDark ? theme.colorScheme.surface : AppColors.surface;
+    final titleColor = isDark
+        ? theme.colorScheme.onSurface
+        : AppColors.darkText;
+    final mutedColor = isDark
+        ? theme.colorScheme.onSurfaceVariant
+        : AppColors.mutedText;
+    final actionBackground = isDark
+        ? theme.colorScheme.surfaceContainerHighest
+        : device.isArmed
+        ? AppColors.surfaceSoft
+        : AppColors.lightBlue;
     return GestureDetector(
       onTap: () => context.push(
         '/camera/${device.id}',
@@ -38,7 +52,7 @@ class CameraCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(18),
         child: DecoratedBox(
           decoration: BoxDecoration(
-            color: AppColors.surface,
+            color: surfaceColor,
             borderRadius: BorderRadius.circular(18),
             boxShadow: const [
               BoxShadow(
@@ -168,10 +182,10 @@ class CameraCard extends StatelessWidget {
                                 device.name,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 11,
                                   fontWeight: FontWeight.w700,
-                                  color: AppColors.darkText,
+                                  color: titleColor,
                                 ),
                               ),
                               const SizedBox(height: 2),
@@ -181,7 +195,7 @@ class CameraCard extends StatelessWidget {
                                   fontSize: 10,
                                   color: device.isArmed
                                       ? AppColors.safe
-                                      : AppColors.mutedText,
+                                      : mutedColor,
                                 ),
                               ),
                             ],
@@ -191,9 +205,7 @@ class CameraCard extends StatelessWidget {
                           width: 32,
                           height: 32,
                           decoration: BoxDecoration(
-                            color: device.isArmed
-                                ? AppColors.surfaceSoft
-                                : AppColors.lightBlue,
+                            color: actionBackground,
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: Icon(
@@ -202,7 +214,7 @@ class CameraCard extends StatelessWidget {
                                 : Icons.videocam_outlined,
                             size: 16,
                             color: device.isArmed
-                                ? AppColors.mutedText
+                                ? mutedColor
                                 : AppColors.primary,
                           ),
                         ),
@@ -231,11 +243,7 @@ class CameraCard extends StatelessWidget {
       child: const Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Icons.videocam_outlined,
-            size: 32,
-            color: Colors.white,
-          ),
+          Icon(Icons.videocam_outlined, size: 32, color: Colors.white),
           SizedBox(height: 4),
           Text(
             'SlientGuard',

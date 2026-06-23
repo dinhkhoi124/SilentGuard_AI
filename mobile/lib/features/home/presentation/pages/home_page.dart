@@ -10,6 +10,8 @@ import 'package:go_router/go_router.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:mobile/core/utils/app_colors.dart';
 import 'package:mobile/core/widgets/wave_text_loader.dart';
+import 'package:mobile/features/auth/presentation/bloc/auth_bloc.dart'; // FIX: session-expired UI needs to trigger sign-out.
+import 'package:mobile/features/auth/presentation/bloc/auth_event.dart'; // FIX: reuse existing logout event instead of changing router/auth logic.
 import 'package:mobile/features/account/presentation/pages/account_page.dart';
 import 'package:mobile/features/home/domain/entities/camera_device.dart';
 import 'package:mobile/features/home/presentation/bloc/home_bloc.dart';
@@ -48,6 +50,11 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final titleColor = isDark
+        ? theme.colorScheme.onSurface
+        : AppColors.darkText;
     return BlocListener<VideoUploadBloc, VideoUploadState>(
       listenWhen: (previous, current) =>
           current is VideoUploadSuccess || current is VideoUploadFailure,
@@ -96,8 +103,8 @@ class _HomePageState extends State<HomePage> {
                 children: [
                   Text(
                     _tabTitles[_selectedTab],
-                    style: const TextStyle(
-                      color: AppColors.darkText,
+                    style: TextStyle(
+                      color: titleColor,
                       fontSize: 22,
                       fontWeight: FontWeight.w700,
                     ),
@@ -219,6 +226,11 @@ class _HomeTab extends StatelessWidget {
       builder: (context, state) {
         return switch (state) {
           HomeInitial() || HomeLoading() => const WaveTextLoader(),
+          HomeBackendWarmingUp() =>
+            const _BackendWarmingView(), // FIX: Render cold start is a waiting state, not an error.
+          HomeUnauthorized(:final message) => _SessionExpiredView(
+            message: message,
+          ), // FIX: show session-expired UI only for auth failures.
           HomeError(:final message) => _ErrorView(message: message),
           HomeLoaded() => _LoadedHome(state: state),
         };
@@ -240,6 +252,17 @@ class _ComingSoonTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final iconBackground = isDark
+        ? theme.colorScheme.surfaceContainerHighest
+        : AppColors.lightBlue;
+    final titleColor = isDark
+        ? theme.colorScheme.onSurface
+        : AppColors.darkText;
+    final messageColor = isDark
+        ? theme.colorScheme.onSurfaceVariant
+        : AppColors.mutedText;
     return SafeArea(
       top: false,
       child: Center(
@@ -250,7 +273,7 @@ class _ComingSoonTab extends StatelessWidget {
             children: [
               DecoratedBox(
                 decoration: BoxDecoration(
-                  color: AppColors.lightBlue,
+                  color: iconBackground,
                   borderRadius: BorderRadius.circular(22),
                 ),
                 child: SizedBox(
@@ -263,8 +286,8 @@ class _ComingSoonTab extends StatelessWidget {
               Text(
                 title,
                 textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: AppColors.darkText,
+                style: TextStyle(
+                  color: titleColor,
                   fontSize: 20,
                   fontWeight: FontWeight.w800,
                 ),
@@ -273,8 +296,8 @@ class _ComingSoonTab extends StatelessWidget {
               Text(
                 message,
                 textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: AppColors.mutedText,
+                style: TextStyle(
+                  color: messageColor,
                   fontSize: 14,
                   height: 1.45,
                   fontWeight: FontWeight.w500,
@@ -444,13 +467,18 @@ class _DevicesHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final titleColor = isDark
+        ? theme.colorScheme.onSurface
+        : AppColors.darkText;
     return Row(
       children: [
-        const Expanded(
+        Expanded(
           child: Text(
             'Tất cả thiết bị',
             style: TextStyle(
-              color: AppColors.darkText,
+              color: titleColor,
               fontSize: 19,
               fontWeight: FontWeight.w700,
             ),
@@ -458,7 +486,7 @@ class _DevicesHeader extends StatelessWidget {
         ),
         IconButton(
           onPressed: () {},
-          icon: const Icon(Iconsax.more, color: AppColors.darkText),
+          icon: Icon(Iconsax.more, color: titleColor),
           tooltip: 'Tùy chọn thiết bị',
           visualDensity: VisualDensity.compact,
         ),
@@ -482,12 +510,21 @@ class _TopBarButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final backgroundColor = isDark
+        ? theme.colorScheme.surface
+        : AppColors.surface;
+    final foregroundColor = isDark
+        ? theme.colorScheme.onSurface
+        : AppColors.darkText;
+    final badgeBorderColor = isDark ? theme.colorScheme.surface : Colors.white;
     return IconButton(
       onPressed: onPressed,
       tooltip: tooltip,
       style: IconButton.styleFrom(
-        backgroundColor: AppColors.surface,
-        foregroundColor: AppColors.darkText,
+        backgroundColor: backgroundColor,
+        foregroundColor: foregroundColor,
         minimumSize: const Size(42, 42),
         elevation: 0,
       ),
@@ -504,11 +541,11 @@ class _TopBarButton extends StatelessWidget {
                 height: 18,
                 padding: const EdgeInsets.symmetric(horizontal: 4),
                 alignment: Alignment.center,
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   color: AppColors.badgeRed,
-                  borderRadius: BorderRadius.all(Radius.circular(9)),
+                  borderRadius: const BorderRadius.all(Radius.circular(9)),
                   border: Border.fromBorderSide(
-                    BorderSide(color: Colors.white, width: 1.5),
+                    BorderSide(color: badgeBorderColor, width: 1.5),
                   ),
                 ),
                 child: Text(
@@ -533,6 +570,14 @@ class _HomeFabs extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final secondaryFabBackground = isDark
+        ? theme.colorScheme.surface
+        : AppColors.surface;
+    final secondaryFabForeground = isDark
+        ? theme.colorScheme.primary
+        : AppColors.primary;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -540,8 +585,8 @@ class _HomeFabs extends StatelessWidget {
           heroTag: 'microphone',
           onPressed: () {},
           tooltip: 'Điều khiển bằng giọng nói',
-          backgroundColor: AppColors.surface,
-          foregroundColor: AppColors.primary,
+          backgroundColor: secondaryFabBackground,
+          foregroundColor: secondaryFabForeground,
           elevation: 3,
           child: const Icon(Iconsax.microphone, size: 20),
         ),
@@ -581,6 +626,83 @@ class _ErrorView extends StatelessWidget {
               onPressed: () =>
                   context.read<HomeBloc>().add(const HomeRetryRequested()),
               child: const Text('Thử lại'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _BackendWarmingView extends StatelessWidget {
+  // FIX: friendly non-dismissable UI while backend wakes up.
+  const _BackendWarmingView();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final textColor = isDark ? theme.colorScheme.onSurface : AppColors.darkText;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(
+              width: 28,
+              height: 28,
+              child: CircularProgressIndicator(strokeWidth: 2.6),
+            ),
+            const SizedBox(height: 18),
+            Text(
+              'Đang kết nối máy chủ, vui lòng chờ giây lát…',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: textColor,
+                fontSize: 16,
+                height: 1.45,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SessionExpiredView extends StatelessWidget {
+  // FIX: separate real auth failure UI from backend warm-up UI.
+  const _SessionExpiredView({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final textColor = isDark ? theme.colorScheme.onSurface : AppColors.darkText;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Iconsax.warning_2, color: AppColors.badgeRed, size: 36),
+            const SizedBox(height: 12),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: TextStyle(color: textColor),
+            ),
+            const SizedBox(height: 18),
+            FilledButton(
+              onPressed: () => context.read<AuthBloc>().add(
+                // FIX: logout option for definitive unauthorized state.
+                const AuthSignOutRequested(),
+              ),
+              child: const Text('Đăng nhập lại'),
             ),
           ],
         ),

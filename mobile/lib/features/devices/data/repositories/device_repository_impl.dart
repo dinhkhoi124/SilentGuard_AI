@@ -95,16 +95,18 @@ class DeviceRepositoryImpl implements DeviceRepository {
       return Left(error.message);
     } on TimeoutException catch (error, stackTrace) {
       _logFailure(error, stackTrace);
-      return const Left('Không thể kết nối mạng. Kết nối quá thời gian chờ.');
+      return const Left(
+        'Không thể kết nối mạng. Kết nối quá thời gian chờ.', // FIX: let HomeBloc classify timeout as backend unavailable.
+      );
     } on SocketException catch (error, stackTrace) {
       _logFailure(error, stackTrace);
       return const Left(
-        'Không thể kết nối mạng. Vui lòng kiểm tra WiFi và địa chỉ máy chủ.',
+        'Không thể kết nối mạng. Vui lòng kiểm tra WiFi và địa chỉ máy chủ.', // FIX: let HomeBloc classify network errors as backend unavailable.
       );
     } on http.ClientException catch (error, stackTrace) {
       _logFailure(error, stackTrace);
       return const Left(
-        'Không thể kết nối mạng. Vui lòng kiểm tra WiFi và địa chỉ máy chủ.',
+        'Không thể kết nối mạng. Vui lòng kiểm tra WiFi và địa chỉ máy chủ.', // FIX: let HomeBloc classify client errors as backend unavailable.
       );
     } catch (error, stackTrace) {
       _logFailure(error, stackTrace);
@@ -116,13 +118,14 @@ class DeviceRepositoryImpl implements DeviceRepository {
     return switch (error.kind) {
       ApiExceptionKind.configuration => error.message,
       ApiExceptionKind.unauthorized =>
-        'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.',
+        'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.', // FIX: let HomeBloc route 401 to session-expired UI.
       ApiExceptionKind.forbidden =>
         'Tài khoản không có quyền truy cập dữ liệu này.',
       ApiExceptionKind.notFound => 'Không tìm thấy dữ liệu trên máy chủ.',
       ApiExceptionKind.badRequest => error.message,
       ApiExceptionKind.invalidResponse => 'Phản hồi máy chủ không hợp lệ.',
-      ApiExceptionKind.server => 'Máy chủ đang gặp lỗi. Vui lòng thử lại sau.',
+      ApiExceptionKind.server =>
+        'Máy chủ đang gặp lỗi. Vui lòng thử lại sau.', // FIX: let HomeBloc classify 5xx as backend warming up.
       ApiExceptionKind.unknown => 'Lỗi không xác định. Vui lòng thử lại.',
     };
   }

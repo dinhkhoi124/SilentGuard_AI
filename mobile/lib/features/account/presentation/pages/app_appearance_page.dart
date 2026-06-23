@@ -175,7 +175,7 @@ class _SettingRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    return InkWell(
+    return GestureDetector(
       onTap: onTap,
       child: SizedBox(
         height: 82,
@@ -262,9 +262,9 @@ class _SheetOption extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    return InkWell(
+    return GestureDetector(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(14),
+      // borderRadius: BorderRadius.circular(14),
       child: SizedBox(
         height: 54,
         child: Row(

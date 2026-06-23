@@ -145,12 +145,19 @@ class _ProfileHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final surfaceColor = isDark ? theme.colorScheme.surface : AppColors.surface;
+    final nameColor = isDark ? theme.colorScheme.onSurface : AppColors.darkText;
+    final emailColor = isDark
+        ? theme.colorScheme.onSurfaceVariant
+        : AppColors.mutedText;
     final name = _displayName(user);
     final email = user?.email?.trim();
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: surfaceColor,
         borderRadius: BorderRadius.circular(24),
         boxShadow: const [
           BoxShadow(
@@ -174,8 +181,8 @@ class _ProfileHeader extends StatelessWidget {
                     name,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: AppColors.darkText,
+                    style: TextStyle(
+                      color: nameColor,
                       fontSize: 18,
                       fontWeight: FontWeight.w800,
                     ),
@@ -185,8 +192,8 @@ class _ProfileHeader extends StatelessWidget {
                     email == null || email.isEmpty ? 'Chưa có email' : email,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: AppColors.mutedText,
+                    style: TextStyle(
+                      color: emailColor,
                       fontSize: 14,
                       fontWeight: FontWeight.w500,
                     ),
@@ -195,11 +202,7 @@ class _ProfileHeader extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 10),
-            const Icon(
-              Icons.chevron_right_rounded,
-              color: AppColors.darkText,
-              size: 26,
-            ),
+            Icon(Icons.chevron_right_rounded, color: nameColor, size: 26),
           ],
         ),
       ),
@@ -271,18 +274,26 @@ class _SectionLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final labelColor = isDark
+        ? theme.colorScheme.onSurfaceVariant
+        : AppColors.mutedText;
+    final dividerColor = isDark
+        ? theme.colorScheme.outline.withValues(alpha: 0.7)
+        : AppColors.border;
     return Row(
       children: [
         Text(
           label,
-          style: const TextStyle(
-            color: AppColors.mutedText,
+          style: TextStyle(
+            color: labelColor,
             fontSize: 14,
             fontWeight: FontWeight.w600,
           ),
         ),
         const SizedBox(width: 14),
-        const Expanded(child: Divider(color: AppColors.border)),
+        Expanded(child: Divider(color: dividerColor)),
       ],
     );
   }
@@ -297,6 +308,12 @@ class _AccountMenuTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final itemColor = isDark ? theme.colorScheme.onSurface : AppColors.darkText;
+    final chevronColor = isDark
+        ? theme.colorScheme.onSurfaceVariant
+        : AppColors.darkText;
     return InkWell(
       borderRadius: BorderRadius.circular(18),
       onTap: onTap,
@@ -304,26 +321,19 @@ class _AccountMenuTile extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 15),
         child: Row(
           children: [
-            SizedBox(
-              width: 42,
-              child: Icon(icon, color: AppColors.darkText, size: 24),
-            ),
+            SizedBox(width: 42, child: Icon(icon, color: itemColor, size: 24)),
             const SizedBox(width: 10),
             Expanded(
               child: Text(
                 title,
-                style: const TextStyle(
-                  color: AppColors.darkText,
+                style: TextStyle(
+                  color: itemColor,
                   fontSize: 16,
                   fontWeight: FontWeight.w700,
                 ),
               ),
             ),
-            const Icon(
-              Icons.chevron_right_rounded,
-              color: AppColors.darkText,
-              size: 25,
-            ),
+            Icon(Icons.chevron_right_rounded, color: chevronColor, size: 25),
           ],
         ),
       ),
@@ -345,35 +355,32 @@ class _LogoutTile extends StatelessWidget {
       onTap: isLoading
           ? null
           : () => context.read<AuthBloc>().add(const AuthSignOutRequested()),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 15),
-        child: Row(
-          children: [
-            SizedBox(
-              width: 42,
-              child: Icon(
-                Iconsax.logout,
+      child: Row(
+        children: [
+          SizedBox(
+            width: 42,
+            child: Icon(
+              Iconsax.logout,
+              color: AppColors.destructive.withValues(
+                alpha: isLoading ? 0.55 : 1,
+              ),
+              size: 24,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'Đăng xuất',
+              style: TextStyle(
                 color: AppColors.destructive.withValues(
                   alpha: isLoading ? 0.55 : 1,
                 ),
-                size: 24,
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
               ),
             ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                'Đăng xuất',
-                style: TextStyle(
-                  color: AppColors.destructive.withValues(
-                    alpha: isLoading ? 0.55 : 1,
-                  ),
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

@@ -89,7 +89,12 @@ Future<void> init() async {
     ..registerLazySingleton(() => AuthNotifier(sl(), sl(), sl(), sl()))
     ..registerLazySingleton(LocalNotificationService.new)
     ..registerLazySingleton(
-      () => FcmService(apiClient: sl(), firebaseAuth: sl(), messaging: sl()),
+      () => FcmService(
+        apiClient: sl(),
+        firebaseAuth: sl(),
+        localNotificationService: sl(),
+        messaging: sl(),
+      ),
     )
     ..registerLazySingleton(() => NotificationLocalDataSource(sl()))
     ..registerLazySingleton(() => NotificationsCubit(sl()))
@@ -105,6 +110,8 @@ Future<void> init() async {
         getWeather: sl(),
         getCameraDevices: sl(),
         deleteCameraDevice: sl(),
+        sessionRepository:
+            sl(), // FIX: HomeBloc reads cached startup session instead of refetching blindly.
       ),
     )
     ..registerFactory(

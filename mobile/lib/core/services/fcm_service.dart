@@ -4,22 +4,27 @@ import 'dart:io';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/widgets.dart';
 import 'package:mobile/core/network/api_client.dart';
+import 'package:mobile/core/services/local_notification_service.dart';
 import 'package:mobile/features/notifications/domain/entities/notification_alert.dart';
 import 'package:mobile/features/notifications/presentation/cubit/notifications_cubit.dart';
 import 'package:permission_handler/permission_handler.dart';
 
-class FcmService {
+class FcmService with WidgetsBindingObserver {
   FcmService({
     required ApiClient apiClient,
     required FirebaseAuth firebaseAuth,
+    required LocalNotificationService localNotificationService,
     FirebaseMessaging? messaging,
   }) : _apiClient = apiClient,
        _firebaseAuth = firebaseAuth,
+       _localNotificationService = localNotificationService,
        _messaging = messaging ?? FirebaseMessaging.instance;
 
   final ApiClient _apiClient;
   final FirebaseAuth _firebaseAuth;
+  final LocalNotificationService _localNotificationService;
   final FirebaseMessaging _messaging;
   static const _messagingTimeout = Duration(seconds: 5);
   static const _backendRegistrationTimeout = Duration(seconds: 5);
@@ -27,6 +32,7 @@ class FcmService {
   StreamSubscription<String>? _tokenRefreshSubscription;
   StreamSubscription<RemoteMessage>? _foregroundSubscription;
   StreamSubscription<RemoteMessage>? _openedSubscription;
+  NotificationsCubit? _notificationsCubit;
   bool _initialized = false;
 
   Future<void> initialize({
@@ -35,15 +41,31 @@ class FcmService {
   }) async {
     if (_initialized) return;
     _initialized = true;
+    _notificationsCubit = notificationsCubit;
+    WidgetsBinding.instance.addObserver(this);
 
     _foregroundSubscription = FirebaseMessaging.onMessage.listen((message) {
       final alert = _alertFromMessage(message);
       developer.log(
-        'Foreground FCM alert received: eventId=${alert.eventId}, '
-        'cameraId=${alert.cameraId}.',
+        '[FCM] foreground received: messageId=${message.messageId}, '
+        'event_id=${alert.eventId}, severity=${alert.severity}, '
+        'persisted=true, navigationTriggered=false.',
         name: 'FcmService',
       );
       notificationsCubit.receiveForegroundMessage(message);
+      unawaited(
+        _localNotificationService.showFallAlert(alert).catchError((
+          Object error,
+          StackTrace stackTrace,
+        ) {
+          developer.log(
+            '[FCM] foreground local notification display failed.',
+            name: 'FcmService',
+            error: error,
+            stackTrace: stackTrace,
+          );
+        }),
+      );
     });
 
     _openedSubscription = FirebaseMessaging.onMessageOpenedApp.listen((
@@ -51,8 +73,9 @@ class FcmService {
     ) {
       final alert = _alertFromMessage(message);
       developer.log(
-        'FCM notification opened: eventId=${alert.eventId}, '
-        'cameraId=${alert.cameraId}.',
+        '[FCM] opened from background: messageId=${message.messageId}, '
+        'event_id=${alert.eventId}, severity=${alert.severity}, '
+        'persisted=true, navigationTriggered=true.',
         name: 'FcmService',
       );
       notificationsCubit.receiveOpenedMessage(message);
@@ -132,7 +155,7 @@ class FcmService {
         )
         .timeout(_messagingTimeout);
     developer.log(
-      'FCM permission status: ${settings.authorizationStatus}.',
+      '[FCM] permission status: ${settings.authorizationStatus}.',
       name: 'FcmService',
     );
     return settings;
@@ -163,7 +186,7 @@ class FcmService {
       await _apiClient
           .postObject('/api/users/device-token', {'fcm_token': normalizedToken})
           .timeout(_backendRegistrationTimeout);
-      developer.log('FCM token registered from $source.', name: 'FcmService');
+      developer.log('[FCM] token registered from $source.', name: 'FcmService');
     } catch (error, stackTrace) {
       developer.log(
         'FCM token registration failed from $source.',
@@ -184,7 +207,20 @@ class FcmService {
     );
   }
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed) return;
+    final cubit = _notificationsCubit;
+    if (cubit == null) return;
+    developer.log(
+      '[FCM] app resumed; reloading local notification store.',
+      name: 'FcmService',
+    );
+    unawaited(cubit.refreshFromLocalAndSyncPendingAlerts());
+  }
+
   Future<void> dispose() async {
+    WidgetsBinding.instance.removeObserver(this);
     await _tokenRefreshSubscription?.cancel();
     await _foregroundSubscription?.cancel();
     await _openedSubscription?.cancel();

@@ -21,15 +21,16 @@ import 'package:mobile/firebase_options.dart';
 import 'package:mobile/injection_container.dart' as di;
 
 @pragma('vm:entry-point')
-Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   try {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     ).timeout(const Duration(seconds: 5));
     await NotificationLocalDataSource.saveBackgroundMessage(message);
     developer.log(
-      'Background FCM received: messageId=${message.messageId}, '
-      'data=${message.data}.',
+      '[FCM] background received: messageId=${message.messageId}, '
+      'event_id=${message.data['event_id'] ?? message.data['eventId']}, '
+      'severity=${message.data['severity']}, persisted=true.',
       name: 'FcmBackground',
     );
   } catch (error, stackTrace) {
@@ -60,18 +61,14 @@ Future<void> main() async {
   await Future.wait([
     Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform),
   ]);
+  FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
   await di.init();
   await di.sl<ThemeController>().load();
 
   final appRouter = AppRouter(di.sl());
 
   runApp(
-    BootstrapApp(
-      appRouter: appRouter,
-      initializer: const AppInitializer(
-        backgroundMessageHandler: _firebaseMessagingBackgroundHandler,
-      ),
-    ),
+    BootstrapApp(appRouter: appRouter, initializer: const AppInitializer()),
   );
 }
 

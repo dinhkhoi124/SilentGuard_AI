@@ -20,6 +20,21 @@ final class HomeLoading extends HomeState {
   const HomeLoading();
 }
 
+final class HomeBackendWarmingUp extends HomeState {
+  // FIX: represent Render cold-start separately from an error.
+  const HomeBackendWarmingUp();
+}
+
+final class HomeUnauthorized extends HomeState {
+  // FIX: show session-expired UI only for definitive auth failures.
+  const HomeUnauthorized(this.message);
+
+  final String message;
+
+  @override
+  List<Object?> get props => [message]; // FIX: keep unauthorized state comparable.
+}
+
 final class HomeLoaded extends HomeState {
   const HomeLoaded({
     required this.weather,

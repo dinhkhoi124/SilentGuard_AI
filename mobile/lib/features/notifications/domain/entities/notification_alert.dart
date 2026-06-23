@@ -107,7 +107,11 @@ class NotificationAlert extends Equatable {
       body: body,
       receivedAt: resolvedReceivedAt,
       isRead: isRead,
-      rawData: Map<String, dynamic>.from(data),
+      rawData: {
+        ...Map<String, dynamic>.from(data),
+        if (messageId != null && messageId.trim().isNotEmpty)
+          'messageId': messageId,
+      },
     );
   }
 
@@ -166,17 +170,18 @@ class NotificationAlert extends Equatable {
     String? messageId,
     DateTime receivedAt,
   ) {
+    final eventId = _readString(data, const ['event_id', 'eventId', 'id']);
+    if (eventId != null && eventId.isNotEmpty) return eventId;
+
     final firebaseId = messageId?.trim() ?? '';
     if (firebaseId.isNotEmpty) return firebaseId;
 
-    final eventId = _readString(data, const ['event_id', 'eventId', 'id']);
     final cameraId = _readString(data, const ['camera_id', 'cameraId']);
     final severity = _readString(data, const ['severity', 'level']);
     final fallback = [
-      eventId,
+      receivedAt.millisecondsSinceEpoch.toString(),
       cameraId,
       severity,
-      receivedAt.millisecondsSinceEpoch.toString(),
     ].whereType<String>().where((value) => value.isNotEmpty).join(':');
     return fallback.isNotEmpty
         ? fallback

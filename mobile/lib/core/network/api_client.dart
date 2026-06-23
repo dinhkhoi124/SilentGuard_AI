@@ -50,6 +50,8 @@ class ApiClient {
     String path, [
     Map<String, dynamic>? body,
     Map<String, String>? extraHeaders,
+    Duration?
+    timeout, // FIX: allow provisionSession login to outlast Render cold starts without changing every API call.
   ]) async {
     final response = await _client
         .post(
@@ -57,7 +59,9 @@ class ApiClient {
           headers: _headers(extraHeaders),
           body: body == null ? null : jsonEncode(body),
         )
-        .timeout(AppConfig.networkTimeout);
+        .timeout(
+          timeout ?? AppConfig.networkTimeout,
+        ); // FIX: keep existing timeout unless a caller explicitly opts in.
     final decoded = _decode(response);
     if (decoded is Map<String, dynamic>) return decoded;
     throw const ApiException(

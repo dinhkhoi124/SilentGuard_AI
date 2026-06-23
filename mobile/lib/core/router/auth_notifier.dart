@@ -11,17 +11,9 @@ import 'package:mobile/features/auth/domain/entities/app_user.dart';
 import 'package:mobile/features/auth/domain/repositories/auth_repository.dart';
 import 'package:mobile/features/session/domain/repositories/session_repository.dart';
 
-// Timeouts for background operations — long enough to succeed on a slow
-// railway.app cold-start, but bounded so they never block the auth flow.
-const Duration _kProvisionTimeout = Duration(seconds: 8);
 const Duration _kFcmTimeout = Duration(seconds: 5);
 
-enum AuthStartupPhase {
-  checkingSession,
-  provisioningSession,
-  unauthenticated,
-  authenticated,
-}
+enum AuthStartupPhase { checkingSession, unauthenticated, authenticated }
 
 class AuthNotifier extends ChangeNotifier with WidgetsBindingObserver {
   AuthNotifier(
@@ -70,9 +62,6 @@ class AuthNotifier extends ChangeNotifier with WidgetsBindingObserver {
   bool _minimumSplashElapsed = false;
   bool _disposed = false;
   bool _splashRemoved = false;
-  // Set to true when the last background provision attempt failed.
-  // Cleared on next successful provision or on sign-out.
-  bool _provisionFailed = false;
   int _authRevision = 0;
   AuthStartupPhase _phase = AuthStartupPhase.checkingSession;
 
@@ -121,75 +110,22 @@ class AuthNotifier extends ChangeNotifier with WidgetsBindingObserver {
     );
 
     if (user == null) {
-      _provisionFailed = false;
       _sessionRepository.clearCachedSession();
-      _completeAuthCheck(false);
+      _completeAuthCheck(
+        false,
+      ); // FIX: only Firebase sign-out sends users to /welcome.
       return;
     }
 
-    // Immediately mark the user as authenticated so the router can redirect
-    // to /home without waiting for the backend provision call. The provision
-    // and FCM registration continue in the background.
-    _phase = AuthStartupPhase.authenticated;
-    _completeAuthCheck(true);
-
-    unawaited(_provisionInBackground(revision));
+    _completeAuthCheck(
+      true,
+    ); // FIX: Firebase auth immediately releases routing to /home; HomeBloc owns backend provisioning.
+    unawaited(
+      _registerFcmAfterFirebaseAuth(revision),
+    ); // FIX: keep FCM work out of the routing decision and do not wait on it.
   }
 
-  /// Runs session provision + FCM token registration asynchronously.
-  /// Never throws — any failure is logged and stored in [_provisionFailed]
-  /// so that [didChangeAppLifecycleState] can retry on next foreground resume.
-  Future<void> _provisionInBackground(int revision) async {
-    if (_disposed || revision != _authRevision) return;
-
-    try {
-      developer.log(
-        'Starting background session provision.',
-        name: 'AuthNotifier',
-      );
-      final result = await _sessionRepository
-          .provisionSession()
-          .timeout(_kProvisionTimeout);
-
-      if (_disposed || revision != _authRevision) return;
-
-      result.fold(
-        (failure) {
-          developer.log(
-            '[AuthNotifier] Background provision failed: ${failure.message}.',
-            name: 'AuthNotifier',
-          );
-          _provisionFailed = true;
-        },
-        (_) {
-          developer.log(
-            'Background session provision succeeded.',
-            name: 'AuthNotifier',
-          );
-          _provisionFailed = false;
-        },
-      );
-    } on TimeoutException {
-      developer.log(
-        '[AuthNotifier] provisionSession timed out — continuing without session.',
-        name: 'AuthNotifier',
-      );
-      _provisionFailed = true;
-    } catch (error, stackTrace) {
-      developer.log(
-        '[AuthNotifier] Background provision error.',
-        name: 'AuthNotifier',
-        error: error,
-        stackTrace: stackTrace,
-      );
-      _provisionFailed = true;
-    }
-
-    if (_disposed || revision != _authRevision) return;
-
-    // Always attempt FCM token registration after provision (success or fail),
-    // so the user still receives push notifications even if the session call
-    // timed out on a slow cold-start.
+  Future<void> _registerFcmAfterFirebaseAuth(int revision) async {
     try {
       await _fcmService.registerToken().timeout(_kFcmTimeout);
     } on TimeoutException {
@@ -205,23 +141,14 @@ class AuthNotifier extends ChangeNotifier with WidgetsBindingObserver {
         stackTrace: stackTrace,
       );
     }
-  }
 
-  /// Retries background provision when the app returns to the foreground and
-  /// the previous attempt failed (e.g. no network at cold-start).
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed &&
-        _isAuthenticated &&
-        _provisionFailed &&
-        !_disposed) {
-      developer.log(
-        '[AuthNotifier] App resumed with failed provision — retrying.',
-        name: 'AuthNotifier',
-      );
-      unawaited(_provisionInBackground(_authRevision));
+    if (_disposed || revision != _authRevision) {
+      return; // FIX: ignore stale async FCM completion after auth changes.
     }
   }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {}
 
   void _completeAuthCheck(bool isAuthenticated) {
     _authResolved = true;

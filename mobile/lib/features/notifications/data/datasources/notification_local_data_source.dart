@@ -80,6 +80,12 @@ class NotificationLocalDataSource {
         storageKey,
         encodeNotifications(insertOrReplace(current, alert)),
       );
+      developer.log(
+        '[FCM] background notification persisted: '
+        'messageId=${message.messageId}, event_id=${alert.eventId}, '
+        'severity=${alert.severity}.',
+        name: 'NotificationLocalDataSource',
+      );
     } catch (error, stackTrace) {
       developer.log(
         'Background notification persist failed.',

@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:developer' as developer;
 
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:mobile/core/router/app_router.dart';
 import 'package:mobile/core/services/fcm_service.dart';
@@ -10,8 +9,6 @@ import 'package:mobile/core/services/local_notification_service.dart';
 import 'package:mobile/features/notifications/domain/entities/notification_alert.dart';
 import 'package:mobile/features/notifications/presentation/cubit/notifications_cubit.dart';
 import 'package:mobile/injection_container.dart' as di;
-
-typedef BackgroundMessageHandler = Future<void> Function(RemoteMessage message);
 
 class AppInitializationResult {
   const AppInitializationResult({
@@ -24,9 +21,7 @@ class AppInitializationResult {
 }
 
 class AppInitializer {
-  const AppInitializer({required this.backgroundMessageHandler});
-
-  final BackgroundMessageHandler backgroundMessageHandler;
+  const AppInitializer();
 
   Future<AppInitializationResult> initializeAfterFirstFrame({
     AppRouter? appRouter,
@@ -48,19 +43,27 @@ class AppInitializer {
         if (initialFcmAlert == null) return;
 
         notificationsCubit.receiveOpenedAlert(initialFcmAlert);
+        developer.log(
+          '[FCM] opened from terminated: event_id=${initialFcmAlert.eventId}, '
+          'severity=${initialFcmAlert.severity}, persisted=true, '
+          'navigationTriggered=true.',
+          name: 'AppInitializer',
+        );
         _openNotificationAlert(resolvedRouter, initialFcmAlert);
       }),
     );
 
     unawaited(
       Future.microtask(() async {
-        final initialCameraId = await _initializeLocalNotifications(
-          onCameraTap: (cameraId) {
-            resolvedRouter.router.go('/camera/$cameraId');
+        final initialLocalAlert = await _initializeLocalNotifications(
+          onAlertTap: (alert) {
+            notificationsCubit.receiveOpenedAlert(alert);
+            _openNotificationAlert(resolvedRouter, alert);
           },
         );
-        if (initialCameraId != null) {
-          resolvedRouter.router.go('/camera/$initialCameraId');
+        if (initialLocalAlert != null) {
+          notificationsCubit.receiveOpenedAlert(initialLocalAlert);
+          _openNotificationAlert(resolvedRouter, initialLocalAlert);
         }
       }),
     );
@@ -73,12 +76,7 @@ class AppInitializer {
 
   void scheduleMessagingSetup(AppInitializationResult result) {
     unawaited(
-      Future<void>.delayed(const Duration(seconds: 3), () async {
-        // Background handler registration can create a background engine on
-        // Android, so keep it well after the first rendered Flutter frame.
-        FirebaseMessaging.onBackgroundMessage(backgroundMessageHandler);
-        await _yieldToUi();
-
+      Future.microtask(() async {
         await di.sl<FcmService>().initialize(
           notificationsCubit: result.notificationsCubit,
           onNotificationTap: (alert) =>
@@ -109,12 +107,12 @@ class AppInitializer {
     }
   }
 
-  Future<String?> _initializeLocalNotifications({
-    required void Function(String cameraId) onCameraTap,
+  Future<NotificationAlert?> _initializeLocalNotifications({
+    required void Function(NotificationAlert alert) onAlertTap,
   }) async {
     try {
       return await di.sl<LocalNotificationService>().initialize(
-        onCameraNotificationTap: onCameraTap,
+        onAlertNotificationTap: onAlertTap,
       );
     } catch (error, stackTrace) {
       developer.log(
@@ -138,10 +136,20 @@ class AppInitializer {
   void _openNotificationAlert(AppRouter appRouter, NotificationAlert alert) {
     final cameraId = alert.cameraId;
     if (cameraId != null && cameraId.isNotEmpty) {
+      developer.log(
+        '[FCM] navigation triggered: cameraId=$cameraId, '
+        'event_id=${alert.eventId}, severity=${alert.severity}.',
+        name: 'AppInitializer',
+      );
       appRouter.router.go('/camera/${Uri.encodeComponent(cameraId)}');
       return;
     }
 
+    developer.log(
+      '[FCM] navigation skipped to home: event_id=${alert.eventId}, '
+      'severity=${alert.severity}, cameraIdMissing=true.',
+      name: 'AppInitializer',
+    );
     appRouter.router.go('/home');
   }
 

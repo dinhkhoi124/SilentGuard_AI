@@ -20,10 +20,15 @@ class BottomNavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final borderColor = isDark
+        ? theme.colorScheme.outline.withValues(alpha: 0.65)
+        : const Color(0xFFEEEEEE);
     return Container(
-      decoration: const BoxDecoration(
-        color: AppColors.surface,
-        border: Border(top: BorderSide(color: Color(0xFFEEEEEE))),
+      decoration: BoxDecoration(
+        color: isDark ? theme.colorScheme.surface : AppColors.surface,
+        border: Border(top: BorderSide(color: borderColor)),
       ),
       child: SafeArea(
         top: false,
@@ -89,11 +94,17 @@ class _NavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = disabled
-        ? AppColors.mutedText.withValues(alpha: 0.45)
-        : active
-        ? AppColors.primary
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final mutedColor = isDark
+        ? theme.colorScheme.onSurfaceVariant
         : AppColors.mutedText;
+    final activeColor = isDark ? theme.colorScheme.primary : AppColors.primary;
+    final color = disabled
+        ? mutedColor.withValues(alpha: 0.45)
+        : active
+        ? activeColor
+        : mutedColor;
     return Expanded(
       child: Semantics(
         button: true,
@@ -112,7 +123,7 @@ class _NavItem extends StatelessWidget {
                 height: 3,
                 margin: const EdgeInsets.only(bottom: 7),
                 decoration: BoxDecoration(
-                  color: active ? AppColors.primary : Colors.transparent,
+                  color: active ? activeColor : Colors.transparent,
                   borderRadius: BorderRadius.circular(4),
                 ),
               ),

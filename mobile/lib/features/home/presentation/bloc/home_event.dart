@@ -16,7 +16,15 @@ final class HomeStarted extends HomeEvent {
 }
 
 final class HomeRetryRequested extends HomeEvent {
-  const HomeRetryRequested();
+  const HomeRetryRequested({
+    this.silent = false,
+  }); // FIX: auto-retry backend warm-up without flashing the loading screen.
+
+  final bool
+  silent; // FIX: distinguish user retry from silent 5s backend retry.
+
+  @override
+  List<Object?> get props => [silent]; // FIX: include retry mode in event equality.
 }
 
 final class RoomFilterChanged extends HomeEvent {

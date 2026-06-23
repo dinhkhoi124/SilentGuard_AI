@@ -31,6 +31,15 @@ class NotificationsCubit extends Cubit<NotificationsState> {
     }
   }
 
+  Future<void> refreshFromLocalAndSyncPendingAlerts() async {
+    await loadNotifications();
+    developer.log(
+      '[FCM] pending alert backend sync skipped: no alert list API is wired yet.',
+      name: 'NotificationsCubit',
+    );
+    // TODO: fetch pending alerts from backend and merge when an alert list API is available.
+  }
+
   void receiveForegroundAlert(NotificationAlert alert) {
     unawaited(_storeAlert(alert, NotificationDelivery.foreground));
   }
@@ -75,6 +84,11 @@ class NotificationsCubit extends Cubit<NotificationsState> {
       alert,
     );
     await _persist(notifications);
+    developer.log(
+      '[FCM] notification persisted: delivery=$delivery, '
+      'id=${alert.id}, event_id=${alert.eventId}, severity=${alert.severity}.',
+      name: 'NotificationsCubit',
+    );
     emit(
       state.copyWith(
         notifications: notifications,

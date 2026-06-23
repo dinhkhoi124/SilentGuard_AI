@@ -10,7 +10,7 @@ class ThemeController extends ChangeNotifier {
   static const _systemValue = 'system';
 
   final SharedPreferencesAsync _preferences;
-  ThemeMode _themeMode = ThemeMode.system;
+  ThemeMode _themeMode = ThemeMode.light;
 
   ThemeMode get themeMode => _themeMode;
 
@@ -31,7 +31,8 @@ class ThemeController extends ChangeNotifier {
     return switch (value) {
       _lightValue => ThemeMode.light,
       _darkValue => ThemeMode.dark,
-      _systemValue || _ => ThemeMode.system,
+      _systemValue => ThemeMode.system,
+      _ => ThemeMode.light,
     };
   }
 

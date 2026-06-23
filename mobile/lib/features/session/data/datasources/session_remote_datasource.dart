@@ -12,6 +12,9 @@ class SessionRemoteDataSourceImpl implements SessionRemoteDataSource {
   const SessionRemoteDataSourceImpl(this._apiClient);
 
   final ApiClient _apiClient;
+  static const _loginTimeout = Duration(
+    seconds: 35,
+  ); // FIX: Render free tier cold starts can take longer than the default API timeout.
 
   @override
   Future<BackendUser> login({String? inviteCode}) async {
@@ -19,6 +22,7 @@ class SessionRemoteDataSourceImpl implements SessionRemoteDataSource {
       '/api/users/login',
       null,
       _inviteHeaders(inviteCode),
+      _loginTimeout, // FIX: only the backend session login gets the extended cold-start timeout.
     );
     final user = response['user'];
     if (user is Map<String, dynamic>) {

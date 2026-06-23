@@ -179,11 +179,60 @@ abstract final class AppTheme {
       dividerColor: Colors.transparent,
       colorScheme: const ColorScheme.dark(
         primary: AppColors.primaryLight,
+        secondary: AppColors.primaryLight,
         surface: surface,
+        surfaceContainerHighest: surfaceSoft,
         error: AppColors.destructive,
         onSurface: onSurface,
         onSurfaceVariant: onSurfaceVariant,
         outline: border,
+      ),
+      cardColor: surface,
+      iconTheme: const IconThemeData(color: onSurface),
+      dividerTheme: const DividerThemeData(
+        color: border,
+        thickness: 1,
+        space: 1,
+      ),
+      bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+        backgroundColor: surface,
+        selectedItemColor: AppColors.primaryLight,
+        unselectedItemColor: onSurfaceVariant,
+        type: BottomNavigationBarType.fixed,
+        elevation: 0,
+      ),
+      navigationBarTheme: NavigationBarThemeData(
+        backgroundColor: surface,
+        indicatorColor: AppColors.primaryLight.withValues(alpha: 0.18),
+        surfaceTintColor: Colors.transparent,
+        labelTextStyle: WidgetStateProperty.resolveWith(
+          (states) => TextStyle(
+            color: states.contains(WidgetState.selected)
+                ? AppColors.primaryLight
+                : onSurfaceVariant,
+            fontSize: 12,
+            fontWeight: states.contains(WidgetState.selected)
+                ? FontWeight.w700
+                : FontWeight.w500,
+          ),
+        ),
+        iconTheme: WidgetStateProperty.resolveWith(
+          (states) => IconThemeData(
+            color: states.contains(WidgetState.selected)
+                ? AppColors.primaryLight
+                : onSurfaceVariant,
+          ),
+        ),
+      ),
+      chipTheme: ChipThemeData(
+        backgroundColor: surface,
+        selectedColor: AppColors.primaryLight,
+        disabledColor: surfaceSoft,
+        side: const BorderSide(color: border),
+        labelStyle: const TextStyle(color: onSurface, fontSize: 13),
+        secondaryLabelStyle: const TextStyle(color: Colors.white, fontSize: 13),
+        brightness: Brightness.dark,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(99)),
       ),
       textTheme: const TextTheme(
         titleLarge: TextStyle(
@@ -213,6 +262,18 @@ abstract final class AppTheme {
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         centerTitle: false,
+      ),
+      popupMenuTheme: PopupMenuThemeData(
+        color: surface,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        shadowColor: Colors.black.withValues(alpha: 0.35),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        textStyle: const TextStyle(
+          color: onSurface,
+          fontSize: 14,
+          fontWeight: FontWeight.w500,
+        ),
       ),
       dialogTheme: DialogThemeData(
         backgroundColor: surface,
@@ -272,6 +333,8 @@ abstract final class AppTheme {
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
           elevation: 0,
+          backgroundColor: AppColors.primaryLight,
+          foregroundColor: Colors.white,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(18),
           ),
@@ -284,6 +347,14 @@ abstract final class AppTheme {
           foregroundColor: AppColors.primaryLight,
           textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
         ),
+      ),
+      floatingActionButtonTheme: const FloatingActionButtonThemeData(
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+        elevation: 2,
+        focusElevation: 2,
+        hoverElevation: 3,
+        highlightElevation: 3,
       ),
     );
   }

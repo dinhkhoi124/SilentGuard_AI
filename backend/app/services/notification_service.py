@@ -68,3 +68,32 @@ async def trigger_call(contact: dict, event_data: dict) -> bool:
     except Exception as e:
         print(f"Failed to trigger VOIP call: {e}")
         return False
+
+
+async def send_fcm_notification(token: str, title: str, body: str, data: dict = None) -> bool:
+    """
+    Sends a general FCM notification to a specific token.
+    """
+    print(f"[Notification Service] Attempting to send push to token: {token}")
+    try:
+        # Convert all dictionary values in data to strings as required by Firebase Messaging API
+        string_data = {}
+        if data:
+            for k, v in data.items():
+                string_data[k] = str(v)
+
+        message = messaging.Message(
+            notification=messaging.Notification(
+                title=title,
+                body=body
+            ),
+            data=string_data,
+            token=token
+        )
+        # messaging.send is blocking, but we keep the signature async as expected
+        response_id = messaging.send(message)
+        print(f"[Notification Service] Push notification sent successfully, msg ID: {response_id}")
+        return True
+    except Exception as e:
+        print(f"[Notification Service] ERROR: Failed to send push notification to token {token}: {e}")
+        return False

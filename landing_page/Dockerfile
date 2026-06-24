@@ -22,5 +22,6 @@ COPY --from=builder /app/dist ./dist
 EXPOSE 3000
 ENV PORT=3000
 ENV HOST=0.0.0.0
+ENV PATH="/app/node_modules/.bin:$PATH"
 
-CMD ["npx", "vinxi", "start", "--port", "3000", "--host", "0.0.0.0"]
+CMD ["vinxi", "start", "--port", "3000", "--host", "0.0.0.0"]

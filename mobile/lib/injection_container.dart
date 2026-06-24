@@ -9,6 +9,9 @@ import 'package:mobile/core/network/api_client.dart';
 import 'package:mobile/core/network/auth_interceptor.dart';
 import 'package:mobile/core/router/auth_notifier.dart';
 import 'package:mobile/core/services/phone_dialer_service.dart';
+import 'package:mobile/features/household_invite/data/datasources/household_invite_remote_data_source.dart';
+import 'package:mobile/features/household_invite/presentation/cubit/invite_management_cubit.dart';
+import 'package:mobile/features/household_invite/presentation/cubit/pending_invites_cubit.dart';
 import 'package:mobile/core/services/fcm_service.dart';
 import 'package:mobile/core/services/local_notification_service.dart';
 import 'package:mobile/core/services/onboarding_service.dart';
@@ -82,6 +85,9 @@ Future<void> init() async {
     ..registerLazySingleton(SharedPreferencesAsync.new)
     ..registerLazySingleton(() => OnboardingService(sl()))
     ..registerLazySingleton(() => PhoneDialerService())
+    ..registerLazySingleton<HouseholdInviteRemoteDataSource>(
+      () => HouseholdInviteRemoteDataSourceImpl(sl()),
+    )
     ..registerLazySingleton(() => ThemeController(sl()))
     ..registerLazySingleton(() => GoogleSignIn.instance)
     ..registerLazySingleton<FirebaseAuthDataSource>(
@@ -159,6 +165,8 @@ Future<void> init() async {
       () => EmergencyContactsRepositoryImpl(sl()),
     )
     ..registerFactory(() => EmergencyContactsCubit(sl()))
+    ..registerFactory(() => InviteManagementCubit(sl()))
+    ..registerFactory(() => PendingInvitesCubit(sl()))
     ..registerLazySingleton<DeviceRemoteDataSource>(
       () =>
           DeviceRemoteDataSourceImpl(apiClient: sl(), sessionRepository: sl()),

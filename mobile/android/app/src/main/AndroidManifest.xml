@@ -14,7 +14,7 @@
     <application
         android:label="SilentGuard"
         android:name=".MainApplication"
-        android:icon="@mipmap/ic_launcher"
+        android:icon="@mipmap/launcher_icon"
         android:usesCleartextTraffic="true"
         android:enableOnBackInvokedCallback="true">
         <meta-data

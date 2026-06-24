@@ -4,8 +4,10 @@ import 'dart:developer' as developer;
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/foundation.dart';
 import 'package:mobile/core/router/app_router.dart';
+import 'package:mobile/core/router/auth_notifier.dart';
 import 'package:mobile/core/services/fcm_service.dart';
 import 'package:mobile/core/services/local_notification_service.dart';
+import 'package:mobile/features/household_invite/data/datasources/household_invite_remote_data_source.dart';
 import 'package:mobile/features/notifications/domain/entities/notification_alert.dart';
 import 'package:mobile/features/notifications/presentation/cubit/notifications_cubit.dart';
 import 'package:mobile/injection_container.dart' as di;
@@ -64,6 +66,46 @@ class AppInitializer {
         if (initialLocalAlert != null) {
           notificationsCubit.receiveOpenedAlert(initialLocalAlert);
           _openNotificationAlert(resolvedRouter, initialLocalAlert);
+        }
+      }),
+    );
+
+    unawaited(
+      Future.microtask(() async {
+        try {
+          final authNotifier = di.sl<AuthNotifier>();
+          if (authNotifier.isAuthenticated) {
+            final remoteDataSource = di.sl<HouseholdInviteRemoteDataSource>();
+            final invites = await remoteDataSource.getPendingInvites();
+
+            for (final invite in invites) {
+              final payload = {
+                'type': 'household_invite',
+                'invite_request_id': invite.inviteRequestId,
+                'household_id': invite.householdId,
+                'household_name': invite.householdName,
+                'inviter_name': invite.inviterName,
+                'title': 'Bạn được mời vào gia đình',
+                'body':
+                    '${invite.inviterName} mời bạn theo dõi camera gia đình cùng.',
+              };
+              final alert = NotificationAlert.fromPayload(
+                payload,
+                messageId: 'invite_${invite.inviteRequestId}',
+                receivedAt: invite.createdAt,
+              );
+              // Store as opened alert so it doesn't trigger foreground banner but appears in list
+              notificationsCubit.receiveOpenedAlert(
+                alert.copyWith(isRead: false),
+              );
+            }
+          }
+        } catch (e) {
+          developer.log(
+            'Failed to fetch pending invites on startup',
+            error: e,
+            name: 'AppInitializer',
+          );
         }
       }),
     );

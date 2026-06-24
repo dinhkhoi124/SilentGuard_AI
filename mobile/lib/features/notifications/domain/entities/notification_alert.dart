@@ -12,6 +12,10 @@ class NotificationAlert extends Equatable {
     this.room,
     this.title,
     this.body,
+    this.inviteRequestId,
+    this.householdId,
+    this.householdName,
+    this.inviterName,
     this.rawData = const {},
   });
 
@@ -23,6 +27,10 @@ class NotificationAlert extends Equatable {
   final String? room;
   final String? title;
   final String? body;
+  final String? inviteRequestId;
+  final String? householdId;
+  final String? householdName;
+  final String? inviterName;
   final DateTime receivedAt;
   final bool isRead;
   final Map<String, dynamic> rawData;
@@ -78,6 +86,10 @@ class NotificationAlert extends Equatable {
       room: room,
       title: title,
       body: body,
+      inviteRequestId: inviteRequestId,
+      householdId: householdId,
+      householdName: householdName,
+      inviterName: inviterName,
       rawData: rawData,
     );
   }
@@ -105,6 +117,16 @@ class NotificationAlert extends Equatable {
       room: _readString(data, const ['room', 'location', 'camera_room']),
       title: title,
       body: body,
+      inviteRequestId: _readString(data, const [
+        'invite_request_id',
+        'inviteRequestId',
+      ]),
+      householdId: _readString(data, const ['household_id', 'householdId']),
+      householdName: _readString(data, const [
+        'household_name',
+        'householdName',
+      ]),
+      inviterName: _readString(data, const ['inviter_name', 'inviterName']),
       receivedAt: resolvedReceivedAt,
       isRead: isRead,
       rawData: {
@@ -125,6 +147,10 @@ class NotificationAlert extends Equatable {
       type: _nullableString(json['type']),
       severity: _nullableString(json['severity']),
       room: _nullableString(json['room']),
+      inviteRequestId: _nullableString(json['inviteRequestId']),
+      householdId: _nullableString(json['householdId']),
+      householdName: _nullableString(json['householdName']),
+      inviterName: _nullableString(json['inviterName']),
       isRead: json['isRead'] == true,
       receivedAt:
           DateTime.tryParse((json['receivedAt'] ?? '').toString()) ??
@@ -145,6 +171,10 @@ class NotificationAlert extends Equatable {
       'type': type,
       'severity': severity,
       'room': room,
+      'inviteRequestId': inviteRequestId,
+      'householdId': householdId,
+      'householdName': householdName,
+      'inviterName': inviterName,
       'receivedAt': receivedAt.toIso8601String(),
       'isRead': isRead,
       'rawData': rawData,
@@ -198,6 +228,10 @@ class NotificationAlert extends Equatable {
     room,
     title,
     body,
+    inviteRequestId,
+    householdId,
+    householdName,
+    inviterName,
     receivedAt,
     isRead,
     rawData,

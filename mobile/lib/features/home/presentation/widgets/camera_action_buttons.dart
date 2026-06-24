@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:mobile/core/utils/app_colors.dart';
 
 import 'package:mobile/features/automation/presentation/widgets/emergency_call_sheet.dart';
+import 'package:mobile/features/household_invite/presentation/widgets/invite_management_sheet.dart';
 
 class CameraActionButtons extends StatelessWidget {
   const CameraActionButtons({super.key});
@@ -21,10 +22,10 @@ class CameraActionButtons extends StatelessWidget {
             onTap: () => EmergencyCallSheet.show(context),
           ),
           const _ActionButton(icon: Icons.textsms, label: 'Nhắn tin'),
-          const _ActionButton(
+          _ActionButton(
             icon: Icons.people,
             label: 'Người nhận\ncảnh báo',
-            badge: '3',
+            onTap: () => InviteManagementSheet.show(context),
           ),
           const _ActionButton(
             icon: Icons.pause_circle,
@@ -40,13 +41,11 @@ class _ActionButton extends StatelessWidget {
   const _ActionButton({
     required this.icon,
     required this.label,
-    this.badge,
     this.onTap,
   });
 
   final IconData icon;
   final String label;
-  final String? badge;
   final VoidCallback? onTap;
 
   @override
@@ -111,29 +110,6 @@ class _ActionButton extends StatelessWidget {
                   ],
                 ),
               ),
-              if (badge != null)
-                Positioned(
-                  top: 6,
-                  right: 6,
-                  child: Container(
-                    width: 18,
-                    height: 18,
-                    alignment: Alignment.center,
-                    decoration: const BoxDecoration(
-                      color: AppColors.primary,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Text(
-                      badge!,
-                      style: const TextStyle(
-                        fontSize: 10,
-                        height: 1,
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
             ],
           ),
         ),

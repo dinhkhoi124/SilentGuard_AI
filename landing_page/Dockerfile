@@ -1,7 +1,7 @@
 # ---- Base Stage ----
 FROM node:20-alpine AS base
 WORKDIR /app
-COPY package*.json ./
+COPY landing_page/package*.json ./
 
 # ---- Dependencies Stage ----
 FROM base AS dependencies
@@ -9,7 +9,7 @@ RUN npm ci
 
 # ---- Build Stage ----
 FROM dependencies AS builder
-COPY . .
+COPY landing_page/ ./
 RUN npm run build
 
 # ---- Production Stage ----

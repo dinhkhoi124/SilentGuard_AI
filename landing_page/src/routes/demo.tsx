@@ -3,8 +3,36 @@ import { useServerFn } from "@tanstack/react-start";
 import { useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { AlertTriangle, CheckCircle2, Film, Loader2, Upload, ArrowLeft, Sparkles } from "lucide-react";
+import { initializeApp, getApps, getApp } from "firebase/app";
+import { getAuth, signInWithEmailAndPassword } from "firebase/auth";
+
+import logoAsset from "@/assets/logo.png";
 
 import { analyzeFallVideo, type FallDetectionResult } from "@/lib/fall-detection.functions";
+
+// Firebase Configuration using the project credentials from environment variables
+const firebaseConfig = {
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID
+};
+
+// Initialize Firebase App
+const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+
+const DEMO_EMAIL = "demo@silentguard.ai";
+const DEMO_PASSWORD = "Demo@2026";
+const DEMO_HOUSEHOLD_ID = "d5494e06-b7ac-43f8-810a-22102079aade";
+
+async function getDemoToken() {
+  const auth = getAuth(app);
+  const userCredential = await signInWithEmailAndPassword(auth, DEMO_EMAIL, DEMO_PASSWORD);
+  const token = await userCredential.user.getIdToken(true); // force refresh to get a fresh token each time
+  return token;
+}
 
 export const Route = createFileRoute("/demo")({
   head: () => ({
@@ -23,65 +51,25 @@ export const Route = createFileRoute("/demo")({
 const FRAME_COUNT = 8;
 const MAX_MB = 50;
 
-async function extractFrames(file: File, count: number): Promise<string[]> {
-  const url = URL.createObjectURL(file);
-  const video = document.createElement("video");
-  video.src = url;
-  video.muted = true;
-  video.playsInline = true;
-  video.preload = "auto";
-  video.crossOrigin = "anonymous";
-
-  await new Promise<void>((resolve, reject) => {
-    video.onloadedmetadata = () => resolve();
-    video.onerror = () => reject(new Error("Không đọc được video. Hãy thử định dạng MP4/WebM."));
-  });
-
-  const duration = isFinite(video.duration) && video.duration > 0 ? video.duration : 1;
-  const width = 480;
-  const ratio = video.videoHeight / (video.videoWidth || 1);
-  const height = Math.round(width * (ratio || 0.5625));
-
-  const canvas = document.createElement("canvas");
-  canvas.width = width;
-  canvas.height = height;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("Trình duyệt không hỗ trợ canvas.");
-
-  const frames: string[] = [];
-  for (let i = 0; i < count; i++) {
-    const t = (duration * (i + 0.5)) / count;
-    await new Promise<void>((resolve, reject) => {
-      const onSeeked = () => {
-        video.removeEventListener("seeked", onSeeked);
-        try {
-          ctx.drawImage(video, 0, 0, width, height);
-          frames.push(canvas.toDataURL("image/jpeg", 0.75));
-          resolve();
-        } catch (e) {
-          reject(e as Error);
-        }
-      };
-      video.addEventListener("seeked", onSeeked, { once: true });
-      video.currentTime = Math.min(t, Math.max(0, duration - 0.05));
-    });
-  }
-  URL.revokeObjectURL(url);
-  return frames;
-}
-
 function DemoPage() {
-  const analyze = useServerFn(analyzeFallVideo);
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [status, setStatus] = useState<"idle" | "extracting" | "analyzing">("idle");
+  const [status, setStatus] = useState<"idle" | "authenticating" | "uploading" | "polling" | "done">("idle");
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<FallDetectionResult | null>(null);
+  const [uploadToken, setUploadToken] = useState<string | null>(null);
+  const [eventResult, setEventResult] = useState<{
+    severity: string | null;
+    confidence: number | null;
+    llm_message: string | null;
+    room: string | null;
+  } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   function selectFile(f: File | null) {
-    setResult(null);
+    setEventResult(null);
+    setUploadToken(null);
     setError(null);
+    setStatus("idle");
     if (!f) {
       setFile(null);
       setPreviewUrl(null);
@@ -103,21 +91,84 @@ function DemoPage() {
   async function runAnalysis() {
     if (!file) return;
     setError(null);
-    setResult(null);
+    setEventResult(null);
+    setUploadToken(null);
+    
     try {
-      setStatus("extracting");
-      const frames = await extractFrames(file, FRAME_COUNT);
-      setStatus("analyzing");
-      const r = await analyze({ data: { frames } });
-      setResult(r);
+      setStatus("authenticating");
+      const token = await getDemoToken();
+
+      setStatus("uploading");
+      
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("household_id", DEMO_HOUSEHOLD_ID); 
+
+      const uploadRes = await fetch("https://c2-app-128-production.up.railway.app/api/events/upload-video", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`
+        },
+        body: formData,
+      });
+
+      if (!uploadRes.ok) {
+        const errJson = await uploadRes.json().catch(() => ({}));
+        throw new Error(errJson.detail?.error?.message || errJson.detail || "Không thể tải video lên.");
+      }
+
+      const { upload_token } = await uploadRes.json();
+      setUploadToken(upload_token);
+      setStatus("polling");
+
+      const startTime = Date.now();
+
+      // Polling function every 3 seconds
+      const pollInterval = setInterval(async () => {
+        try {
+          // Timeout after 120 seconds
+          if (Date.now() - startTime > 120 * 1000) {
+            clearInterval(pollInterval);
+            setError("Quá thời gian phân tích (120 giây). Vui lòng thử lại.");
+            setStatus("idle");
+            return;
+          }
+
+          const statusRes = await fetch(`https://c2-app-128-production.up.railway.app/api/events/upload-status/${upload_token}`);
+          if (!statusRes.ok) {
+            clearInterval(pollInterval);
+            throw new Error("Không thể kiểm tra trạng thái video.");
+          }
+
+          const statusData = await statusRes.json();
+          if (statusData.status === "processed") {
+            clearInterval(pollInterval);
+            setEventResult({
+              severity: statusData.event?.severity || null,
+              confidence: statusData.event?.confidence || null,
+              llm_message: statusData.event?.llm_message || null,
+              room: statusData.event?.room || null,
+            });
+            setStatus("done");
+          } else if (statusData.status === "failed") {
+            clearInterval(pollInterval);
+            setError("Phân tích thất bại, vui lòng thử lại.");
+            setStatus("idle");
+          }
+        } catch (e) {
+          clearInterval(pollInterval);
+          setError(e instanceof Error ? e.message : "Có lỗi xảy ra khi xử lý.");
+          setStatus("idle");
+        }
+      }, 3000);
+
     } catch (e) {
       setError(e instanceof Error ? e.message : "Có lỗi xảy ra.");
-    } finally {
       setStatus("idle");
     }
   }
 
-  const busy = status !== "idle";
+  const busy = status === "authenticating" || status === "uploading" || status === "polling";
 
   return (
     <main className="min-h-screen bg-background text-foreground">
@@ -127,9 +178,13 @@ function DemoPage() {
             <ArrowLeft className="size-4" /> Về trang chủ
           </Link>
           <div className="flex items-center gap-2">
-            <span className="grid size-5 place-items-center rounded-full bg-brand">
-              <span className="size-1.5 rounded-full bg-brand-foreground" />
-            </span>
+            <img
+              src={logoAsset}
+              alt="SilentGuard"
+              width={24}
+              height={24}
+              className="size-6 object-cover rounded-full mix-blend-multiply"
+            />
             <span className="font-semibold tracking-tight">SilentGuard · Demo</span>
           </div>
         </div>
@@ -144,8 +199,7 @@ function DemoPage() {
             Tải video lên — AI sẽ cho biết có té ngã hay không
           </h1>
           <p className="mx-auto mt-4 max-w-[52ch] text-pretty text-ink-soft">
-            Hệ thống trích 8 khung hình từ video của bạn và phân tích bằng cùng mô hình thị giác
-            mà SilentGuard sử dụng trong sản phẩm.
+            Tải lên video của bạn. Hệ thống sẽ xử lý và gửi thông báo cảnh báo chi tiết từ mô hình AI.
           </p>
         </div>
 
@@ -210,11 +264,13 @@ function DemoPage() {
                   className="inline-flex items-center gap-2 rounded-full bg-brand px-5 py-2 text-sm font-medium text-brand-foreground shadow-soft ring-1 ring-brand transition-all hover:shadow-glow disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {busy && <Loader2 className="size-4 animate-spin" />}
-                  {status === "extracting"
-                    ? "Đang trích khung hình…"
-                    : status === "analyzing"
-                      ? "AI đang phân tích…"
-                      : "Phân tích bằng AI"}
+                  {status === "authenticating"
+                    ? "Đang xác thực tài khoản demo…"
+                    : status === "uploading"
+                      ? "Đang tải video lên…"
+                      : status === "polling"
+                        ? "AI đang xử lý video…"
+                        : "Phân tích bằng AI"}
                 </button>
               </div>
             </div>
@@ -229,10 +285,10 @@ function DemoPage() {
           {/* Result */}
           <div className="rounded-3xl bg-surface p-6 ring-1 ring-border shadow-soft">
             <h2 className="mb-4 text-sm font-semibold uppercase tracking-widest text-ink-soft">
-              Kết quả phân tích
+              Kết quả phân tích từ AI
             </h2>
             <AnimatePresence mode="wait">
-              {!result && !busy && (
+              {!eventResult && !busy && (
                 <motion.div
                   key="empty"
                   initial={{ opacity: 0 }}
@@ -256,37 +312,61 @@ function DemoPage() {
                   className="flex h-72 flex-col items-center justify-center gap-3 text-sm text-ink-soft"
                 >
                   <Loader2 className="size-6 animate-spin text-brand" />
-                  {status === "extracting"
-                    ? "Đang trích 8 khung hình từ video…"
-                    : "Mô hình thị giác đang phân tích chuyển động…"}
+                  {status === "authenticating"
+                    ? "Đang xác thực thông tin đăng nhập..."
+                    : status === "uploading"
+                      ? "Đang tải tệp video lên hệ thống lưu trữ…"
+                      : "Hệ thống AI đang quét và phân tích té ngã…"}
                 </motion.div>
               )}
 
-              {result && !busy && <ResultCard key="result" r={result} />}
+              {eventResult && !busy && <ResultCard key="result" r={eventResult} />}
             </AnimatePresence>
           </div>
         </div>
 
         <p className="mx-auto mt-12 max-w-[60ch] text-center text-xs text-ink-soft">
-          Lưu ý: Demo này gửi 8 khung hình tĩnh trích từ video lên dịch vụ AI để phân tích — không
-          phải dòng video trực tiếp như trong sản phẩm thật. Độ chính xác có thể khác với hệ thống
-          camera SilentGuard.
+          Lưu ý: Demo này gửi video của bạn lên dịch vụ phân tích AI để tự động phát hiện các sự cố té ngã theo thời gian thực.
         </p>
       </section>
     </main>
   );
 }
 
-function ResultCard({ r }: { r: FallDetectionResult }) {
-  const positive = r.fallDetected;
+function ResultCard({ r }: { r: { severity: string | null; confidence: number | null; llm_message: string | null; room: string | null } }) {
+  const isFall = r.severity !== null && 
+                 r.severity.toUpperCase() !== "LOW" && 
+                 r.severity.toUpperCase() !== "NONE";
+                 
   const sevColor =
-    r.severity === "high"
+    r.severity?.toUpperCase() === "HIGH" || r.severity?.toUpperCase() === "CRITICAL"
       ? "bg-red-100 text-red-700 ring-red-200"
-      : r.severity === "medium"
+      : r.severity?.toUpperCase() === "MEDIUM"
         ? "bg-orange-100 text-orange-700 ring-orange-200"
-        : r.severity === "low"
-          ? "bg-amber-100 text-amber-700 ring-amber-200"
-          : "bg-emerald-100 text-emerald-700 ring-emerald-200";
+        : "bg-emerald-100 text-emerald-700 ring-emerald-200";
+
+  // Clean the AI message: strip room details ("trong bedroom", "trong phòng khách", etc) and duration_sec ("bất động hơn X giây")
+  let cleanMessage = r.llm_message || "Không có phản hồi chi tiết từ AI.";
+  if (r.llm_message) {
+    // Remove "trong <room>" or "trong phòng <room>"
+    cleanMessage = cleanMessage.replace(/trong\s+[a-zA-Z0-9_À-ỹ\s]+(?=\slúc)/i, "");
+    // Remove "Người thân bất động hơn X giây. " or "Người thân bất động hơn X giây" or "Người thân chưa đứng dậy sau X giây. "
+    cleanMessage = cleanMessage.replace(/(Người thân bất động hơn|Người thân chưa đứng dậy sau)\s+\d+\s+giây\.?\s*/i, "");
+
+    // Dynamically convert UTC time string in message (e.g. "lúc 04:08") to Vietnam Local Time (GMT+7)
+    const timeMatch = cleanMessage.match(/lúc\s+(\d{2}):(\d{2})/i);
+    if (timeMatch) {
+      const utcHours = parseInt(timeMatch[1], 10);
+      const utcMinutes = parseInt(timeMatch[2], 10);
+      
+      // Add 7 hours for Vietnam (GMT+7) timezone conversion
+      let localHours = (utcHours + 7) % 24;
+      const formattedHours = String(localHours).padStart(2, '0');
+      const formattedMinutes = String(utcMinutes).padStart(2, '0');
+      
+      cleanMessage = cleanMessage.replace(/lúc\s+\d{2}:\d{2}/i, `lúc ${formattedHours}:${formattedMinutes}`);
+    }
+  }
 
   return (
     <motion.div
@@ -298,52 +378,47 @@ function ResultCard({ r }: { r: FallDetectionResult }) {
     >
       <div
         className={`flex items-center gap-3 rounded-2xl p-4 ring-1 ${
-          positive
+          isFall
             ? "bg-red-50 text-red-800 ring-red-200"
             : "bg-emerald-50 text-emerald-800 ring-emerald-200"
         }`}
       >
-        {positive ? (
+        {isFall ? (
           <AlertTriangle className="size-6 shrink-0" />
         ) : (
           <CheckCircle2 className="size-6 shrink-0" />
         )}
         <div>
           <div className="text-xs font-semibold uppercase tracking-widest opacity-70">
-            {positive ? "Phát hiện té ngã" : "Không phát hiện té ngã"}
+            {isFall ? "Phát hiện té ngã" : "An toàn / Bình thường (Không té ngã)"}
           </div>
           <div className="text-lg font-semibold">
-            Độ tin cậy {(r.confidence * 100).toFixed(0)}%
+            Độ tin cậy {r.confidence ? `${(r.confidence * 100).toFixed(0)}%` : "N/A"}
           </div>
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2 animate-fade-in">
         <span className={`rounded-full px-3 py-1 text-xs font-medium ring-1 ${sevColor}`}>
-          Mức độ: {labelSeverity(r.severity)}
-        </span>
-        <span className="rounded-full bg-surface-2 px-3 py-1 text-xs text-ink-soft ring-1 ring-border">
-          {r.timestampHint}
+          Mức độ nghiêm trọng: {r.severity || "Không xác định"}
         </span>
       </div>
 
-      <div>
-        <h4 className="mb-1 text-xs font-semibold uppercase tracking-widest text-ink-soft">
-          Mô tả
+      <div className={`rounded-xl border p-4 ${
+        isFall 
+          ? "border-red-200 bg-red-50/50" 
+          : "border-emerald-200 bg-emerald-50/50"
+      }`}>
+        <h4 className={`mb-1 text-xs font-semibold uppercase tracking-widest ${
+          isFall ? "text-red-800" : "text-emerald-800"
+        }`}>
+          {isFall ? "Cảnh báo chi tiết từ AI" : "Thông tin chi tiết từ AI"}
         </h4>
-        <p className="text-sm leading-relaxed">{r.description}</p>
-      </div>
-
-      <div>
-        <h4 className="mb-1 text-xs font-semibold uppercase tracking-widest text-ink-soft">
-          Khuyến nghị
-        </h4>
-        <p className="text-sm leading-relaxed">{r.recommendation}</p>
+        <p className={`text-sm leading-relaxed ${
+          isFall ? "text-red-900" : "text-emerald-900"
+        }`}>{cleanMessage}</p>
       </div>
     </motion.div>
   );
 }
 
-function labelSeverity(s: FallDetectionResult["severity"]) {
-  return { none: "Không có", low: "Nhẹ", medium: "Trung bình", high: "Nghiêm trọng" }[s];
-}

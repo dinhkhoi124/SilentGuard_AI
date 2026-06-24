@@ -252,3 +252,47 @@ async def detect_event(
         "event_id": req.event_id
     }
 
+@router.get("/upload-status/{upload_token}")
+async def get_upload_status(upload_token: str):
+    """
+    GET /api/events/upload-status/{upload_token}
+    Poll the status of a video upload and retrieve the associated event information once processed.
+    """
+    try:
+        # Query video_uploads record by token
+        res = supabase.table("video_uploads").select("*").eq("upload_token", upload_token).execute()
+        if not res.data:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={"error": {"code": "NOT_FOUND", "message": "Không tìm thấy upload token này"}}
+            )
+        
+        upload_record = res.data[0]
+        status_val = upload_record.get("status", "pending")
+        event_id = upload_record.get("event_id")
+        
+        event_data = None
+        if status_val == "processed" and event_id:
+            # Query the corresponding event details
+            event_res = supabase.table("events").select("*").eq("id", event_id).execute()
+            if event_res.data:
+                event_data = event_res.data[0]
+        
+        return {
+            "status": status_val,
+            "upload_token": upload_token,
+            "event": {
+                "severity": event_data.get("severity") if event_data else None,
+                "confidence": event_data.get("confidence") if event_data else None,
+                "llm_message": event_data.get("llm_message") if event_data else None
+            } if event_data else None
+        }
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={"error": {"code": "DATABASE_ERROR", "message": f"Lỗi truy vấn trạng thái upload: {str(e)}"}}
+        )
+
+

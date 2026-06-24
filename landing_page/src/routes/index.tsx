@@ -1,13 +1,14 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { motion, useScroll, useTransform, useReducedMotion } from "framer-motion";
-import { useRef, useState } from "react";
-import { Activity, Bell, Camera, ChevronDown, Eye, EyeOff, Moon, PlayCircle, ShieldCheck, Sparkles, Users, Wifi } from "lucide-react";
+import { motion, useScroll, useTransform, useReducedMotion, AnimatePresence } from "framer-motion";
+import { useRef, useState, useEffect } from "react";
+import { Activity, Bell, Camera, ChevronDown, Eye, EyeOff, Loader2, Moon, PlayCircle, ShieldCheck, Sparkles, Users, Wifi, X, Download, ArrowUp } from "lucide-react";
+import { toast } from "sonner";
 
 import { ClientOnly } from "@/components/ClientOnly";
 import { Hero3D } from "@/components/Hero3D";
 import lifestyleImg from "@/assets/lifestyle.jpg";
 import appScreenImg from "@/assets/app-screen.jpg";
-import logoAsset from "@/assets/silentguard-logo.png.asset.json";
+import logoAsset from "@/assets/logo.png";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -66,11 +67,11 @@ function Nav() {
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
         <a href="#top" className="flex items-center gap-2">
           <img
-            src={logoAsset.url}
+            src={logoAsset}
             alt="SilentGuard"
             width={28}
             height={28}
-            className="size-7 object-contain"
+            className="size-7 object-cover rounded-full mix-blend-multiply"
           />
           <span className="font-semibold tracking-tight">SilentGuard</span>
         </a>
@@ -180,8 +181,8 @@ function Hero() {
               className="mt-12 grid max-w-md grid-cols-3 gap-4 text-sm"
             >
               {[
-                { k: "<3s", v: "Phát hiện" },
-                { k: "99.4%", v: "Độ chính xác" },
+                { k: "<60s", v: "Phát hiện" },
+                { k: "90%", v: "Độ chính xác" },
                 { k: "24/7", v: "Quan sát liên tục" },
               ].map((s) => (
                 <div key={s.v}>
@@ -444,6 +445,8 @@ function Stories() {
 
 function Contact() {
   const [submitted, setSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
+
   return (
     <Section id="contact" className="py-24">
       <div className="mx-auto max-w-6xl px-6">
@@ -485,7 +488,12 @@ function Contact() {
             <form
               onSubmit={(e) => {
                 e.preventDefault();
-                setSubmitted(true);
+                setLoading(true);
+                // Simulate an API call with 1.2s timeout
+                setTimeout(() => {
+                  setLoading(false);
+                  setSubmitted(true);
+                }, 1200);
               }}
               className="space-y-4 rounded-2xl bg-surface-2 p-6 ring-1 ring-border md:p-8"
             >
@@ -494,9 +502,9 @@ function Contact() {
                   <div className="grid size-12 place-items-center rounded-full bg-brand-light text-brand">
                     <ShieldCheck className="size-6" />
                   </div>
-                  <p className="font-semibold">Cảm ơn bạn đã đăng ký!</p>
+                  <p className="font-semibold text-lg text-emerald-800">Cảm ơn bạn đã đăng ký thành công!</p>
                   <p className="text-sm text-ink-soft">
-                    Chúng tôi sẽ liên hệ trong vòng 24 giờ.
+                    Đội ngũ chăm sóc khách hàng SilentGuard sẽ chủ động liên hệ tới số điện thoại của bạn trong vòng 24 giờ để tư vấn chi tiết.
                   </p>
                 </div>
               ) : (
@@ -508,8 +516,9 @@ function Contact() {
                     <input
                       required
                       type="text"
+                      disabled={loading}
                       placeholder="Nguyễn Văn A"
-                      className="w-full rounded-xl bg-surface px-4 py-3 text-sm ring-1 ring-border outline-none transition-all focus:ring-brand"
+                      className="w-full rounded-xl bg-surface px-4 py-3 text-sm ring-1 ring-border outline-none transition-all focus:ring-brand disabled:opacity-55"
                     />
                   </div>
                   <div className="space-y-1.5">
@@ -519,8 +528,9 @@ function Contact() {
                     <input
                       required
                       type="tel"
+                      disabled={loading}
                       placeholder="09xx xxx xxx"
-                      className="w-full rounded-xl bg-surface px-4 py-3 text-sm ring-1 ring-border outline-none transition-all focus:ring-brand"
+                      className="w-full rounded-xl bg-surface px-4 py-3 text-sm ring-1 ring-border outline-none transition-all focus:ring-brand disabled:opacity-55"
                     />
                   </div>
                   <div className="space-y-1.5">
@@ -529,15 +539,24 @@ function Contact() {
                     </label>
                     <input
                       type="text"
+                      disabled={loading}
                       placeholder="Hà Nội / TP. HCM / …"
-                      className="w-full rounded-xl bg-surface px-4 py-3 text-sm ring-1 ring-border outline-none transition-all focus:ring-brand"
+                      className="w-full rounded-xl bg-surface px-4 py-3 text-sm ring-1 ring-border outline-none transition-all focus:ring-brand disabled:opacity-55"
                     />
                   </div>
                   <button
                     type="submit"
-                    className="mt-2 w-full rounded-full bg-brand px-6 py-3 text-sm font-medium text-brand-foreground shadow-soft ring-1 ring-brand transition-all hover:scale-[1.01] hover:shadow-glow"
+                    disabled={loading}
+                    className="mt-2 w-full rounded-full bg-brand px-6 py-3 text-sm font-medium text-brand-foreground shadow-soft ring-1 ring-brand transition-all hover:scale-[1.01] hover:shadow-glow disabled:cursor-not-allowed disabled:opacity-50 flex items-center justify-center gap-2"
                   >
-                    Đăng ký nhận tư vấn
+                    {loading ? (
+                      <>
+                        <Loader2 className="size-4 animate-spin" />
+                        Đang kết nối hệ thống...
+                      </>
+                    ) : (
+                      "Đăng ký nhận tư vấn"
+                    )}
                   </button>
                   <p className="text-center text-xs text-ink-soft">
                     Thông tin của bạn được bảo mật theo chính sách riêng tư.
@@ -553,6 +572,8 @@ function Contact() {
 }
 
 function AppDownload() {
+  const [isAndroidModalOpen, setIsAndroidModalOpen] = useState(false);
+
   return (
     <Section className="pb-24">
       <div className="mx-auto max-w-6xl px-6">
@@ -583,37 +604,47 @@ function AppDownload() {
               </p>
 
               <div className="flex flex-wrap gap-3">
-                <a
-                  href="#"
-                  className="inline-flex items-center gap-3 rounded-2xl bg-background px-5 py-3 text-ink ring-1 ring-white/10 transition-all hover:scale-[1.02]"
+                <button
+                  type="button"
+                  onClick={() => {
+                    toast.info("Tính năng này sẽ sớm được ra mắt", {
+                      description: "Phiên bản dành cho iOS (App Store) đang được kiểm duyệt và sẽ sớm ra mắt.",
+                    });
+                  }}
+                  className="inline-flex items-center gap-3 rounded-2xl bg-background px-5 py-3 text-ink ring-1 ring-white/10 transition-all hover:scale-[1.02] cursor-pointer"
                 >
                   <svg viewBox="0 0 24 24" className="size-6" fill="currentColor" aria-hidden>
-                    <path d="M16.365 1.43c0 1.14-.42 2.22-1.16 3.04-.79.87-2.07 1.55-3.12 1.47-.13-1.09.43-2.24 1.13-3.02.78-.87 2.13-1.52 3.15-1.49zM20.5 17.05c-.55 1.27-.82 1.83-1.53 2.95-1 1.56-2.4 3.51-4.14 3.52-1.55.01-1.95-1.01-4.05-1-2.1.01-2.54 1.02-4.09 1.01-1.74-.01-3.07-1.77-4.07-3.33C-.04 16.69-.36 11.43 1.84 8.62c1.55-1.99 4-3.16 6.31-3.16 2.34 0 3.82 1.28 5.76 1.28 1.88 0 3.03-1.28 5.74-1.28 2.05.01 4.22 1.12 5.77 3.06-5.07 2.78-4.24 10.03.08 11.53z" />
+                    <path d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701"/>
                   </svg>
                   <div className="text-left leading-tight">
                     <div className="text-[10px] uppercase tracking-wider text-ink-soft">Tải về trên</div>
                     <div className="text-sm font-semibold">App Store</div>
                   </div>
-                </a>
-                <a
-                  href="#"
-                  className="inline-flex items-center gap-3 rounded-2xl bg-background px-5 py-3 text-ink ring-1 ring-white/10 transition-all hover:scale-[1.02]"
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsAndroidModalOpen(true)}
+                  className="inline-flex items-center gap-3 rounded-2xl bg-background px-5 py-3 text-ink ring-1 ring-white/10 transition-all hover:scale-[1.02] cursor-pointer"
                 >
-                  <svg viewBox="0 0 24 24" className="size-6" aria-hidden>
-                    <path fill="#34A853" d="M3.6 2.3c-.4.4-.6 1-.6 1.8v15.8c0 .8.2 1.4.6 1.8l11.6-11.6L3.6 2.3z" opacity=".0" />
-                    <path fill="currentColor" d="M3.6 2.3c-.4.4-.6 1-.6 1.8v15.8c0 .8.2 1.4.6 1.8l9-9-9-10.4zM16.6 9.7L4.2 2.2c-.3-.2-.5-.2-.7-.1l9.1 10.4 4-2.8zM20.5 11.3l-3.9-2.3-4.2 3 4.2 3 3.9-2.3c1.1-.7 1.1-1.7 0-2.4zM3.5 21.9c.2.1.5.1.7-.1l12.4-7.5-4-3-9.1 10.6z" />
+                  <svg viewBox="0 0 28.99 31.99" className="size-6" aria-hidden>
+                    <g fillRule="nonzero">
+                      <path d="M13.54 15.28.12 29.34a3.66 3.66 0 0 0 5.33 2.16l15.1-8.6Z" fill="#ea4335" />
+                      <path d="m27.11 12.89-6.53-3.74-7.35 6.45 7.38 7.28 6.48-3.7a3.54 3.54 0 0 0 1.5-4.79 3.62 3.62 0 0 0-1.5-1.5z" fill="#fbbc04" />
+                      <path d="M.12 2.66a3.57 3.57 0 0 0-.12.92v24.84a3.57 3.57 0 0 0 .12.92L14 15.64Z" fill="#4285f4" />
+                      <path d="m13.64 16 6.94-6.85L5.5.51A3.73 3.73 0 0 0 3.63 0 3.64 3.64 0 0 0 .12 2.65Z" fill="#34a853" />
+                    </g>
                   </svg>
                   <div className="text-left leading-tight">
                     <div className="text-[10px] uppercase tracking-wider text-ink-soft">Tải về trên</div>
                     <div className="text-sm font-semibold">Google Play</div>
                   </div>
-                </a>
+                </button>
               </div>
 
               <div className="mt-8 flex flex-wrap items-center gap-6 text-xs text-background/60">
                 <div className="flex items-center gap-2">
-                  <span className="text-brand-glow">★★★★★</span>
-                  <span>4.9 / 5 · 1.200+ đánh giá</span>
+                  <ShieldCheck className="size-4 text-brand-glow" />
+                  <span>Sản phẩm được các điều dưỡng tin dùng</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Wifi className="size-3.5 text-brand-glow" />
@@ -641,6 +672,131 @@ function AppDownload() {
           </div>
         </motion.div>
       </div>
+
+      <AnimatePresence>
+        {isAndroidModalOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md"
+            onClick={() => setIsAndroidModalOpen(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              transition={{ type: "spring", duration: 0.5 }}
+              className="relative w-full max-w-2xl overflow-hidden rounded-3xl bg-ink text-background p-6 md:p-8 ring-1 ring-white/20 shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Glow Effects */}
+              <div className="pointer-events-none absolute -left-20 -top-20 size-60 rounded-full bg-brand/20 blur-3xl" />
+              <div className="pointer-events-none absolute -right-20 -bottom-20 size-60 rounded-full bg-brand-glow/10 blur-3xl" />
+
+              {/* Close Button */}
+              <button
+                type="button"
+                onClick={() => setIsAndroidModalOpen(false)}
+                className="absolute right-4 top-4 rounded-full p-2 text-background/60 hover:bg-white/10 hover:text-background transition-colors cursor-pointer"
+              >
+                <X className="size-5" />
+              </button>
+
+              <div className="relative">
+                <div className="mb-6">
+                  <span className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-brand/20 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-brand-glow">
+                    Tải xuống APK
+                  </span>
+                  <h3 className="text-2xl font-bold">Chọn phiên bản Android phù hợp</h3>
+                  <p className="text-sm text-background/60 mt-1">
+                    Ứng dụng SilentGuard hỗ trợ các kiến trúc chip Android khác nhau để tối ưu hóa hiệu năng và tương thích tốt nhất.
+                  </p>
+                </div>
+
+                <div className="space-y-4">
+                  {/* Version 1: ARM64-v8a */}
+                  <div className="relative overflow-hidden rounded-2xl bg-white/5 p-5 ring-1 ring-brand/35 hover:bg-white/10 transition-all">
+                    <div className="absolute right-3 top-3">
+                      <span className="rounded-full bg-brand px-2.5 py-0.5 text-[10px] font-semibold text-white uppercase tracking-wider shadow-[0_0_10px_var(--brand)]">
+                        Khuyên dùng
+                      </span>
+                    </div>
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                      <div>
+                        <h4 className="text-base font-semibold text-brand-glow flex items-center gap-2">
+                          Cấu trúc ARM64-v8a (64-bit)
+                        </h4>
+                        <p className="text-xs text-background/70 mt-1 max-w-[48ch]">
+                          <strong>Thiết bị phù hợp:</strong> Hầu hết điện thoại Android hiện nay (đời mới từ khoảng 2017 trở lại đây). Đây là bản phổ biến nhất chạy trên các máy tầm trung đến cao cấp.
+                        </p>
+                        <span className="inline-block mt-2 text-[11px] text-background/50 font-mono">
+                          File: app-arm64-v8a-release.apk
+                        </span>
+                      </div>
+                      <a
+                        href="/downloads/app-arm64-v8a-release.apk"
+                        download
+                        className="flex items-center justify-center gap-2 rounded-xl bg-brand hover:bg-brand-glow text-white px-4 py-2.5 text-sm font-semibold transition-all self-start md:self-auto shadow-md"
+                      >
+                        <Download className="size-4" /> Tải xuống
+                      </a>
+                    </div>
+                  </div>
+
+                  {/* Version 2: ARMEABI-v7a */}
+                  <div className="relative overflow-hidden rounded-2xl bg-white/5 p-5 ring-1 ring-white/10 hover:bg-white/10 transition-all">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                      <div>
+                        <h4 className="text-base font-semibold text-background flex items-center gap-2">
+                          Cấu trúc ARMEABI-v7a (32-bit)
+                        </h4>
+                        <p className="text-xs text-background/70 mt-1 max-w-[48ch]">
+                          <strong>Thiết bị phù hợp:</strong> Các dòng điện thoại Android đời cũ, máy cấu hình thấp, smartwatch, tivi. Bản này có thể tương thích ngược trên cả máy 64-bit.
+                        </p>
+                        <span className="inline-block mt-2 text-[11px] text-background/50 font-mono">
+                          File: app-armeabi-v7a-release.apk
+                        </span>
+                      </div>
+                      <a
+                        href="/downloads/app-armeabi-v7a-release.apk"
+                        download
+                        className="flex items-center justify-center gap-2 rounded-xl bg-white/10 hover:bg-white/20 text-white px-4 py-2.5 text-sm font-semibold transition-all self-start md:self-auto"
+                      >
+                        <Download className="size-4" /> Tải xuống
+                      </a>
+                    </div>
+                  </div>
+
+                  {/* Version 3: x86_64 */}
+                  <div className="relative overflow-hidden rounded-2xl bg-white/5 p-5 ring-1 ring-white/10 hover:bg-white/10 transition-all">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                      <div>
+                        <h4 className="text-base font-semibold text-background flex items-center gap-2">
+                          Cấu trúc x86_64 (64-bit)
+                        </h4>
+                        <p className="text-xs text-background/70 mt-1 max-w-[48ch]">
+                          <strong>Thiết bị phù hợp:</strong> Trình giả lập (Emulator) trên máy tính (như LDPlayer, Bluestacks, NoxPlayer hoặc Android Studio Emulator chạy trên chip Intel/AMD).
+                        </p>
+                        <span className="inline-block mt-2 text-[11px] text-background/50 font-mono">
+                          File: app-x86_64-release.apk
+                        </span>
+                      </div>
+                      <a
+                        href="/downloads/app-x86_64-release.apk"
+                        download
+                        className="flex items-center justify-center gap-2 rounded-xl bg-white/10 hover:bg-white/20 text-white px-4 py-2.5 text-sm font-semibold transition-all self-start md:self-auto"
+                      >
+                        <Download className="size-4" /> Tải xuống
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </Section>
   );
 }
@@ -767,7 +923,7 @@ function Footer() {
         <div className="flex flex-col items-start justify-between gap-12 md:flex-row">
           <div>
             <div className="mb-6 flex items-center gap-2">
-              <img src={logoAsset.url} alt="SilentGuard" width={24} height={24} className="size-6 object-contain" />
+              <img src={logoAsset} alt="SilentGuard" width={24} height={24} className="size-6 object-cover rounded-full mix-blend-multiply" />
               <span className="font-semibold tracking-tight">SilentGuard</span>
             </div>
             <p className="max-w-[32ch] text-sm text-ink-soft">
@@ -780,8 +936,8 @@ function Footer() {
                 Liên hệ
               </h5>
               <ul className="space-y-2 text-sm text-ink">
-                <li>Hotline: 1900 68XX</li>
-                <li>hello@silentguard.vn</li>
+                <li>Hotline: 0347838309</li>
+                <li>vinhv304@gmail.com</li>
               </ul>
             </div>
             <div className="space-y-4">
@@ -803,6 +959,47 @@ function Footer() {
   );
 }
 
+function BackToTop() {
+  const [isVisible, setIsVisible] = useState(false);
+
+  useEffect(() => {
+    const toggleVisibility = () => {
+      if (window.scrollY > 400) {
+        setIsVisible(true);
+      } else {
+        setIsVisible(false);
+      }
+    };
+
+    window.addEventListener("scroll", toggleVisibility);
+    return () => window.removeEventListener("scroll", toggleVisibility);
+  }, []);
+
+  const scrollToTop = () => {
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth",
+    });
+  };
+
+  return (
+    <AnimatePresence>
+      {isVisible && (
+        <motion.button
+          initial={{ opacity: 0, scale: 0.8, y: 20 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.8, y: 20 }}
+          onClick={scrollToTop}
+          className="fixed bottom-6 right-6 z-40 flex size-12 cursor-pointer items-center justify-center rounded-full bg-brand text-white shadow-glow ring-1 ring-white/10 transition-all hover:bg-brand-glow hover:scale-110 active:scale-95"
+          aria-label="Cuộn về đầu trang"
+        >
+          <ArrowUp className="size-5" />
+        </motion.button>
+      )}
+    </AnimatePresence>
+  );
+}
+
 function Index() {
   return (
     <main className="min-h-screen bg-background text-foreground">
@@ -816,6 +1013,7 @@ function Index() {
       <Contact />
       <AppDownload />
       <Footer />
+      <BackToTop />
     </main>
   );
 }

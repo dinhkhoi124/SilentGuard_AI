@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { ArrowLeft, Check, Lock, ShieldCheck, X } from "lucide-react";
+import logoAsset from "@/assets/logo.png";
 
 export const Route = createFileRoute("/privacy")({
   head: () => ({
@@ -34,18 +35,30 @@ function PrivacyPage() {
           <Link to="/" className="flex items-center gap-2 text-sm text-ink-soft hover:text-brand">
             <ArrowLeft className="size-4" /> {lang === "vi" ? "Về trang chủ" : "Back to home"}
           </Link>
-          <div className="flex items-center gap-1 rounded-full bg-surface-2 p-1 text-xs font-medium ring-1 ring-border">
-            {(["vi", "en"] as const).map((l) => (
-              <button
-                key={l}
-                onClick={() => setLang(l)}
-                className={`rounded-full px-3 py-1 transition-colors ${
-                  lang === l ? "bg-brand text-brand-foreground" : "text-ink-soft hover:text-ink"
-                }`}
-              >
-                {l === "vi" ? "Tiếng Việt" : "English"}
-              </button>
-            ))}
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-1.5">
+              <img
+                src={logoAsset}
+                alt="SilentGuard"
+                width={24}
+                height={24}
+                className="size-6 object-cover rounded-full mix-blend-multiply"
+              />
+              <span className="font-semibold text-sm tracking-tight">SilentGuard</span>
+            </div>
+            <div className="flex items-center gap-1 rounded-full bg-surface-2 p-1 text-xs font-medium ring-1 ring-border">
+              {(["vi", "en"] as const).map((l) => (
+                <button
+                  key={l}
+                  onClick={() => setLang(l)}
+                  className={`rounded-full px-3 py-1 transition-colors ${
+                    lang === l ? "bg-brand text-brand-foreground" : "text-ink-soft hover:text-ink"
+                  }`}
+                >
+                  {l === "vi" ? "Tiếng Việt" : "English"}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </nav>

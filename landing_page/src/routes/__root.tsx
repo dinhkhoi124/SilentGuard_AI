@@ -77,6 +77,8 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   );
 }
 
+import logoAsset from "../assets/logo.png";
+
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   head: () => ({
     meta: [
@@ -95,6 +97,15 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       {
         rel: "stylesheet",
         href: appCss,
+      },
+      {
+        rel: "icon",
+        type: "image/png",
+        href: logoAsset,
+      },
+      {
+        rel: "apple-touch-icon",
+        href: logoAsset,
       },
     ],
   }),
@@ -118,6 +129,8 @@ function RootShell({ children }: { children: ReactNode }) {
   );
 }
 
+import { Toaster } from "../components/ui/sonner";
+
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
@@ -125,6 +138,7 @@ function RootComponent() {
     <QueryClientProvider client={queryClient}>
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
       <Outlet />
+      <Toaster />
     </QueryClientProvider>
   );
 }

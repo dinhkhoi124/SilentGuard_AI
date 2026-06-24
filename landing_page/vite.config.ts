@@ -12,4 +12,15 @@ export default defineConfig({
     // nitro/vite builds from this
     server: { entry: "server" },
   },
+  vite: {
+    server: {
+      proxy: {
+        "/api": {
+          target: "https://c2-app-128-production.up.railway.app/",
+          changeOrigin: true,
+          secure: false,
+        },
+      },
+    },
+  },
 });

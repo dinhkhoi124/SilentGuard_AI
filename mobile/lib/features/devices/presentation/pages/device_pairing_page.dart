@@ -7,6 +7,7 @@ import 'package:mobile/core/utils/app_colors.dart';
 import 'package:mobile/features/devices/presentation/bloc/device_pairing_bloc.dart';
 import 'package:mobile/features/devices/presentation/bloc/device_pairing_event.dart';
 import 'package:mobile/features/devices/presentation/bloc/device_pairing_state.dart';
+import 'package:mobile/features/devices/domain/entities/resolved_device.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 class DevicePairingPage extends StatelessWidget {
@@ -33,7 +34,13 @@ class DevicePairingPage extends StatelessWidget {
       ),
       body: SafeArea(
         top: false,
-        child: BlocBuilder<DevicePairingBloc, DevicePairingState>(
+        child: BlocConsumer<DevicePairingBloc, DevicePairingState>(
+          listenWhen: (previous, current) => current is DevicePairingSuccess,
+          listener: (context, state) {
+            if (state is DevicePairingSuccess) {
+              context.pop();
+            }
+          },
           builder: (context, state) {
             return switch (state) {
               DevicePairingInitial() => const _ProgressView(
@@ -60,6 +67,9 @@ class DevicePairingPage extends StatelessWidget {
                     : 'Camera đang offline — vẫn tiếp tục thêm thiết bị.',
                 activeStep: 3,
               ),
+              DevicePairingNameInput(:final resolvedDevice) => _NameInputView(
+                resolvedDevice: resolvedDevice,
+              ),
               DevicePairingPersisting(:final resolvedDevice) => _ProgressView(
                 title: 'Đang lưu thiết bị',
                 message:
@@ -84,14 +94,10 @@ class DevicePairingPage extends StatelessWidget {
                 ),
               ),
               DevicePairingSuccess(:final device, :final warningMessage) =>
-                _MessageView(
-                  icon: Icons.check_circle_outline,
-                  title: 'Đã thêm camera',
-                  message:
-                      warningMessage ??
-                      '${device.name} đã sẵn sàng phát luồng trực tiếp trong SlientGuard.',
-                  primaryLabel: 'Hoàn tất',
-                  onPrimary: () => context.pop(device.toCameraDevice()),
+                _ProgressView(
+                  title: 'Hoàn tất',
+                  message: warningMessage ?? 'Đã thêm ${device.name}.',
+                  activeStep: 5,
                 ),
               DevicePairingError(:final message) => _MessageView(
                 icon: Icons.warning_amber_rounded,
@@ -110,6 +116,90 @@ class DevicePairingPage extends StatelessWidget {
           },
         ),
       ),
+    );
+  }
+}
+
+class _NameInputView extends StatefulWidget {
+  const _NameInputView({required this.resolvedDevice});
+
+  final ResolvedDevice resolvedDevice;
+
+  @override
+  State<_NameInputView> createState() => _NameInputViewState();
+}
+
+class _NameInputViewState extends State<_NameInputView> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(
+      text: widget.resolvedDevice.displayName,
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 34, 20, 28),
+      children: [
+        const Icon(
+          Icons.camera_alt_outlined,
+          size: 48,
+          color: AppColors.primary,
+        ),
+        const SizedBox(height: 22),
+        const Text(
+          'Đặt tên camera',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: AppColors.darkText,
+            fontSize: 22,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Serial: ${widget.resolvedDevice.serialNumber}',
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            color: AppColors.mutedText,
+            fontSize: 14,
+            height: 1.45,
+          ),
+        ),
+        const SizedBox(height: 28),
+        TextField(
+          controller: _controller,
+          decoration: InputDecoration(
+            labelText: 'Tên thiết bị',
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+          ),
+        ),
+        const SizedBox(height: 24),
+        FilledButton(
+          onPressed: () {
+            final name = _controller.text.trim();
+            if (name.isEmpty) return;
+            context.read<DevicePairingBloc>().add(
+              DevicePairingNameSubmitted(
+                name,
+                widget.resolvedDevice,
+                widget.resolvedDevice.serialNumber,
+              ),
+            );
+          },
+          child: const Text('Tiếp tục'),
+        ),
+      ],
     );
   }
 }

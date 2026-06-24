@@ -2,12 +2,14 @@ import 'dart:developer' as developer;
 
 import 'package:dartz/dartz.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:mobile/features/devices/domain/entities/imou_device_status.dart';
 import 'package:mobile/features/devices/domain/entities/resolved_device.dart';
 import 'package:mobile/features/devices/domain/failures/imou_stream_failure.dart';
 import 'package:mobile/features/devices/domain/repositories/device_repository.dart';
 import 'package:mobile/features/devices/domain/repositories/imou_stream_repository.dart';
 import 'package:mobile/features/devices/presentation/bloc/device_pairing_event.dart';
 import 'package:mobile/features/devices/presentation/bloc/device_pairing_state.dart';
+import 'package:mobile/features/devices/domain/utils/qr_parser.dart';
 
 class DevicePairingBloc extends Bloc<DevicePairingEvent, DevicePairingState> {
   DevicePairingBloc({
@@ -21,6 +23,7 @@ class DevicePairingBloc extends Bloc<DevicePairingEvent, DevicePairingState> {
     on<DevicePairingOpenSettingsRequested>(_onOpenSettingsRequested);
     on<DevicePairingGalleryQrRequested>(_onGalleryQrRequested);
     on<DevicePairingLiveQrDetected>(_onLiveQrDetected);
+    on<DevicePairingNameSubmitted>(_onNameSubmitted);
   }
 
   final DeviceRepository _deviceRepository;
@@ -115,6 +118,16 @@ class DevicePairingBloc extends Bloc<DevicePairingEvent, DevicePairingState> {
   }) async {
     try {
       emit(const DevicePairingResolving());
+      final serialNumber = parseSerialNumber(rawQr);
+      if (serialNumber == null) {
+        emit(
+          const DevicePairingError(
+            'Không đọc được mã serial từ QR. Vui lòng thử lại.',
+          ),
+        );
+        return;
+      }
+
       final resolvedResult = await _deviceRepository.resolveDeviceQr(rawQr);
       final resolvedDevice = _valueOrError(
         resolvedResult,
@@ -135,40 +148,75 @@ class DevicePairingBloc extends Bloc<DevicePairingEvent, DevicePairingState> {
   }) async {
     emit(DevicePairingCheckingImou(resolvedDevice: resolvedDevice));
 
-    final statusResult = await _imouStreamRepository.checkDeviceStatus(
-      resolvedDevice.serialNumber,
-    );
-    final imouStatus = _valueOrImouError(
-      statusResult,
-      (failure) => emit(DevicePairingError(failure.message)),
-    );
-    if (imouStatus == null) return;
+    String streamUrl = '';
+
+    try {
+      final statusResult = await _imouStreamRepository.checkDeviceStatus(
+        resolvedDevice.serialNumber,
+      );
+      final imouStatus = statusResult.fold((_) => null, (status) => status);
+
+      emit(
+        DevicePairingObtainingStream(
+          resolvedDevice: resolvedDevice,
+          imouStatus:
+              imouStatus ??
+              ImouDeviceStatus(
+                serialNumber: resolvedDevice.serialNumber,
+                isBound: false,
+                isMine: false,
+                isOnline: false,
+                deviceName: null,
+                channelCount: null,
+              ),
+        ),
+      );
+
+      if (imouStatus != null) {
+        final streamResult = await _imouStreamRepository.getStreamUrl(
+          resolvedDevice.serialNumber,
+        );
+        streamUrl = streamResult.fold((_) => '', (url) => url);
+      }
+    } catch (_) {
+      // Imou is non-fatal: device can be saved without a stream URL.
+    }
 
     emit(
-      DevicePairingObtainingStream(
+      DevicePairingNameInput(
         resolvedDevice: resolvedDevice,
-        imouStatus: imouStatus,
+        streamUrl: streamUrl,
       ),
     );
+  }
 
-    final streamResult = await _imouStreamRepository.getStreamUrl(
-      resolvedDevice.serialNumber,
+  Future<void> _onNameSubmitted(
+    DevicePairingNameSubmitted event,
+    Emitter<DevicePairingState> emit,
+  ) async {
+    final resolvedDevice = ResolvedDevice(
+      deviceId: event.resolvedDevice.deviceId,
+      displayName: event.name.trim(),
+      serialNumber: event.serialNumber,
+      model: event.resolvedDevice.model,
+      productId: event.resolvedDevice.productId,
+      location: event.resolvedDevice.location,
+      metadata: event.resolvedDevice.metadata,
     );
-    final streamUrl = _valueOrImouError(streamResult, (failure) {
-      if (imouStatus.isOnline) emit(DevicePairingError(failure.message));
-    });
-    if (streamUrl == null && imouStatus.isOnline) return;
+
+    final streamUrl = (state as DevicePairingNameInput).streamUrl;
 
     emit(
       DevicePairingPersisting(
         resolvedDevice: resolvedDevice,
-        streamUrl: streamUrl ?? '',
+        streamUrl: streamUrl,
       ),
     );
+
     final saveResult = await _deviceRepository.savePairedDevice(
       resolvedDevice: resolvedDevice,
       ipAddress: 'imou-cloud',
-      rtspUrl: streamUrl ?? '',
+      rtspUrl: streamUrl,
     );
     final pairedDevice = _valueOrError(
       saveResult,
@@ -176,14 +224,7 @@ class DevicePairingBloc extends Bloc<DevicePairingEvent, DevicePairingState> {
     );
     if (pairedDevice == null) return;
 
-    emit(
-      DevicePairingSuccess(
-        pairedDevice,
-        warningMessage: imouStatus.isOnline
-            ? null
-            : 'Camera đang offline — đã thêm thiết bị nhưng chưa xem được video',
-      ),
-    );
+    emit(DevicePairingSuccess(pairedDevice, warningMessage: null));
   }
 
   T? _valueOrError<T>(
@@ -198,6 +239,8 @@ class DevicePairingBloc extends Bloc<DevicePairingEvent, DevicePairingState> {
     return value;
   }
 
+  // Kept for compatibility with the existing bloc structure.
+  // ignore: unused_element
   T? _valueOrImouError<T>(
     Either<ImouStreamFailure, T> result,
     void Function(ImouStreamFailure failure) onFailure,

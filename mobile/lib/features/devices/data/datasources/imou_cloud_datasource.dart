@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:developer' as developer;
 
 import 'package:crypto/crypto.dart';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:mobile/core/config/app_config.dart';
 import 'package:mobile/features/devices/domain/entities/imou_device_status.dart';
@@ -21,8 +22,9 @@ class ImouCloudDataSourceImpl implements ImouCloudDataSource {
   static const tokenMethod = 'accessToken';
   static const checkBindMethod = 'checkDeviceBindOrNot';
   static const deviceOnlineMethod = 'deviceOnline';
-  static const createRtmpMethod = 'createDeviceRtmpLive';
-  static const queryRtmpMethod = 'queryDeviceRtmpLive';
+  static const bindDeviceLiveMethod = 'bindDeviceLive';
+  static const getLiveStreamInfoMethod = 'getLiveStreamInfo';
+  static const unsupportedStreamFormatCode = 'unsupported_stream_format';
 
   final http.Client _client;
 
@@ -61,25 +63,108 @@ class ImouCloudDataSourceImpl implements ImouCloudDataSource {
       'channelId': channel,
     };
 
-    Map<String, dynamic> data;
+    String? liveToken;
     try {
-      data = await _request(createRtmpMethod, params);
+      final bindResponse = await _request(bindDeviceLiveMethod, params);
+      liveToken = _readString(bindResponse, const ['liveToken']);
+      final streamId = _readString(bindResponse, const ['streamId']);
+      debugPrint(
+        '[Imou] bindDeviceLive session: '
+        'liveToken=${liveToken == null ? 'missing' : 'present'}, '
+        'streamId=${streamId == null ? 'missing' : 'present'}',
+      );
     } on ImouCloudException catch (error) {
       if (_isAuthError(error)) _cachedToken = null;
-      if (error.code != 'LV1001') rethrow;
+      // bindDeviceLive is best-effort: ignore all errors and attempt
+      // getLiveStreamInfo regardless. Imou may already have an active
+      // session (LV1001) or the device may not require explicit binding.
+    }
+
+    final infoParams = <String, dynamic>{
+      'token': token,
+      'deviceId': deviceId,
+      'channelId': channel,
+      'liveToken': ?liveToken,
+    };
+
+    for (var attempt = 1; attempt <= 3; attempt++) {
+      Map<String, dynamic> data;
       try {
-        data = await _request(queryRtmpMethod, params);
-      } on ImouCloudException catch (queryError) {
-        if (_isAuthError(queryError)) _cachedToken = null;
+        data = await _request(getLiveStreamInfoMethod, infoParams);
+      } on ImouCloudException catch (error) {
+        if (_isAuthError(error)) _cachedToken = null;
         rethrow;
+      }
+
+      _logSafeLiveStreamInfo(data);
+
+      if (_isStreamReady(data)) {
+        return _selectPlayableStreamUrl(data);
+      }
+
+      if (attempt < 3) {
+        debugPrint('[Imou] stream not ready, retrying ($attempt/3) in 1s...');
+        await Future<void>.delayed(const Duration(seconds: 1));
       }
     }
 
-    final url = _selectRtmpUrl(data);
-    if (url == null || url.isEmpty) {
-      throw const ImouCloudException('Imou Cloud did not return an RTMP URL.');
+    throw const ImouCloudException(
+      'Camera đang trực tuyến nhưng chưa phản hồi luồng trực tiếp. Vui lòng kiểm tra mạng của camera hoặc thử lại sau.',
+      code: 'device_no_response',
+    );
+  }
+
+  void _logSafeLiveStreamInfo(Map<String, dynamic> data) {
+    debugPrint('[Imou] live status: ${data['status']}');
+    debugPrint('[Imou] live job: ${data['job']}');
+    debugPrint('[Imou] liveType: ${data['liveType']}');
+    debugPrint('[Imou] streamId: ${data['streamId']}');
+    final hasHls = data.keys.any((k) => k.toLowerCase().contains('hls'));
+    debugPrint('[Imou] hls exists in root: $hasHls');
+
+    final streams = data['streams'];
+    if (streams is List) {
+      debugPrint('[Imou] streams length: ${streams.length}');
+      for (var i = 0; i < streams.length; i++) {
+        final stream = streams[i];
+        if (stream is Map) {
+          final sId = stream['streamId'];
+          final sType = stream['type'] ?? stream['format'];
+          final sStatus = stream['status'];
+          debugPrint(
+            '[Imou] streams[$i] streamId: $sId, type: $sType, status: $sStatus',
+          );
+        }
+      }
+    } else {
+      debugPrint('[Imou] streams length: 0');
     }
-    return url;
+  }
+
+  bool _isStreamReady(Map<String, dynamic> data) {
+    bool isStatusReady(String? status) {
+      if (status == null) return false;
+      final lower = status.toLowerCase();
+      return lower == 'ready' ||
+          lower == 'normal' ||
+          lower == 'active' ||
+          lower == 'success' ||
+          lower == '1';
+    }
+
+    final rootStatus = data['status']?.toString();
+    if (isStatusReady(rootStatus)) return true;
+
+    final streams = data['streams'];
+    if (streams is List) {
+      for (final stream in streams) {
+        if (stream is Map) {
+          if (isStatusReady(stream['status']?.toString())) return true;
+        }
+      }
+    }
+
+    return false;
   }
 
   Future<String> _accessToken() async {
@@ -115,6 +200,9 @@ class ImouCloudDataSourceImpl implements ImouCloudDataSource {
     Map<String, dynamic> params,
   ) async {
     _ensureConfigured();
+    if (_isLiveMethod(method)) {
+      debugPrint('[Imou] live endpoint called: $method');
+    }
     final uri = _uri(method);
     final body = _openApiBody(params);
 
@@ -220,9 +308,110 @@ class ImouCloudDataSourceImpl implements ImouCloudDataSource {
     }
   }
 
-  String? _selectRtmpUrl(Map<String, dynamic> data) {
-    return _readString(data, const ['rtmp', 'rtmpUrl', 'url']) ??
-        _readString(data, const ['rtmpHD', 'rtmpHd', 'rtmp_hd']);
+  String _selectPlayableStreamUrl(Map<String, dynamic> data) {
+    final streamMaps = <Map<String, dynamic>>[data];
+    final streams = data['streams'];
+    if (streams is List) {
+      for (final stream in streams) {
+        if (stream is Map) {
+          streamMaps.add(Map<String, dynamic>.from(stream));
+        }
+      }
+    }
+
+    final availableKeys =
+        streamMaps.expand((stream) => stream.keys).toSet().toList()..sort();
+    debugPrint('[Imou] available response keys: $availableKeys');
+
+    final hlsCandidates = <String>[];
+    final rtmpCandidates = <String>[];
+    for (final stream in streamMaps) {
+      _addUrlCandidates(hlsCandidates, stream, const [
+        'hls',
+        'httpsHls',
+        'hlsUrl',
+        'm3u8',
+        'url',
+      ]);
+      _addUrlCandidates(rtmpCandidates, stream, const [
+        'rtmp',
+        'rtmps',
+        'rtmpHD',
+        'rtmpHd',
+        'rtmp_hd',
+      ]);
+    }
+
+    final httpsHls = hlsCandidates.firstWhere(
+      (url) => _isHlsUrl(url, requireHttps: true),
+      orElse: () => '',
+    );
+    if (httpsHls.isNotEmpty) {
+      _logSelectedStream('httpsHls', httpsHls);
+      return httpsHls;
+    }
+
+    final hls = hlsCandidates.firstWhere(_isHlsUrl, orElse: () => '');
+    if (hls.isNotEmpty) {
+      _logSelectedStream('hls', hls);
+      return hls;
+    }
+
+    final unsupportedRtmp = [
+      ...rtmpCandidates,
+      ...hlsCandidates,
+    ].firstWhere(_isRtmpUrl, orElse: () => '');
+    if (unsupportedRtmp.isNotEmpty) {
+      _logSelectedStream('unsupportedRtmp', unsupportedRtmp);
+      throw const ImouCloudException(
+        'Imou Cloud returned only an unsupported RTMP stream.',
+        code: unsupportedStreamFormatCode,
+      );
+    }
+
+    debugPrint('[Imou] selected stream format: unavailable');
+    throw const ImouCloudException(
+      'Imou Cloud did not return a supported HLS stream.',
+    );
+  }
+
+  void _addUrlCandidates(
+    List<String> target,
+    Map<String, dynamic> stream,
+    List<String> keys,
+  ) {
+    for (final key in keys) {
+      final value = stream[key]?.toString().trim() ?? '';
+      if (value.isNotEmpty && !target.contains(value)) target.add(value);
+    }
+  }
+
+  bool _isHlsUrl(String url, {bool requireHttps = false}) {
+    final uri = Uri.tryParse(url);
+    if (uri == null || uri.host.isEmpty) return false;
+    if (requireHttps && uri.scheme.toLowerCase() != 'https') return false;
+    final scheme = uri.scheme.toLowerCase();
+    return (scheme == 'http' || scheme == 'https') &&
+        uri.path.toLowerCase().endsWith('.m3u8');
+  }
+
+  bool _isRtmpUrl(String url) {
+    final scheme = Uri.tryParse(url)?.scheme.toLowerCase();
+    return scheme == 'rtmp' || scheme == 'rtmps';
+  }
+
+  void _logSelectedStream(String format, String url) {
+    final uri = Uri.tryParse(url);
+    debugPrint('[Imou] selected stream format: $format');
+    debugPrint('[Imou] selected stream URL: ${uri?.scheme}://${uri?.host}');
+    debugPrint('[Imou] FULL stream URL: $url');
+  }
+
+  bool _isLiveMethod(String method) {
+    return method == bindDeviceLiveMethod ||
+        method == getLiveStreamInfoMethod ||
+        method == 'createDeviceRtmpLive' ||
+        method == 'queryDeviceRtmpLive';
   }
 
   String? _readString(Map<String, dynamic> json, List<String> keys) {

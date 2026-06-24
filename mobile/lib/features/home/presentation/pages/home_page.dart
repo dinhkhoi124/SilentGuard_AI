@@ -209,9 +209,9 @@ class _HomeTab extends StatelessWidget {
       listenWhen: (previous, current) =>
           current is HomeLoaded && current.openPairingFlow,
       listener: (context, state) {
-        context.push<CameraDevice>('/add-device').then((device) {
-          if (!context.mounted || device == null) return;
-          context.read<HomeBloc>().add(HomeDevicePaired(device));
+        context.push('/add-device').then((_) {
+          if (!context.mounted) return;
+          context.read<HomeBloc>().add(const HomeStarted());
         });
       },
       builder: (context, state) {
@@ -632,7 +632,7 @@ void _handleAddDevicePressed(BuildContext context) {
 }
 
 Future<void> _openPairingFlow(BuildContext context) async {
-  final device = await context.push<CameraDevice>('/add-device');
-  if (!context.mounted || device == null) return;
-  context.read<HomeBloc>().add(HomeDevicePaired(device));
+  await context.push('/add-device');
+  if (!context.mounted) return;
+  context.read<HomeBloc>().add(const HomeStarted());
 }

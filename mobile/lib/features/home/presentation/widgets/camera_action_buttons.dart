@@ -38,11 +38,7 @@ class CameraActionButtons extends StatelessWidget {
 }
 
 class _ActionButton extends StatelessWidget {
-  const _ActionButton({
-    required this.icon,
-    required this.label,
-    this.onTap,
-  });
+  const _ActionButton({required this.icon, required this.label, this.onTap});
 
   final IconData icon;
   final String label;

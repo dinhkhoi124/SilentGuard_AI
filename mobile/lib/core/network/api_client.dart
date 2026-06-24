@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 
 import 'package:http/http.dart' as http;
 import 'package:mobile/core/config/app_config.dart';
@@ -146,6 +147,11 @@ class ApiClient {
 
   Object? _decode(http.Response response, {bool allowEmpty = false}) {
     final success = response.statusCode >= 200 && response.statusCode < 300;
+    if (!success) {
+      debugPrint(
+        'API Error ${response.statusCode} [${response.request?.url}]: ${response.body}',
+      );
+    }
     if (success && response.body.trim().isEmpty && allowEmpty) return null;
 
     Object? body;

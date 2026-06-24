@@ -1,11 +1,12 @@
-import 'dart:convert';
 import 'dart:developer' as developer;
-
 import 'package:mobile/core/network/api_client.dart';
 import 'package:mobile/features/devices/data/models/device_models.dart';
 import 'package:mobile/features/devices/domain/entities/paired_device.dart';
 import 'package:mobile/features/devices/domain/entities/resolved_device.dart';
+import 'package:mobile/features/devices/domain/utils/qr_parser.dart';
 import 'package:mobile/features/session/domain/repositories/session_repository.dart';
+import 'package:flutter/foundation.dart';
+import 'dart:convert';
 
 abstract interface class DeviceRemoteDataSource {
   Future<ResolvedDevice> resolveDeviceQr(String qrRaw);
@@ -38,33 +39,18 @@ class DeviceRemoteDataSourceImpl implements DeviceRemoteDataSource {
       );
     }
 
-    try {
-      final decoded = jsonDecode(trimmedQr);
-      if (decoded is Map<String, dynamic>) {
-        return ResolvedDeviceModel.fromJson(decoded).toEntity();
-      }
-      if (decoded is Map) {
-        return ResolvedDeviceModel.fromJson(
-          Map<String, dynamic>.from(decoded),
-        ).toEntity();
-      }
-    } on FormatException {
-      // Fallback below supports simple QR payloads containing only a serial.
-    }
-
-    final serialNumber = _extractSerialNumberFromQrPayload(trimmedQr);
-    if (serialNumber != null) {
-      return ResolvedDevice(
-        deviceId: serialNumber,
-        displayName: 'Camera $serialNumber',
-        serialNumber: serialNumber,
+    final serialNumber = parseSerialNumber(trimmedQr);
+    if (serialNumber == null) {
+      throw const ApiException(
+        'Không đọc được mã serial từ QR. Vui lòng thử lại.',
+        kind: ApiExceptionKind.badRequest,
       );
     }
 
     return ResolvedDevice(
-      deviceId: trimmedQr,
-      displayName: 'Camera $trimmedQr',
-      serialNumber: trimmedQr,
+      deviceId: serialNumber,
+      displayName: 'Camera $serialNumber',
+      serialNumber: serialNumber,
     );
   }
 
@@ -90,18 +76,33 @@ class DeviceRemoteDataSourceImpl implements DeviceRemoteDataSource {
     required String rtspUrl,
   }) async {
     final householdId = _currentHouseholdId();
-    final response = await _apiClient.postObject('/api/cameras', {
-      'household_id': householdId,
-      ...PairedDeviceModel.toPairingJson(resolvedDevice: resolvedDevice),
-    });
-    return PairedDeviceModel.fromJson({
-      ..._payload(response),
-      'household_id': householdId,
-      'ip_address': ipAddress,
-      'rtsp_url': rtspUrl,
-      'status': 'unknown',
-      'serial_number': resolvedDevice.serialNumber.trim(),
-    }).toEntity();
+    try {
+      final requestBody = {
+        'household_id': householdId,
+        ...PairedDeviceModel.toPairingJson(resolvedDevice: resolvedDevice),
+      };
+      debugPrint('POST /api/cameras householdId: $householdId');
+      debugPrint('POST /api/cameras body: ${jsonEncode(requestBody)}');
+
+      final response = await _apiClient.postObject('/api/cameras', requestBody);
+      return PairedDeviceModel.fromJson({
+        ..._payload(response),
+        'household_id': householdId,
+        'ip_address': ipAddress,
+        'rtsp_url': rtspUrl,
+        'status': 'unknown',
+        'serial_number': resolvedDevice.serialNumber,
+      }).toEntity();
+    } on ApiException catch (e) {
+      debugPrint('POST /api/cameras response ${e.statusCode}: ${e.message}');
+      if (e.statusCode == 409 || e.message.contains('DUPLICATE_SERIAL')) {
+        throw const ApiException(
+          'Camera này đã được đăng ký. Kiểm tra lại thiết bị.',
+          kind: ApiExceptionKind.badRequest,
+        );
+      }
+      rethrow;
+    }
   }
 
   @override
@@ -130,15 +131,5 @@ class DeviceRemoteDataSourceImpl implements DeviceRemoteDataSource {
       if (value is Map) return Map<String, dynamic>.from(value);
     }
     return response;
-  }
-
-  String? _extractSerialNumberFromQrPayload(String payload) {
-    final match = RegExp(
-      r'''(?:^|[{\s,])SN\s*[:=]\s*["']?([^,"'}\s]+)''',
-      caseSensitive: false,
-    ).firstMatch(payload);
-    final serialNumber = match?.group(1)?.trim();
-    if (serialNumber == null || serialNumber.isEmpty) return null;
-    return serialNumber;
   }
 }

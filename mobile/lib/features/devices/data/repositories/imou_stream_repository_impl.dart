@@ -80,18 +80,24 @@ class ImouStreamRepositoryImpl implements ImouStreamRepository {
     }
   }
 
-  void _logFailure(Object error, StackTrace stackTrace) {
+  void _logFailure(Object error, StackTrace _) {
+    final code = error is ImouCloudException ? error.code : null;
     developer.log(
-      'Imou stream request failed.',
+      'Imou stream request failed'
+      '${code == null ? '' : ' (code: $code)'}.',
       name: 'ImouStreamRepository',
-      error: error,
-      stackTrace: stackTrace,
     );
   }
 
   String _messageForImouCloudException(ImouCloudException error) {
     final code = error.code?.toLowerCase() ?? '';
     final message = error.message.toLowerCase();
+    if (code == ImouCloudDataSourceImpl.unsupportedStreamFormatCode) {
+      return 'Camera đang trực tuyến nhưng luồng trực tiếp hiện chưa hỗ trợ trên Android. Vui lòng thử lại sau hoặc kiểm tra cấu hình camera.';
+    }
+    if (code == 'device_no_response') {
+      return 'Camera đang trực tuyến nhưng chưa phản hồi luồng trực tiếp. Vui lòng kiểm tra mạng của camera hoặc thử lại sau.';
+    }
     if (code == 'lv1001' || message.contains('live')) {
       return 'Luồng camera đang bận. Vui lòng thử lại sau vài giây.';
     }

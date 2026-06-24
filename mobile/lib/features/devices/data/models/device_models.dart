@@ -129,8 +129,9 @@ class PairedDeviceModel {
   }) {
     return {
       'name': resolvedDevice.displayName,
+      'room': 'unknown',
       'fps': 15,
-      'serial_number': resolvedDevice.serialNumber.trim(),
+      'serial_number': resolvedDevice.serialNumber,
     };
   }
 }

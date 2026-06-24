@@ -53,6 +53,19 @@ final class DevicePairingObtainingStream extends DevicePairingState {
   List<Object?> get props => [resolvedDevice, imouStatus];
 }
 
+final class DevicePairingNameInput extends DevicePairingState {
+  const DevicePairingNameInput({
+    required this.resolvedDevice,
+    required this.streamUrl,
+  });
+
+  final ResolvedDevice resolvedDevice;
+  final String streamUrl;
+
+  @override
+  List<Object?> get props => [resolvedDevice, streamUrl];
+}
+
 final class DevicePairingPersisting extends DevicePairingState {
   const DevicePairingPersisting({
     required this.resolvedDevice,

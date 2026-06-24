@@ -15,6 +15,9 @@ from app.models.schemas import (
 from app.services.notification_service import send_fcm_notification
 
 
+router = APIRouter(prefix="/api/households", tags=["Households"])
+
+
 @router.post("/invite-by-email", status_code=status.HTTP_201_CREATED)
 async def invite_by_email(
     req: InviteByEmailRequest,

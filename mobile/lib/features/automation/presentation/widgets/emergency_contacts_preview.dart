@@ -1,8 +1,28 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 import 'package:mobile/core/utils/app_colors.dart';
+import 'package:mobile/features/automation/domain/entities/emergency_contact.dart';
+import 'package:mobile/features/automation/presentation/cubit/emergency_contacts_cubit.dart';
+import 'package:mobile/features/automation/presentation/cubit/emergency_contacts_state.dart';
+import 'package:mobile/injection_container.dart';
 
 class EmergencyContactsPreview extends StatelessWidget {
   const EmergencyContactsPreview({super.key, required this.onManageContacts});
+
+  final VoidCallback onManageContacts;
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocProvider(
+      create: (_) => sl<EmergencyContactsCubit>()..loadContacts(),
+      child: _PreviewContent(onManageContacts: onManageContacts),
+    );
+  }
+}
+
+class _PreviewContent extends StatelessWidget {
+  const _PreviewContent({required this.onManageContacts});
 
   final VoidCallback onManageContacts;
 
@@ -32,7 +52,7 @@ class EmergencyContactsPreview extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.all(20),
             child: Text(
-              'Danh sách này sẽ được dùng khi cảnh báo mức cao không được phản hồi.',
+              'Danh sách này được dùng khi cảnh báo mức cao không được phản hồi.',
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: isDark
                     ? theme.colorScheme.onSurfaceVariant
@@ -44,37 +64,83 @@ class EmergencyContactsPreview extends StatelessWidget {
             height: 1,
             color: isDark ? theme.colorScheme.outline : AppColors.background,
           ),
-          const _ContactPreviewTile(
-            number: '1',
-            name: 'Tôi',
-            role: 'Người nhận cảnh báo đầu tiên',
-          ),
-          Divider(
-            height: 1,
-            indent: 64,
-            color: isDark ? theme.colorScheme.outline : AppColors.background,
-          ),
-          const _ContactPreviewTile(
-            number: '2',
-            name: 'Anh Long',
-            role: 'Gọi nếu không có phản hồi',
-          ),
-          Divider(
-            height: 1,
-            indent: 64,
-            color: isDark ? theme.colorScheme.outline : AppColors.background,
-          ),
-          const _ContactPreviewTile(
-            number: '3',
-            name: 'Chị Liên',
-            role: 'Dự phòng khi khẩn cấp',
+          BlocBuilder<EmergencyContactsCubit, EmergencyContactsState>(
+            builder: (context, state) {
+              if (state is EmergencyContactsLoading && state.contacts.isEmpty) {
+                return const Padding(
+                  padding: EdgeInsets.all(32),
+                  child: Center(child: CircularProgressIndicator()),
+                );
+              }
+
+              if (state.contacts.isEmpty) {
+                return Padding(
+                  padding: const EdgeInsets.all(32),
+                  child: Center(
+                    child: Column(
+                      children: [
+                        Icon(
+                          Icons.contact_phone_outlined,
+                          size: 32,
+                          color: isDark
+                              ? theme.colorScheme.outline
+                              : AppColors.mutedText,
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          'Chưa có liên hệ khẩn cấp',
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: isDark
+                                ? theme.colorScheme.onSurface
+                                : AppColors.darkText,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Thêm số điện thoại để gọi nhanh khi có sự cố.',
+                          textAlign: TextAlign.center,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: isDark
+                                ? theme.colorScheme.onSurfaceVariant
+                                : AppColors.mutedText,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }
+
+              final topContacts = state.contacts.take(3).toList();
+              return Column(
+                children: [
+                  for (int i = 0; i < topContacts.length; i++) ...[
+                    _ContactPreviewTile(contact: topContacts[i]),
+                    if (i < topContacts.length - 1)
+                      Divider(
+                        height: 1,
+                        indent: 64,
+                        color: isDark
+                            ? theme.colorScheme.outline
+                            : AppColors.background,
+                      ),
+                  ],
+                ],
+              );
+            },
           ),
           Padding(
             padding: const EdgeInsets.all(16),
             child: SizedBox(
               width: double.infinity,
               child: OutlinedButton(
-                onPressed: onManageContacts,
+                onPressed: () async {
+                  await context.push('/emergency-contacts');
+                  if (context.mounted) {
+                    context.read<EmergencyContactsCubit>().loadContacts();
+                  }
+                },
                 style: OutlinedButton.styleFrom(
                   foregroundColor: isDark
                       ? theme.colorScheme.primary
@@ -103,15 +169,9 @@ class EmergencyContactsPreview extends StatelessWidget {
 }
 
 class _ContactPreviewTile extends StatelessWidget {
-  const _ContactPreviewTile({
-    required this.number,
-    required this.name,
-    required this.role,
-  });
+  const _ContactPreviewTile({required this.contact});
 
-  final String number;
-  final String name;
-  final String role;
+  final EmergencyContact contact;
 
   @override
   Widget build(BuildContext context) {
@@ -133,7 +193,7 @@ class _ContactPreviewTile extends StatelessWidget {
               shape: BoxShape.circle,
             ),
             child: Text(
-              number,
+              contact.priorityOrder.toString(),
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: isDark
                     ? theme.colorScheme.onSurfaceVariant
@@ -148,7 +208,7 @@ class _ContactPreviewTile extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  name,
+                  contact.name,
                   style: theme.textTheme.titleSmall?.copyWith(
                     color: isDark
                         ? theme.colorScheme.onSurface
@@ -158,11 +218,12 @@ class _ContactPreviewTile extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  role,
+                  contact.phoneNumber,
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: isDark
                         ? theme.colorScheme.onSurfaceVariant
                         : AppColors.mutedText,
+                    fontFeatures: const [FontFeature.tabularFigures()],
                   ),
                 ),
               ],

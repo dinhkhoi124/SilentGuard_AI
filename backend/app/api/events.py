@@ -140,6 +140,53 @@ async def upload_video(
         "upload_token": upload_token
     }
 
+@router.get("/upload-status/{upload_token}", status_code=status.HTTP_200_OK)
+async def get_upload_status(upload_token: str):
+    """
+    GET /api/events/upload-status/{upload_token}
+    Polls the processing status of a video upload.
+    No auth required — upload_token acts as session key.
+    Used by landing page demo to check AI analysis result.
+    """
+    try:
+        upload_res = supabase.table("video_uploads")\
+            .select("id, status, event_id, created_at")\
+            .eq("upload_token", upload_token)\
+            .execute()
+
+        if not upload_res.data:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={"error": {"code": "NOT_FOUND", "message": "Upload token không tồn tại"}}
+            )
+
+        upload = upload_res.data[0]
+        result = {
+            "status": upload.get("status"),  # pending | processed | failed
+            "created_at": upload.get("created_at"),
+            "event": None
+        }
+
+        if upload.get("status") == "processed" and upload.get("event_id"):
+            event_res = supabase.table("events")\
+                .select("event_id, severity, confidence, duration_sec, room, llm_message, timestamp, status")\
+                .eq("id", upload.get("event_id"))\
+                .execute()
+
+            if event_res.data:
+                result["event"] = event_res.data[0]
+
+        return result
+
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        print(f"Error in get_upload_status: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={"error": {"code": "DATABASE_ERROR", "message": str(e)}}
+        )
+
 @router.post("/detect", status_code=status.HTTP_201_CREATED)
 async def detect_event(
     req: EventDetectRequest,

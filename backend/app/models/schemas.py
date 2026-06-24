@@ -148,3 +148,18 @@ class HouseholdUpdateRequest(BaseModel):
     address: Optional[str] = None
 
 
+class InviteByEmailRequest(BaseModel):
+    household_id: str
+    email: str
+
+
+class RespondInviteRequest(BaseModel):
+    action: str
+
+    @field_validator("action")
+    @classmethod
+    def validate_action(cls, v: str) -> str:
+        if v not in ("accepted", "declined"):
+            raise ValueError("action must be 'accepted' or 'declined'")
+        return v
+

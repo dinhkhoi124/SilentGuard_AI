@@ -554,6 +554,111 @@ Content-Type: application/json
 
 ---
 
+### 3.13e Mời thành viên bằng Email (`POST /api/households/invite-by-email`)
+Mời người dùng tham gia hộ gia đình bằng địa chỉ Email của họ. Chỉ áp dụng cho chủ hộ (`owner`).
+
+- **Headers**:
+```http
+Authorization: Bearer <FIREBASE_ID_TOKEN>
+Content-Type: application/json
+```
+- **Request Body**:
+```json
+{
+  "household_id": "household-uuid",
+  "email": "user@example.com"
+}
+```
+- **Response 201 Created**:
+```json
+{
+  "invite_request_id": "invite-uuid",
+  "invitee_id": "user-uuid",
+  "status": "pending"
+}
+```
+
+---
+
+### 3.13f Lấy danh sách lời mời đang chờ xử lý (`GET /api/households/invite-requests/pending`)
+Lấy toàn bộ các lời mời vào hộ gia đình đang ở trạng thái `pending` của người dùng hiện tại.
+
+- **Headers**:
+```http
+Authorization: Bearer <FIREBASE_ID_TOKEN>
+```
+- **Response 200 OK**:
+```json
+{
+  "items": [
+    {
+      "id": "invite-uuid",
+      "household_id": "household-uuid",
+      "household_name": "Nha Ba Me",
+      "elderly_name": "Nguyen Van A",
+      "invited_by_name": "Chủ Hộ A",
+      "invited_by_email": "owner@example.com",
+      "status": "pending",
+      "created_at": "2026-06-24T08:00:00Z"
+    }
+  ],
+  "total": 1
+}
+```
+
+---
+
+### 3.13g Trả lời lời mời gia đình (`POST /api/households/invite-requests/{invite_id}/respond`)
+Đồng ý hoặc từ chối lời mời gia đình. Nếu đồng ý (`accepted`), người dùng được tự động thêm vào `household_members` với quyền `member` và danh sách liên hệ khẩn cấp `contacts` của hộ gia đình đó.
+
+- **Headers**:
+```http
+Authorization: Bearer <FIREBASE_ID_TOKEN>
+Content-Type: application/json
+```
+- **Request Body**:
+```json
+{
+  "action": "accepted" // Hoặc "declined"
+}
+```
+- **Response 200 OK**:
+```json
+{
+  "status": "accepted"
+}
+```
+
+---
+
+### 3.13h Lấy danh sách thành viên hộ gia đình (`GET /api/households/{household_id}/members`)
+Lấy danh sách tất cả các thành viên hiện tại thuộc hộ gia đình (kèm thông tin liên hệ khẩn cấp của họ nếu có). Áp dụng cho cả chủ hộ (`owner`) và thành viên (`member`).
+
+- **Headers**:
+```http
+Authorization: Bearer <FIREBASE_ID_TOKEN>
+```
+- **Response 200 OK**:
+```json
+{
+  "members": [
+    {
+      "user_id": "user-uuid",
+      "full_name": "Nguyen Van B",
+      "email": "member@example.com",
+      "phone": "0987654321",
+      "role": "member",
+      "joined_at": "2026-06-24T08:00:00.000Z",
+      "is_in_contacts": true,
+      "contacts_priority": 1
+    }
+  ],
+  "total": 1
+}
+```
+
+---
+
 ### 3.14 Đăng ký camera mới (`POST /api/cameras`)
 Đăng ký camera mới cho hộ gia đình. Chỉ áp dụng cho tài khoản chủ hộ (`owner`).
 

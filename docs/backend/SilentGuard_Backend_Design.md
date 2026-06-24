@@ -193,6 +193,18 @@ CREATE TABLE household_invites (
 );
 CREATE INDEX idx_household_invites_code ON household_invites(code);
 
+CREATE TABLE household_invite_requests (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    household_id    UUID NOT NULL REFERENCES households(id) ON DELETE CASCADE,
+    invited_by      UUID NOT NULL REFERENCES users(id),
+    invitee_id      UUID NOT NULL REFERENCES users(id),
+    status          TEXT NOT NULL DEFAULT 'pending',
+    created_at      TIMESTAMPTZ DEFAULT NOW(),
+    responded_at    TIMESTAMPTZ,
+    UNIQUE(household_id, invitee_id)
+);
+CREATE INDEX idx_household_invite_requests_invitee ON household_invite_requests(invitee_id);
+
 ```
 
 ---
@@ -727,7 +739,101 @@ Response:
 }
 ```
 
+### 4.12e `POST /api/households/invite-by-email` — Mời thành viên bằng Email
+
+Quyền: `owner` (Chủ hộ).
+
+Header: `Authorization: Bearer <token>`
+
+Body:
+```json
+{
+  "household_id": "household-uuid",
+  "email": "user@example.com"
+}
+```
+
+Response 201 Created:
+```json
+{
+  "invite_request_id": "invite-uuid",
+  "invitee_id": "user-uuid",
+  "status": "pending"
+}
+```
+
+### 4.12f `GET /api/households/invite-requests/pending` — Lấy danh sách lời mời đang chờ xử lý
+
+Quyền: Người dùng đã đăng nhập (invitee).
+
+Header: `Authorization: Bearer <token>`
+
+Response:
+```json
+{
+  "items": [
+    {
+      "id": "invite-uuid",
+      "household_id": "household-uuid",
+      "household_name": "Nha Ba Me",
+      "elderly_name": "Nguyen Van A",
+      "invited_by_name": "Chủ Hộ A",
+      "invited_by_email": "owner@example.com",
+      "status": "pending",
+      "created_at": "2026-06-24T08:00:00Z"
+    }
+  ],
+  "total": 1
+}
+```
+
+### 4.12g `POST /api/households/invite-requests/{invite_id}/respond` — Trả lời lời mời gia đình
+
+Quyền: Người dùng được mời (invitee).
+
+Header: `Authorization: Bearer <token>`
+
+Body:
+```json
+{
+  "action": "accepted" // Hoặc "declined"
+}
+```
+
+Response:
+```json
+{
+  "status": "accepted"
+}
+```
+
+### 4.12h `GET /api/households/{household_id}/members` — Lấy danh sách thành viên hộ gia đình
+
+Quyền: Thành viên thuộc hộ gia đình đó (`owner` hoặc `member`).
+
+Header: `Authorization: Bearer <token>`
+
+Response:
+```json
+{
+  "members": [
+    {
+      "user_id": "user-uuid",
+      "full_name": "Nguyen Van B",
+      "email": "member@example.com",
+      "phone": "0987654321",
+      "role": "member",
+      "joined_at": "2026-06-24T08:00:00Z",
+      "is_in_contacts": true,
+      "contacts_priority": 1
+    }
+  ],
+  "total": 1
+}
+```
+
 ### 4.13 `POST /api/cameras` — Đăng ký camera mới
+
 
 Quyền: `owner` (Chủ hộ).
 

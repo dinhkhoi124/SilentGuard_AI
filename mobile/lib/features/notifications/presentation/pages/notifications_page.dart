@@ -19,7 +19,8 @@ class NotificationsPage extends StatefulWidget {
   State<NotificationsPage> createState() => _NotificationsPageState();
 }
 
-class _NotificationsPageState extends State<NotificationsPage> with SingleTickerProviderStateMixin {
+class _NotificationsPageState extends State<NotificationsPage>
+    with SingleTickerProviderStateMixin {
   late final TabController _tabController;
 
   @override
@@ -46,14 +47,21 @@ class _NotificationsPageState extends State<NotificationsPage> with SingleTicker
   Widget build(BuildContext context) {
     return BlocBuilder<NotificationsCubit, NotificationsState>(
       builder: (context, state) {
-        final alertNotifications = state.notifications.where((n) => n.type != 'household_invite').toList();
-        final inviteNotifications = state.notifications.where((n) => n.type == 'household_invite').toList();
+        final alertNotifications = state.notifications
+            .where((n) => n.type != 'household_invite')
+            .toList();
+        final inviteNotifications = state.notifications
+            .where((n) => n.type == 'household_invite')
+            .toList();
 
         final unreadAlerts = alertNotifications.where((n) => !n.isRead).length;
-        final unreadInvites = inviteNotifications.where((n) => !n.isRead).length;
+        final unreadInvites = inviteNotifications
+            .where((n) => !n.isRead)
+            .length;
 
-        final hasUnreadInCurrentTab = (_tabController.index == 0 && unreadAlerts > 0) ||
-                                      (_tabController.index == 1 && unreadInvites > 0);
+        final hasUnreadInCurrentTab =
+            (_tabController.index == 0 && unreadAlerts > 0) ||
+            (_tabController.index == 1 && unreadInvites > 0);
 
         return Scaffold(
           backgroundColor: Theme.of(context).colorScheme.surface,
@@ -71,11 +79,13 @@ class _NotificationsPageState extends State<NotificationsPage> with SingleTicker
                     ? () {
                         if (_tabController.index == 0) {
                           for (final n in alertNotifications) {
-                            if (!n.isRead) context.read<NotificationsCubit>().markRead(n.id);
+                            if (!n.isRead)
+                              context.read<NotificationsCubit>().markRead(n.id);
                           }
                         } else if (_tabController.index == 1) {
                           for (final n in inviteNotifications) {
-                            if (!n.isRead) context.read<NotificationsCubit>().markRead(n.id);
+                            if (!n.isRead)
+                              context.read<NotificationsCubit>().markRead(n.id);
                           }
                         }
                       }
@@ -117,13 +127,17 @@ class _NotificationsPageState extends State<NotificationsPage> with SingleTicker
     );
   }
 
-  Widget _buildNotificationList(BuildContext context, List<NotificationAlert> notifications, bool isInvite) {
+  Widget _buildNotificationList(
+    BuildContext context,
+    List<NotificationAlert> notifications,
+    bool isInvite,
+  ) {
     if (notifications.isEmpty) {
       return _EmptyNotifications(
         icon: isInvite ? Iconsax.people : Iconsax.notification,
         title: isInvite ? 'Chưa có lời mời' : 'Chưa có thông báo',
-        subtitle: isInvite 
-            ? 'Lời mời tham gia gia đình sẽ xuất hiện tại đây.' 
+        subtitle: isInvite
+            ? 'Lời mời tham gia gia đình sẽ xuất hiện tại đây.'
             : 'Các cảnh báo từ hệ thống sẽ xuất hiện tại đây.',
       );
     }
@@ -131,7 +145,12 @@ class _NotificationsPageState extends State<NotificationsPage> with SingleTicker
     final grouped = _groupNotificationsByDate(notifications);
 
     return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(AppSpacing.pagePadding, 10, AppSpacing.pagePadding, 28),
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.pagePadding,
+        10,
+        AppSpacing.pagePadding,
+        28,
+      ),
       itemCount: grouped.length,
       itemBuilder: (context, index) {
         final item = grouped[index];
@@ -156,8 +175,8 @@ class _NotificationsPageState extends State<NotificationsPage> with SingleTicker
         } else if (item is NotificationAlert) {
           return Padding(
             padding: const EdgeInsets.only(bottom: 12),
-            child: isInvite 
-                ? _InviteNotificationCard(notification: item) 
+            child: isInvite
+                ? _InviteNotificationCard(notification: item)
                 : _NotificationCard(
                     notification: item,
                     onTap: () => _handleNotificationTap(context, item),
@@ -169,21 +188,28 @@ class _NotificationsPageState extends State<NotificationsPage> with SingleTicker
     );
   }
 
-  List<dynamic> _groupNotificationsByDate(List<NotificationAlert> notifications) {
+  List<dynamic> _groupNotificationsByDate(
+    List<NotificationAlert> notifications,
+  ) {
     final Map<String, List<NotificationAlert>> groups = {};
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final yesterday = today.subtract(const Duration(days: 1));
 
     for (final n in notifications) {
-      final date = DateTime(n.receivedAt.year, n.receivedAt.month, n.receivedAt.day);
+      final date = DateTime(
+        n.receivedAt.year,
+        n.receivedAt.month,
+        n.receivedAt.day,
+      );
       String key;
       if (date == today) {
         key = 'Hôm nay';
       } else if (date == yesterday) {
         key = 'Hôm qua';
       } else {
-        key = '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
+        key =
+            '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
       }
       groups.putIfAbsent(key, () => []).add(n);
     }
@@ -196,7 +222,10 @@ class _NotificationsPageState extends State<NotificationsPage> with SingleTicker
     return result;
   }
 
-  void _handleNotificationTap(BuildContext context, NotificationAlert notification) {
+  void _handleNotificationTap(
+    BuildContext context,
+    NotificationAlert notification,
+  ) {
     context.read<NotificationsCubit>().markRead(notification.id);
 
     final cameraId = notification.cameraId?.trim() ?? '';
@@ -375,11 +404,7 @@ class _EmptyNotifications extends StatelessWidget {
                 color: AppColors.lightBlue,
                 borderRadius: BorderRadius.circular(28),
               ),
-              child: Icon(
-                icon,
-                color: AppColors.primary,
-                size: 32,
-              ),
+              child: Icon(icon, color: AppColors.primary, size: 32),
             ),
             const SizedBox(height: 20),
             Text(
@@ -394,9 +419,9 @@ class _EmptyNotifications extends StatelessWidget {
             Text(
               subtitle,
               textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: AppColors.mutedText,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: AppColors.mutedText),
             ),
           ],
         ),
@@ -551,7 +576,9 @@ class _InviteNotificationCard extends StatelessWidget {
                                         );
                                   },
                             style: OutlinedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(horizontal: 20),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 20,
+                              ),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(10),
                               ),
@@ -582,7 +609,9 @@ class _InviteNotificationCard extends StatelessWidget {
                             style: FilledButton.styleFrom(
                               backgroundColor: AppColors.primary,
                               elevation: 0,
-                              padding: const EdgeInsets.symmetric(horizontal: 24),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 24,
+                              ),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(10),
                               ),

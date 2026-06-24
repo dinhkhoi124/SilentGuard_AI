@@ -8,7 +8,8 @@ import 'package:mobile/features/household_invite/presentation/cubit/invite_manag
 import 'package:mobile/injection_container.dart';
 
 class InviteManagementCubit extends Cubit<InviteManagementState> {
-  InviteManagementCubit(this._dataSource) : super(const InviteManagementInitial());
+  InviteManagementCubit(this._dataSource)
+    : super(const InviteManagementInitial());
 
   final HouseholdInviteRemoteDataSource _dataSource;
 
@@ -56,13 +57,19 @@ class InviteManagementCubit extends Cubit<InviteManagementState> {
         });
         await loadMembers(householdId);
       } catch (e) {
-        emit(const InviteManagementError('Không thể thêm vào danh sách cảnh báo.'));
-        emit(currentState); 
+        emit(
+          const InviteManagementError('Không thể thêm vào danh sách cảnh báo.'),
+        );
+        emit(currentState);
       }
     }
   }
 
-  Future<void> reorderContacts(String contactId, int newPriority, String householdId) async {
+  Future<void> reorderContacts(
+    String contactId,
+    int newPriority,
+    String householdId,
+  ) async {
     final currentState = state;
     if (currentState is InviteManagementLoaded) {
       try {

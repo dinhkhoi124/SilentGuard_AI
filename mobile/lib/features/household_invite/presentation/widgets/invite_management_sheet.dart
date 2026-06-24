@@ -181,7 +181,9 @@ class _SheetContent extends StatelessWidget {
                                     : Colors.white,
                                 borderRadius: BorderRadius.circular(16),
                                 border: Border.all(
-                                  color: AppColors.border.withValues(alpha: 0.5),
+                                  color: AppColors.border.withValues(
+                                    alpha: 0.5,
+                                  ),
                                 ),
                                 boxShadow: [
                                   BoxShadow(
@@ -200,7 +202,9 @@ class _SheetContent extends StatelessWidget {
                                   ),
                                   leading: CircleAvatar(
                                     backgroundColor: isDark
-                                        ? theme.colorScheme.surfaceContainerHighest
+                                        ? theme
+                                              .colorScheme
+                                              .surfaceContainerHighest
                                         : const Color(0xFFF0F4F8),
                                     child: Text(
                                       member.fullName.isNotEmpty
@@ -242,8 +246,9 @@ class _SheetContent extends StatelessWidget {
                                           color: AppColors.warning.withValues(
                                             alpha: 0.1,
                                           ),
-                                          borderRadius:
-                                              BorderRadius.circular(8),
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
                                         ),
                                         child: Row(
                                           children: [
@@ -319,7 +324,9 @@ class _SheetContent extends StatelessWidget {
                                       : Colors.white,
                                   borderRadius: BorderRadius.circular(16),
                                   border: Border.all(
-                                    color: AppColors.border.withValues(alpha: 0.5),
+                                    color: AppColors.border.withValues(
+                                      alpha: 0.5,
+                                    ),
                                   ),
                                 ),
                                 child: ListTile(
@@ -329,7 +336,9 @@ class _SheetContent extends StatelessWidget {
                                   ),
                                   leading: CircleAvatar(
                                     backgroundColor: isDark
-                                        ? theme.colorScheme.surfaceContainerHighest
+                                        ? theme
+                                              .colorScheme
+                                              .surfaceContainerHighest
                                         : const Color(0xFFF0F4F8),
                                     child: Text(
                                       member.fullName.isNotEmpty
@@ -365,12 +374,17 @@ class _SheetContent extends StatelessWidget {
                                           '';
                                       context
                                           .read<InviteManagementCubit>()
-                                          .addToAlerts(member.userId, householdId);
+                                          .addToAlerts(
+                                            member.userId,
+                                            householdId,
+                                          );
                                     },
                                     icon: const Icon(Icons.add, size: 16),
                                     label: const Text(
                                       'Thêm',
-                                      style: TextStyle(fontWeight: FontWeight.bold),
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                      ),
                                     ),
                                     style: FilledButton.styleFrom(
                                       padding: const EdgeInsets.symmetric(

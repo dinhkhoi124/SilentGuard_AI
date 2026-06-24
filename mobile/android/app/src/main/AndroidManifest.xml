@@ -17,9 +17,10 @@
         android:icon="@mipmap/launcher_icon"
         android:usesCleartextTraffic="true"
         android:enableOnBackInvokedCallback="true">
+        <!-- TODO(impeller): re-enable after media_kit adds Impeller support -->
         <meta-data
-            android:name="io.flutter.embedding.android.ImpellerBackend"
-            android:value="opengles" />
+            android:name="io.flutter.embedding.android.EnableImpeller"
+            android:value="false" />
         <provider
             android:name="androidx.startup.InitializationProvider"
             android:authorities="${applicationId}.androidx-startup"

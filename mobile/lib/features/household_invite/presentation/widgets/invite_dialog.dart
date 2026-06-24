@@ -93,7 +93,7 @@ class _InviteDialogState extends State<InviteDialog> {
                         fontWeight: FontWeight.w400,
                       ),
                       filled: true,
-                      fillColor: isDark 
+                      fillColor: isDark
                           ? theme.colorScheme.surfaceContainerHighest
                           : const Color(0xFFF9FAFB),
                       border: OutlineInputBorder(

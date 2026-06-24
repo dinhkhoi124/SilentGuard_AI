@@ -54,13 +54,16 @@ CREATE TABLE users (
     phone           TEXT,
     fcm_token       TEXT,
     role            TEXT DEFAULT 'family' CHECK (role IN ('family', 'admin')),
+    active_household_id UUID REFERENCES households(id),
     created_at      TIMESTAMPTZ DEFAULT now()
 );
 
 -- ============ ELDERLY PROFILE ============
 CREATE TABLE households (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name            TEXT,
     elderly_name    TEXT,
+    address         TEXT,
     owner_user_id   UUID REFERENCES users(id),
     created_at      TIMESTAMPTZ DEFAULT now()
 );
@@ -189,6 +192,18 @@ CREATE TABLE household_invites (
     used_by         UUID REFERENCES users(id)
 );
 CREATE INDEX idx_household_invites_code ON household_invites(code);
+
+CREATE TABLE household_invite_requests (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    household_id    UUID NOT NULL REFERENCES households(id) ON DELETE CASCADE,
+    invited_by      UUID NOT NULL REFERENCES users(id),
+    invitee_id      UUID NOT NULL REFERENCES users(id),
+    status          TEXT NOT NULL DEFAULT 'pending',
+    created_at      TIMESTAMPTZ DEFAULT NOW(),
+    responded_at    TIMESTAMPTZ,
+    UNIQUE(household_id, invitee_id)
+);
+CREATE INDEX idx_household_invite_requests_invitee ON household_invite_requests(invitee_id);
 
 ```
 
@@ -362,6 +377,30 @@ Response:
     { "name": "Camera phòng ngủ", "status": "online", "fps": 15 },
     { "name": "Camera phòng khách", "status": "online", "fps": 15 }
   ]
+}
+```
+
+### 4.4a `POST /api/events/{event_id}/feedback` — Phản hồi độ chính xác cảnh báo
+
+Quyền: `owner` hoặc `member` (Thành viên hộ gia đình của cảnh báo).
+
+Header: `Authorization: Bearer <token>`
+
+Request Body:
+```json
+{
+  "label": "correct",
+  "note": "Ba bị trượt chân nhưng không sao",
+  "camera_serial": "SN12345678"
+}
+```
+*(Chấp nhận label: "correct" | "incorrect" | "uncertain". Trường `camera_serial` là tùy chọn)*
+
+Response:
+```json
+{
+  "status": "received",
+  "feedback_id": "feedback-uuid"
 }
 ```
 
@@ -589,7 +628,7 @@ Response:
 
 ### 4.12 `GET /api/households/me` — Truy vấn thông tin hộ gia đình của user hiện tại
 
-Quyền: `owner` hoặc `member` (Thành viên hộ gia đình).
+Quyền: `owner` hoặc `member`. Trả về hộ gia đình đang active (`users.active_household_id`). Nếu chưa thiết lập, tự động fallback sang hộ đầu tiên tham gia và thiết lập làm active.
 
 Header: `Authorization: Bearer <token>`
 
@@ -598,11 +637,203 @@ Response:
 {
   "household_id": "household-uuid",
   "role": "owner",
-  "elderly_name": "Nguyen Van A"
+  "name": "Nha Ba Me",
+  "elderly_name": "Nguyen Van A",
+  "address": "123 Nguyen Trai",
+  "created_at": "2026-06-19T03:00:00Z"
+}
+```
+
+### 4.12a `POST /api/households` — Tạo hộ gia đình mới
+
+Quyền: Bất kỳ user nào đã đăng nhập.
+
+Header: `Authorization: Bearer <token>`
+Body:
+```json
+{
+  "name": "Nha Ba Me",
+  "elderly_name": "Nha ong ba Nguyen",
+  "address": "123 Nguyen Trai"
+}
+```
+
+Response:
+```json
+{
+  "id": "household-uuid",
+  "name": "Nha Ba Me",
+  "elderly_name": "Nha ong ba Nguyen",
+  "address": "123 Nguyen Trai",
+  "role": "owner",
+  "created_at": "2026-06-19T03:00:00Z"
+}
+```
+
+### 4.12b `GET /api/households` — Liệt kê toàn bộ hộ gia đình của user
+
+Quyền: Bất kỳ user nào đã đăng nhập.
+
+Header: `Authorization: Bearer <token>`
+
+Response:
+```json
+{
+  "households": [
+    {
+      "id": "household-uuid",
+      "name": "Nha Ba Me",
+      "elderly_name": "Nha ong ba Nguyen",
+      "address": "123 Nguyen Trai",
+      "role": "owner",
+      "is_active": true
+    }
+  ],
+  "active_household_id": "household-uuid"
+}
+```
+
+### 4.12c `POST /api/users/switch-household` — Chuyển đổi hộ gia đình hoạt động
+
+Quyền: Thành viên thuộc hộ gia đình đích.
+
+Header: `Authorization: Bearer <token>`
+Body:
+```json
+{
+  "household_id": "household-uuid"
+}
+```
+
+Response:
+```json
+{
+  "active_household_id": "household-uuid"
+}
+```
+
+### 4.12d `PATCH /api/households/{household_id}` — Cập nhật thông tin hộ gia đình
+
+Quyền: `owner` (Chủ hộ).
+
+Header: `Authorization: Bearer <token>`
+
+Request Body (Partial Update):
+```json
+{
+  "name": "Nha Ong Ba Ngoai",
+  "elderly_name": "Ong Nguyen Van A",
+  "address": "456 Tran Hung Dao"
+}
+```
+*(Tất cả các trường đều là tùy chọn. Yêu cầu gửi ít nhất 1 trường)*
+
+Response:
+```json
+{
+  "id": "household-uuid",
+  "name": "Nha Ong Ba Ngoai",
+  "elderly_name": "Ong Nguyen Van A",
+  "address": "456 Tran Hung Dao",
+  "created_at": "2026-06-19T03:00:00Z"
+}
+```
+
+### 4.12e `POST /api/households/invite-by-email` — Mời thành viên bằng Email
+
+Quyền: `owner` (Chủ hộ).
+
+Header: `Authorization: Bearer <token>`
+
+Body:
+```json
+{
+  "household_id": "household-uuid",
+  "email": "user@example.com"
+}
+```
+
+Response 201 Created:
+```json
+{
+  "invite_request_id": "invite-uuid",
+  "invitee_id": "user-uuid",
+  "status": "pending"
+}
+```
+
+### 4.12f `GET /api/households/invite-requests/pending` — Lấy danh sách lời mời đang chờ xử lý
+
+Quyền: Người dùng đã đăng nhập (invitee).
+
+Header: `Authorization: Bearer <token>`
+
+Response:
+```json
+{
+  "items": [
+    {
+      "id": "invite-uuid",
+      "household_id": "household-uuid",
+      "household_name": "Nha Ba Me",
+      "elderly_name": "Nguyen Van A",
+      "invited_by_name": "Chủ Hộ A",
+      "invited_by_email": "owner@example.com",
+      "status": "pending",
+      "created_at": "2026-06-24T08:00:00Z"
+    }
+  ],
+  "total": 1
+}
+```
+
+### 4.12g `POST /api/households/invite-requests/{invite_id}/respond` — Trả lời lời mời gia đình
+
+Quyền: Người dùng được mời (invitee).
+
+Header: `Authorization: Bearer <token>`
+
+Body:
+```json
+{
+  "action": "accepted" // Hoặc "declined"
+}
+```
+
+Response:
+```json
+{
+  "status": "accepted"
+}
+```
+
+### 4.12h `GET /api/households/{household_id}/members` — Lấy danh sách thành viên hộ gia đình
+
+Quyền: Thành viên thuộc hộ gia đình đó (`owner` hoặc `member`).
+
+Header: `Authorization: Bearer <token>`
+
+Response:
+```json
+{
+  "members": [
+    {
+      "user_id": "user-uuid",
+      "full_name": "Nguyen Van B",
+      "email": "member@example.com",
+      "phone": "0987654321",
+      "role": "member",
+      "joined_at": "2026-06-24T08:00:00Z",
+      "is_in_contacts": true,
+      "contacts_priority": 1
+    }
+  ],
+  "total": 1
 }
 ```
 
 ### 4.13 `POST /api/cameras` — Đăng ký camera mới
+
 
 Quyền: `owner` (Chủ hộ).
 
@@ -614,9 +845,11 @@ Request:
   "household_id": "household-uuid",
   "name": "Camera Hành Lang",
   "room": "hallway",
-  "fps": 15
+  "fps": 15,
+  "serial_number": "SN12345678"
 }
 ```
+*(Trường `serial_number` là tùy chọn. Nếu trùng với một camera đang hoạt động khác, sẽ trả về mã lỗi `409 Conflict` với code `DUPLICATE_SERIAL`)*
 
 Response:
 ```json
@@ -624,6 +857,7 @@ Response:
   "camera_id": "camera-uuid",
   "name": "Camera Hành Lang",
   "room": "hallway",
+  "serial_number": "SN12345678",
   "device_api_key": "sg_live_randomstring...",
   "warning": "Lưu lại key này ngay — sẽ không hiển thị lại được"
 }
@@ -650,6 +884,25 @@ Response:
 ]
 ```
 *(Lưu ý: Không bao giờ trả về device_api_key hay hash của nó ở endpoint này)*
+
+### 4.14a `GET /api/cameras/{camera_id}` — Lấy thông tin chi tiết camera
+
+Quyền: `owner` hoặc `member` (Thành viên hộ gia đình).
+
+Header: `Authorization: Bearer <token>`
+
+Response:
+```json
+{
+  "id": "camera-uuid",
+  "name": "Camera Hành Lang",
+  "room": "hallway",
+  "status": "online",
+  "fps": 15,
+  "last_heartbeat": "2026-06-20T10:00:00Z",
+  "created_at": "2026-06-16T09:00:00Z"
+}
+```
 
 ### 4.15 `PATCH /api/cameras/{camera_id}/rotate-key` — Đổi mã kết nối camera mới
 
@@ -690,9 +943,11 @@ Request:
 {
   "name": "Camera Phòng Ngủ Mới",
   "room": "bedroom",
-  "fps": 10
+  "fps": 10,
+  "serial_number": "SN87654321"
 }
 ```
+*(Tất cả các trường là tùy chọn. Nếu `serial_number` trùng với một camera đang hoạt động khác, sẽ trả về mã lỗi `409 Conflict` với code `DUPLICATE_SERIAL`)*
 
 Response:
 ```json
@@ -728,76 +983,6 @@ Response:
 ### 4.19 Camera offline alert (internal)
 
 Heartbeat job kiểm tra `cameras.last_heartbeat`. Nếu quá 5 phút → tạo "system event" (severity = `SYSTEM`) và gửi push "Camera X mất kết nối".
-
-### 4.20 Event Feedback API (`POST /api/events/{event_id}/feedback`)
-
-Quyền: `owner` hoặc `member` thuộc household sở hữu event.
-
-- **Headers**:
-  - `Authorization: Bearer <FIREBASE_ID_TOKEN>` (Bắt buộc)
-- **Path Parameters**:
-  - `event_id`: Chuỗi định danh sự kiện (ví dụ: `EVT-20260613-001`), không phải UUID DB.
-- **Request Body**:
-  ```json
-  {
-    "label": "correct",
-    "note": "video thực sự có té ngã"
-  }
-  ```
-- **Ràng buộc validation**:
-  - `label`: Chỉ chấp nhận `"correct"`, `"incorrect"`, hoặc `"uncertain"`. Trả về `422 Unprocessable Entity` nếu không đúng.
-  - Event phải tồn tại (trả về `404 Not Found` nếu không tìm thấy `event_id`).
-  - Người dùng thuộc hộ gia đình của event (trả về `403 Forbidden` nếu không đúng).
-- **Response 201 Created**:
-  ```json
-  {
-    "status": "received",
-    "feedback_id": "feedback-uuid"
-  }
-  ```
-
-### 4.21 Event History API (`GET /api/events/history`)
-
-Quyền: `owner` hoặc `member` thuộc household.
-
-- **Headers**:
-  - `Authorization: Bearer <FIREBASE_ID_TOKEN>` (Bắt buộc)
-- **Query Parameters**:
-  - `household_id` (Bắt buộc): ID của hộ gia đình (UUID).
-  - `severity` (Tùy chọn): Lọc theo mức độ nghiêm trọng (`LOW`, `MEDIUM`, `HIGH`, `CRITICAL`, `SYSTEM`).
-  - `room` (Tùy chọn): Lọc theo tên phòng.
-  - `from_date` (Tùy chọn): Lọc từ thời điểm (ISO 8601, ví dụ: `2026-06-18T00:00:00Z`).
-  - `to_date` (Tùy chọn): Lọc đến thời điểm (ISO 8601).
-  - `page` (Tùy chọn, mặc định `1`): Trang cần lấy.
-  - `page_size` (Tùy chọn, mặc định `20`, tối đa `100`): Kích thước trang.
-- **Ràng buộc**: Người dùng phải là thành viên của hộ gia đình được truyền vào. Trả về `403 Forbidden` nếu không đúng.
-- **Response 200 OK**:
-  ```json
-  {
-    "items": [
-      {
-        "id": "event-uuid",
-        "event_id": "EVT-20260618-331",
-        "household_id": "household-uuid",
-        "camera_id": null,
-        "source": "video_upload",
-        "event_type": "fall",
-        "severity": "HIGH",
-        "confidence": 0.91,
-        "timestamp": "2026-06-18T16:00:00+00:00",
-        "duration_sec": 999,
-        "room": "bedroom",
-        "clip_path": "https://...",
-        "status": "pending",
-        "model_ver": "v1.0.0",
-        "created_at": "2026-06-18T16:00:02+00:00"
-      }
-    ],
-    "total": 1,
-    "page": 1,
-    "page_size": 20
-  }
-  ```
 
 ---
 
@@ -926,14 +1111,15 @@ async def run_escalation(event):
         await notification_service.trigger_call(next_contact, event)
         await log_escalation(event.id, next_contact.id, channel="call")
 
-    # Xóa escalate_after để job không chạy lại lần sau
+     # Xóa escalate_after để job không chạy lại lần sau
     await update_event_escalate_after(event.id, None)
     await update_event_status(event.id, "escalated")
 ```
 
-> "Auto-call" thật cần tích hợp Twilio hoặc tương đương — để như interface `trigger_call()` implement sau (out of scope Sprint 1).
+> **Tích hợp Twilio Auto-call (Đã triển khai)**: Hệ thống đã tích hợp Twilio cho luồng cảnh báo `CRITICAL`. Khi sự cố `CRITICAL` xảy ra, hệ thống sẽ thực hiện cuộc gọi đồng thời tới tất cả số điện thoại liên hệ trong hộ gia đình (sử dụng TwiML với văn bản không dấu để hỗ trợ Text-to-Speech tốt nhất).
 
 ---
+
 
 ## 7. Notification Service (FCM)
 
@@ -962,26 +1148,23 @@ async def send_push(user_id: str, event: Event):
 
 ---
 
-## 8. LLM Service (Claude API)
+## 8. LLM Service (OpenAI API / Rule-based)
 
+### 8.1 Cảnh báo tức thời (Rule-based)
+Hàm `generate_alert_message` được triển khai hoàn toàn bằng phương pháp rule-based (không sử dụng LLM):
 ```python
 # app/services/llm_service.py
-async def generate_alert_message(event: Event) -> str:
-    prompt = f"""
-    Một sự cố té ngã vừa được phát hiện:
-    - Mức độ: {event.severity}
-    - Thời gian: {event.timestamp}
-    - Phòng: {event.room}
-    - Bất động: {event.duration_sec} giây
+async def generate_alert_message(event: dict) -> str:
+    # 1. Parse timestamp thành định dạng HH:MM
+    # 2. Sinh thông báo bằng tiếng Việt theo severity (LOW, MEDIUM, HIGH, CRITICAL)
+```
+* **LOW**: Người thân vừa té ngã trong {room} lúc {time_str} và đã tự đứng dậy sau {duration_sec} giây. Dù vậy, té ngã ở người cao tuổi có thể gây chấn thương không rõ ngay — nên gọi điện hỏi thăm sức khỏe trong hôm nay.
+* **MEDIUM**: ⚠️ Cảnh báo: Phát hiện té ngã trong {room} lúc {time_str}. Người thân chưa đứng dậy sau {duration_sec} giây. Vui lòng kiểm tra.
+* **HIGH**: 🚨 Khẩn cấp: Phát hiện té ngã trong {room} lúc {time_str}. Người thân bất động hơn {duration_sec} giây. Cần kiểm tra ngay!
+* **CRITICAL**: 🆘 NGUY HIỂM: Người thân bất động hơn {duration_sec} giây trong {room} kể từ {time_str}. Liên hệ cấp cứu ngay!
 
-    Viết 1-2 câu tin nhắn tự nhiên, ấm áp, rõ ràng cho gia đình,
-    nêu rõ mức độ nghiêm trọng và hành động nên làm.
-    """
-    return await call_claude(prompt)
-
-async def generate_daily_report(events: list[Event]) -> str:
-    # Tổng hợp event log của 1 ngày thành đoạn văn tự nhiên
-    ...
+### 8.2 Daily Report & Config Parser (OpenAI `gpt-4o-mini`)
+Các tác vụ phân tích cấu hình từ hội thoại (`parse_config`) và tổng hợp báo cáo ngày (`generate_daily_report`) sử dụng OpenAI client với model `gpt-4o-mini`.
 
 from pydantic import BaseModel, Field, validator
 from typing import Optional
@@ -1032,9 +1215,10 @@ async def parse_config(message: str) -> ParsedConfig:
 | Job | Tần suất | Nhiệm vụ |
 |---|---|---|
 | `periodic_check_job` | mỗi 1 phút | ① Kiểm tra `cameras.last_heartbeat` offline > 5 phút; ② Check `events.escalate_after <= now()` và escalate nếu cần |
+| `retry_critical_calls` | mỗi 2 phút | Tìm kiếm sự kiện `CRITICAL` đang ở trạng thái `pending` được tạo > 2 phút trước và tự động thực hiện cuộc gọi lại qua Twilio nếu chưa được xác nhận (Acknowledge) |
 | `daily_report_job` | 1 lần/ngày (23:00) | Tổng hợp `events` trong ngày → gọi LLM → lưu `daily_reports` |
 
-Dùng **APScheduler** (chạy trong cùng FastAPI process cho MVP) với 2 interval jobs.
+Dùng **APScheduler** (chạy trong cùng FastAPI process cho MVP) với các interval jobs.
 
 ---
 
@@ -1083,8 +1267,11 @@ SUPABASE_URL=https://xxxx.supabase.co
 SUPABASE_SERVICE_KEY=xxxx
 FIREBASE_SERVICE_ACCOUNT_JSON={"type":"service_account",...}
 FIREBASE_SERVICE_ACCOUNT_PATH=./firebase-service-account.json
-ANTHROPIC_API_KEY=xxxx
+OPENAI_API_KEY=xxxx
 APP_ENV=development
+TWILIO_ACCOUNT_SID=ACxxxxxxxxxxxx
+TWILIO_AUTH_TOKEN=xxxxxxxxxxxx
+TWILIO_PHONE_NUMBER=+1xxxxxxxxxx
 ```
 
 ---
@@ -1100,7 +1287,7 @@ APP_ENV=development
 }
 ```
 
-Mã lỗi thường dùng: `UNAUTHORIZED`, `INVALID_DEVICE_KEY`, `EVENT_NOT_FOUND`, `VALIDATION_ERROR`, `LLM_TIMEOUT`.
+Mã lỗi thường dùng: `UNAUTHORIZED`, `INVALID_DEVICE_KEY`, `EVENT_NOT_FOUND`, `VALIDATION_ERROR`, `LLM_TIMEOUT`, `DUPLICATE_EVENT` (trả về 409 khi trùng lặp event_id).
 
 ---
 

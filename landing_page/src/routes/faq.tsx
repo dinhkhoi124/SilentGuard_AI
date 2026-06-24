@@ -86,7 +86,7 @@ function FAQPage() {
           <h3 className="mb-2 text-xl font-semibold">{labels.more}</h3>
           <p className="mb-5 text-sm text-ink-soft">hello@silentguard.vn · 1900 68XX</p>
           <a
-            href="mailto:hello@silentguard.vn"
+            href="mailto:vinhv304@gmail.com"
             className="inline-flex items-center gap-2 rounded-full bg-brand px-6 py-3 text-sm font-medium text-brand-foreground shadow-soft ring-1 ring-brand transition-all hover:shadow-glow"
           >
             {labels.contact}

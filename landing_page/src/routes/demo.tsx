@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { AlertTriangle, CheckCircle2, Film, Loader2, Upload, ArrowLeft, Sparkles } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Film, Loader2, Upload, ArrowLeft, Sparkles, Download } from "lucide-react";
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth, signInWithEmailAndPassword } from "firebase/auth";
 
@@ -64,6 +64,7 @@ function DemoPage() {
     room: string | null;
   } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const resultRef = useRef<HTMLDivElement>(null);
 
   function selectFile(f: File | null) {
     setEventResult(null);
@@ -83,9 +84,28 @@ function DemoPage() {
       setError(`Video tối đa ${MAX_MB}MB.`);
       return;
     }
-    setFile(f);
-    if (previewUrl) URL.revokeObjectURL(previewUrl);
-    setPreviewUrl(URL.createObjectURL(f));
+
+    // Check video duration (max 1 minute / 60 seconds)
+    const video = document.createElement("video");
+    video.preload = "metadata";
+    video.onloadedmetadata = function () {
+      window.URL.revokeObjectURL(video.src);
+      if (video.duration > 60) {
+        setError("Độ dài video tối đa là 1 phút (60 giây). Vui lòng chọn video ngắn hơn.");
+        setFile(null);
+        setPreviewUrl(null);
+      } else {
+        setFile(f);
+        if (previewUrl) URL.revokeObjectURL(previewUrl);
+        setPreviewUrl(URL.createObjectURL(f));
+      }
+    };
+    video.onerror = function () {
+      setError("Không thể đọc thông tin video. Vui lòng thử lại với video khác.");
+      setFile(null);
+      setPreviewUrl(null);
+    };
+    video.src = URL.createObjectURL(f);
   }
 
   async function runAnalysis() {
@@ -150,6 +170,11 @@ function DemoPage() {
               room: statusData.event?.room || null,
             });
             setStatus("done");
+            
+            // Auto scroll down to results container smoothly on mobile
+            setTimeout(() => {
+              resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+            }, 100);
           } else if (statusData.status === "failed") {
             clearInterval(pollInterval);
             setError("Phân tích thất bại, vui lòng thử lại.");
@@ -199,7 +224,7 @@ function DemoPage() {
             Tải video lên — AI sẽ cho biết có té ngã hay không
           </h1>
           <p className="mx-auto mt-4 max-w-[52ch] text-pretty text-ink-soft">
-            Tải lên video của bạn. Hệ thống sẽ xử lý và gửi thông báo cảnh báo chi tiết từ mô hình AI.
+            Tải lên video của bạn (độ dài tối đa 1 phút). Hệ thống sẽ xử lý và gửi thông báo cảnh báo chi tiết từ mô hình AI.
           </p>
         </div>
 
@@ -227,7 +252,7 @@ function DemoPage() {
                     <Upload className="size-6" />
                   </div>
                   <div className="font-medium text-ink">Kéo thả video vào đây</div>
-                  <div className="text-xs">hoặc bấm để chọn · MP4, WebM, MOV · tối đa {MAX_MB}MB</div>
+                  <div className="text-xs">hoặc bấm để chọn · MP4, WebM, MOV · tối đa 1 phút ({MAX_MB}MB)</div>
                 </div>
               )}
             </label>
@@ -280,10 +305,44 @@ function DemoPage() {
                 {error}
               </div>
             )}
+
+            {/* Test Video Fall samples */}
+            <div className="mt-8 border-t border-border pt-6">
+              <h3 className="mb-3 text-xs font-semibold uppercase tracking-widest text-ink-soft">
+                Video mẫu để kiểm thử nhanh
+              </h3>
+              <p className="mb-4 text-xs text-ink-soft">
+                Nếu chưa có sẵn video, bạn có thể tải về các video mẫu ngã thật dưới đây để tải lên hệ thống kiểm tra:
+              </p>
+              <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
+                {[
+                  "20240912_101331.mp4",
+                  "20240912_101427.mp4",
+                  "20240912_101520.mp4",
+                  "20240912_101626.mp4",
+                  "20240912_101723.mp4",
+                  "20240912_101943.mp4",
+                  "20240912_102048.mp4",
+                  "20240912_102146.mp4",
+                  "20240912_102330.mp4",
+                  "20240912_102649.mp4"
+                ].map((videoName, i) => (
+                  <a
+                    key={videoName}
+                    href={`/downloads/fall/${videoName}`}
+                    download
+                    className="flex items-center justify-between rounded-xl bg-surface-2 p-2.5 text-xs font-medium text-ink border border-border hover:bg-brand-light/35 hover:border-brand/30 transition-all text-left"
+                  >
+                    <span className="truncate pr-2">Video ngã mẫu {i + 1}</span>
+                    <Download className="size-3.5 shrink-0 text-brand-glow" />
+                  </a>
+                ))}
+              </div>
+            </div>
           </div>
 
           {/* Result */}
-          <div className="rounded-3xl bg-surface p-6 ring-1 ring-border shadow-soft">
+          <div ref={resultRef} className="rounded-3xl bg-surface p-6 ring-1 ring-border shadow-soft scroll-mt-20">
             <h2 className="mb-4 text-sm font-semibold uppercase tracking-widest text-ink-soft">
               Kết quả phân tích từ AI
             </h2>

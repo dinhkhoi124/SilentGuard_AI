@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { motion, useScroll, useTransform, useReducedMotion, AnimatePresence } from "framer-motion";
 import { useRef, useState, useEffect } from "react";
-import { Activity, Bell, Camera, ChevronDown, Eye, EyeOff, Loader2, Moon, PlayCircle, ShieldCheck, Sparkles, Users, Wifi, X, Download, ArrowUp } from "lucide-react";
+import { Activity, Bell, Camera, ChevronDown, Eye, EyeOff, Loader2, Moon, PlayCircle, ShieldCheck, Sparkles, Users, Wifi, X, Download, ArrowUp, HelpCircle, Laptop, Smartphone, Key, Settings, Info } from "lucide-react";
 import { toast } from "sonner";
 
 import { ClientOnly } from "@/components/ClientOnly";
@@ -9,6 +9,9 @@ import { Hero3D } from "@/components/Hero3D";
 import lifestyleImg from "@/assets/lifestyle.jpg";
 import appScreenImg from "@/assets/app-screen.jpg";
 import logoAsset from "@/assets/logo.png";
+import produce1 from "@/assets/produce1.jpg";
+import produce2 from "@/assets/produce2.jpg";
+import produce3 from "@/assets/produce3.jpg";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -115,9 +118,9 @@ function Hero() {
         style={{ background: "radial-gradient(circle, color-mix(in oklab, var(--accent) 30%, transparent), transparent 70%)" }}
       />
 
-      <div className="mx-auto max-w-6xl px-6 py-20 lg:py-32">
+      <div className="mx-auto max-w-6xl px-6 pt-10 pb-20 lg:pt-16 lg:pb-32">
         <div className="grid items-center gap-16 lg:grid-cols-[1.05fr_0.95fr]">
-          <motion.div style={{ y, scale, opacity }} className="relative">
+          <motion.div style={{ y, scale, opacity }} className="relative min-w-0">
             <motion.span
               variants={fadeUp}
               initial="hidden"
@@ -178,7 +181,7 @@ function Hero() {
               initial="hidden"
               animate="show"
               transition={{ delay: 0.4 }}
-              className="mt-12 grid max-w-md grid-cols-3 gap-4 text-sm"
+              className="mt-12 flex flex-wrap gap-x-8 gap-y-6 text-sm sm:max-w-md sm:justify-between"
             >
               {[
                 { k: "<60s", v: "Phát hiện" },
@@ -186,15 +189,15 @@ function Hero() {
                 { k: "24/7", v: "Quan sát liên tục" },
               ].map((s) => (
                 <div key={s.v}>
-                  <div className="text-2xl font-semibold text-brand">{s.k}</div>
-                  <div className="text-xs text-ink-soft">{s.v}</div>
+                  <div className="text-3xl font-semibold text-brand tracking-tight">{s.k}</div>
+                  <div className="text-xs sm:text-sm text-ink-soft mt-1">{s.v}</div>
                 </div>
               ))}
             </motion.div>
           </motion.div>
 
           {/* 3D Scene */}
-          <div className="relative">
+          <div className="relative min-w-0">
             <div className="relative aspect-square w-full overflow-hidden rounded-3xl bg-gradient-to-br from-brand-light via-surface to-surface-2 ring-1 ring-border shadow-glow">
               <ClientOnly
                 fallback={
@@ -443,6 +446,103 @@ function Stories() {
   );
 }
 
+import useEmblaCarousel from "embla-carousel-react";
+
+function ProductGallery() {
+  const galleryImages = [
+    { src: produce1, alt: "Thiết bị camera SilentGuard phát hiện té ngã", title: "Thiết bị Camera AI", desc: "Thiết kế nhỏ gọn, hiện đại, lắp đặt linh hoạt ở mọi góc phòng." },
+    { src: produce2, alt: "Ứng dụng theo dõi SilentGuard", title: "Ứng dụng di động", desc: "Giao diện trực quan, cảnh báo tức thì, cập nhật trạng thái mọi lúc." },
+    { src: produce3, alt: "SilentGuard bảo vệ người thân", title: "Giải pháp bảo vệ toàn diện", desc: "An tâm cho cha mẹ cao tuổi, kết nối con cái dù ở bất cứ đâu." }
+  ];
+
+  // Nhân bản danh sách ảnh để đảm bảo Embla Carousel có đủ số lượng slide (ít nhất 6) để loop mượt mà
+  const displayImages = [...galleryImages, ...galleryImages];
+
+  const [emblaRef, emblaApi] = useEmblaCarousel({ 
+    align: "center", 
+    loop: true,
+    skipSnaps: false
+  });
+
+  // Tự động chạy slider (Autoplay) mỗi 3 giây và tạm dừng khi người dùng tương tác
+  useEffect(() => {
+    if (!emblaApi) return;
+
+    let intervalId: ReturnType<typeof setInterval>;
+
+    const startAutoplay = () => {
+      stopAutoplay();
+      intervalId = setInterval(() => {
+        if (emblaApi) emblaApi.scrollNext();
+      }, 3000);
+    };
+
+    const stopAutoplay = () => {
+      if (intervalId) clearInterval(intervalId);
+    };
+
+    startAutoplay();
+
+    emblaApi.on("pointerDown", stopAutoplay);
+    emblaApi.on("pointerUp", startAutoplay);
+
+    return () => {
+      stopAutoplay();
+      if (emblaApi) {
+        emblaApi.off("pointerDown", stopAutoplay);
+        emblaApi.off("pointerUp", startAutoplay);
+      }
+    };
+  }, [emblaApi]);
+
+  return (
+    <Section id="gallery" className="py-24 bg-surface-2 border-y border-border overflow-hidden">
+      <div className="mx-auto max-w-6xl px-6">
+        <motion.div variants={fadeUp} className="mb-16 text-center">
+          <span className="mb-4 inline-block text-xs font-semibold uppercase tracking-widest text-brand">
+            Hình ảnh thực tế
+          </span>
+          <h2 className="text-balance text-3xl font-semibold leading-tight lg:text-4xl">
+            Chi tiết sản phẩm SilentGuard
+          </h2>
+          <p className="mx-auto mt-4 max-w-[48ch] text-pretty text-ink-soft">
+            Trực quan thiết bị camera AI và giao diện ứng dụng kết nối trực tiếp trong gia đình.
+          </p>
+        </motion.div>
+
+        {/* Embla Carousel Viewport */}
+        <div className="w-full overflow-hidden cursor-grab active:cursor-grabbing" ref={emblaRef}>
+          <div className="flex touch-pan-y">
+            {displayImages.map((img, i) => (
+              <div 
+                key={i} 
+                className="flex-[0_0_85%] sm:flex-[0_0_55%] lg:flex-[0_0_36%] min-w-0 px-3"
+              >
+                <div
+                  className="group h-full flex flex-col overflow-hidden rounded-3xl bg-surface border border-border shadow-soft transition-all duration-300 hover:-translate-y-1.5 hover:shadow-glow"
+                >
+                  <div className="relative w-full overflow-hidden aspect-[4/5] bg-surface-2 p-6 flex items-center justify-center">
+                    <img
+                      src={img.src}
+                      alt={img.alt}
+                      loading="lazy"
+                      className="w-full h-full object-contain drop-shadow-xl group-hover:scale-105 transition-all duration-700 pointer-events-none rounded-[1rem]"
+                    />
+                  </div>
+                  <div className="p-6 flex-1 flex flex-col justify-center">
+                    <h3 className="mb-2 text-lg font-semibold text-ink">{img.title}</h3>
+                    <p className="text-sm text-ink-soft leading-relaxed">{img.desc}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </Section>
+  );
+}
+
 function Contact() {
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -573,6 +673,7 @@ function Contact() {
 
 function AppDownload() {
   const [isAndroidModalOpen, setIsAndroidModalOpen] = useState(false);
+  const [isIosModalOpen, setIsIosModalOpen] = useState(false);
 
   return (
     <Section className="pb-24">
@@ -606,25 +707,21 @@ function AppDownload() {
               <div className="flex flex-wrap gap-3">
                 <button
                   type="button"
-                  onClick={() => {
-                    toast.info("Tính năng này sẽ sớm được ra mắt", {
-                      description: "Phiên bản dành cho iOS (App Store) đang được kiểm duyệt và sẽ sớm ra mắt.",
-                    });
-                  }}
+                  onClick={() => setIsIosModalOpen(true)}
                   className="inline-flex items-center gap-3 rounded-2xl bg-background px-5 py-3 text-ink ring-1 ring-white/10 transition-all hover:scale-[1.02] cursor-pointer"
                 >
                   <svg viewBox="0 0 24 24" className="size-6" fill="currentColor" aria-hidden>
                     <path d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701"/>
                   </svg>
                   <div className="text-left leading-tight">
-                    <div className="text-[10px] uppercase tracking-wider text-ink-soft">Tải về trên</div>
-                    <div className="text-sm font-semibold">App Store</div>
+                    <div className="text-[10px] uppercase tracking-wider text-ink-soft">Tải về bản</div>
+                    <div className="text-sm font-semibold">iOS (.IPA)</div>
                   </div>
                 </button>
                 <button
                   type="button"
                   onClick={() => setIsAndroidModalOpen(true)}
-                  className="inline-flex items-center gap-3 rounded-2xl bg-background px-5 py-3 text-ink ring-1 ring-white/10 transition-all hover:scale-[1.02] cursor-pointer"
+                  className="inline-flex items-center gap-3 rounded-2xl bg-background px-5 py-3 text-ink ring-1 ring-white/10 transition-all hover:scale-[1.02] cursor-pointer self-start"
                 >
                   <svg viewBox="0 0 28.99 31.99" className="size-6" aria-hidden>
                     <g fillRule="nonzero">
@@ -635,8 +732,8 @@ function AppDownload() {
                     </g>
                   </svg>
                   <div className="text-left leading-tight">
-                    <div className="text-[10px] uppercase tracking-wider text-ink-soft">Tải về trên</div>
-                    <div className="text-sm font-semibold">Google Play</div>
+                    <div className="text-[10px] uppercase tracking-wider text-ink-soft">Tải về bản</div>
+                    <div className="text-sm font-semibold">Android (.APK)</div>
                   </div>
                 </button>
               </div>
@@ -793,6 +890,164 @@ function AppDownload() {
                   </div>
                 </div>
               </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {isIosModalOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md overflow-y-auto"
+            onClick={() => setIsIosModalOpen(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              transition={{ type: "spring", duration: 0.5 }}
+              className="relative w-full max-w-2xl my-8 overflow-hidden rounded-3xl bg-ink text-background p-6 md:p-8 ring-1 ring-white/20 shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Glow Effects */}
+              <div className="pointer-events-none absolute -left-20 -top-20 size-60 rounded-full bg-brand/20 blur-3xl" />
+              <div className="pointer-events-none absolute -right-20 -bottom-20 size-60 rounded-full bg-brand-glow/10 blur-3xl" />
+
+              {/* Close Button */}
+              <button
+                type="button"
+                onClick={() => setIsIosModalOpen(false)}
+                className="absolute right-4 top-4 rounded-full p-2 text-background/60 hover:bg-white/10 hover:text-background transition-colors cursor-pointer z-20 bg-white/5 border border-white/10"
+              >
+                <X className="size-5" />
+              </button>
+
+              <div className="relative pt-6">
+                <div className="mb-6 pr-12">
+                  <span className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-brand/20 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-brand-glow">
+                    Hướng dẫn cài đặt
+                  </span>
+                  <h3 className="text-2xl font-bold">Cài đặt App iOS bằng Sideloadly</h3>
+                  <p className="text-sm text-background/60 mt-1">
+                    Hướng dẫn cách cài file .ipa lên iPhone/iPad cho mục đích thử nghiệm nội bộ và demo nhanh.
+                  </p>
+                </div>
+
+                <div className="relative max-h-[60vh] overflow-y-auto pr-4 custom-scrollbar">
+
+                <div className="space-y-6 text-sm text-background/90">
+                  {/* Step 1 */}
+                  <div className="flex gap-4">
+                    <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-brand/20 text-brand-glow font-bold text-xs">
+                      1
+                    </div>
+                    <div>
+                      <h4 className="font-semibold text-white mb-1">Yêu cầu chuẩn bị</h4>
+                      <ul className="list-disc pl-5 space-y-1 text-background/70">
+                        <li>Một máy tính Windows hoặc macOS.</li>
+                        <li>Một chiếc iPhone/iPad để cài đặt app.</li>
+                        <li>Cáp USB kết nối thiết bị với máy tính.</li>
+                        <li>
+                          File ứng dụng dạng{" "}
+                          <a
+                            href="/downloads/SilentGuard.ipa"
+                            download
+                            className="text-brand-glow hover:underline inline-flex items-center gap-0.5"
+                          >
+                            SilentGuard.ipa <Download className="size-3" />
+                          </a>
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
+
+                  {/* Step 2 */}
+                  <div className="flex gap-4">
+                    <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-brand/20 text-brand-glow font-bold text-xs">
+                      2
+                    </div>
+                    <div>
+                      <h4 className="font-semibold text-white mb-1">Cài đặt công cụ cần thiết</h4>
+                      <p className="text-background/70 mb-2">
+                        Nếu dùng hệ điều hành Windows, bạn cần tải và cài đặt trước 3 công cụ sau (chỉ cần mở ứng dụng Sideloadly để sử dụng):
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        <a
+                          href="https://sideloadly.io/"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 hover:bg-white/20 px-3 py-1.5 text-xs text-white transition-colors"
+                        >
+                          <Laptop className="size-3.5" /> Tải Sideloadly
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Step 3 */}
+                  <div className="flex gap-4">
+                    <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-brand/20 text-brand-glow font-bold text-xs">
+                      3
+                    </div>
+                    <div>
+                      <h4 className="font-semibold text-white mb-1">Chuẩn bị iPhone</h4>
+                      <p className="text-background/70">
+                        Kết nối iPhone với máy tính bằng cáp USB. Nếu điện thoại hiển thị thông báo <strong>"Trust This Computer?" (Tin cậy máy tính này?)</strong>, hãy chọn <strong>"Trust" (Tin cậy)</strong> và nhập passcode của máy.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Step 4 */}
+                  <div className="flex gap-4">
+                    <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-brand/20 text-brand-glow font-bold text-xs">
+                      4
+                    </div>
+                    <div>
+                      <h4 className="font-semibold text-white mb-1">Cài đặt bằng Sideloadly</h4>
+                      <ul className="list-decimal pl-5 space-y-1 text-background/70">
+                        <li>Mở phần mềm <strong>Sideloadly</strong> trên máy tính.</li>
+                        <li>Ở mục <strong>Device</strong>: Chọn chính xác iPhone của bạn đang kết nối.</li>
+                        <li>Ở mục <strong>IPA</strong>: Kéo thả file <code>SilentGuard.ipa</code> đã tải vào hoặc click vào icon để chọn file.</li>
+                        <li>Ở mục <strong>Apple Account</strong>: Nhập tài khoản Apple ID của bạn để thực hiện ký số.</li>
+                        <li>Click nút <strong>Start</strong>. Phần mềm sẽ yêu cầu bạn nhập mật khẩu Apple ID để tiến hành cài đặt.</li>
+                      </ul>
+                    </div>
+                  </div>
+
+                  {/* Step 5 */}
+                  <div className="flex gap-4">
+                    <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-brand/20 text-brand-glow font-bold text-xs">
+                      5
+                    </div>
+                    <div>
+                      <h4 className="font-semibold text-white mb-1">Cấu hình Tin cậy (Trust Developer) trên iPhone</h4>
+                      <p className="text-background/70 mb-3">
+                        Sau khi cài đặt xong, nếu mở app báo lỗi <strong>"Untrusted Developer"</strong>, hãy thao tác trên iPhone:
+                      </p>
+                      <div className="rounded-xl bg-white/5 p-4 border border-white/10 space-y-2 text-xs text-background/80">
+                        <div className="flex items-center gap-2">
+                          <Settings className="size-4 text-brand-glow" />
+                          <span>Cài đặt (Settings) &rarr; Cài đặt chung (General) &rarr; Quản lý VPN & Thiết bị (VPN & Device Management)</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Key className="size-4 text-brand-glow" />
+                          <span>Chọn tài khoản Apple ID của bạn &rarr; Chọn <strong>Trust (Tin cậy)</strong></span>
+                        </div>
+                        <div className="mt-2 pt-2 border-t border-white/10 flex items-start gap-2 text-brand-glow">
+                          <Info className="size-4 shrink-0 mt-0.5" />
+                          <span>
+                            <strong>Lưu ý iOS 16+:</strong> Nếu ứng dụng yêu cầu Bật chế độ nhà phát triển (Developer Mode), hãy vào <strong>Cài đặt &rarr; Quyền riêng tư & Bảo mật &rarr; Chế độ nhà phát triển</strong>, gạt Bật và khởi động lại iPhone.
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div> {/* Đóng space-y-6 */}
+              </div> {/* Đóng custom-scrollbar scroll area */}
+            </div> {/* Đóng relative-pt-6 */}
             </motion.div>
           </motion.div>
         )}
@@ -1007,6 +1262,7 @@ function Index() {
       <Hero />
       <HowItWorks />
       <Features />
+      <ProductGallery />
       <DemoCTA />
       <Stories />
       <FAQ />

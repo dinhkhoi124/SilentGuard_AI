@@ -37,6 +37,17 @@ async def create_camera(
     Creates a new camera for the household. Owner-only.
     """
     plain_key = f"sg_live_{secrets.token_urlsafe(32)}"
+    if req.serial_number:
+        serial_check = supabase.table("cameras")\
+            .select("id")\
+            .eq("serial_number", req.serial_number)\
+            .is_("deleted_at", "null")\
+            .execute()
+        if serial_check.data:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={"error": {"code": "DUPLICATE_SERIAL", "message": f"Serial number '{req.serial_number}' đã được sử dụng"}}
+            )
     hashed_key = hashlib.sha256(plain_key.encode()).hexdigest()
     
     camera_data = {
@@ -248,6 +259,19 @@ async def update_camera_details(
         # Verify owner role
         verify_owner_role(camera["household_id"], user.get("id"))
             
+        if req.serial_number is not None:
+            serial_check = supabase.table("cameras")\
+                .select("id")\
+                .eq("serial_number", req.serial_number)\
+                .neq("id", camera_id)\
+                .is_("deleted_at", "null")\
+                .execute()
+            if serial_check.data:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail={"error": {"code": "DUPLICATE_SERIAL", "message": f"Serial number '{req.serial_number}' đã được sử dụng"}}
+                )
+
         update_data = {}
         if req.name is not None:
             update_data["name"] = req.name

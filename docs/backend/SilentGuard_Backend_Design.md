@@ -378,10 +378,11 @@ Request Body:
 ```json
 {
   "label": "correct",
-  "note": "Ba bị trượt chân nhưng không sao"
+  "note": "Ba bị trượt chân nhưng không sao",
+  "camera_serial": "SN12345678"
 }
 ```
-*(Chấp nhận label: "correct" | "incorrect" | "uncertain")*
+*(Chấp nhận label: "correct" | "incorrect" | "uncertain". Trường `camera_serial` là tùy chọn)*
 
 Response:
 ```json
@@ -738,9 +739,11 @@ Request:
   "household_id": "household-uuid",
   "name": "Camera Hành Lang",
   "room": "hallway",
-  "fps": 15
+  "fps": 15,
+  "serial_number": "SN12345678"
 }
 ```
+*(Trường `serial_number` là tùy chọn. Nếu trùng với một camera đang hoạt động khác, sẽ trả về mã lỗi `409 Conflict` với code `DUPLICATE_SERIAL`)*
 
 Response:
 ```json
@@ -748,6 +751,7 @@ Response:
   "camera_id": "camera-uuid",
   "name": "Camera Hành Lang",
   "room": "hallway",
+  "serial_number": "SN12345678",
   "device_api_key": "sg_live_randomstring...",
   "warning": "Lưu lại key này ngay — sẽ không hiển thị lại được"
 }
@@ -833,9 +837,11 @@ Request:
 {
   "name": "Camera Phòng Ngủ Mới",
   "room": "bedroom",
-  "fps": 10
+  "fps": 10,
+  "serial_number": "SN87654321"
 }
 ```
+*(Tất cả các trường là tùy chọn. Nếu `serial_number` trùng với một camera đang hoạt động khác, sẽ trả về mã lỗi `409 Conflict` với code `DUPLICATE_SERIAL`)*
 
 Response:
 ```json

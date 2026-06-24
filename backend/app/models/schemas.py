@@ -132,6 +132,7 @@ class SwitchHouseholdRequest(BaseModel):
 class FeedbackRequest(BaseModel):
     label: str
     note: Optional[str] = None
+    camera_serial: Optional[str] = None
 
     @field_validator("label")
     @classmethod

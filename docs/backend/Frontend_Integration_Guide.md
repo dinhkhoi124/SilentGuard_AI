@@ -198,7 +198,8 @@ Content-Type: application/json
 ```json
 {
   "label": "correct", // Hoặc "incorrect", "uncertain"
-  "note": "Mô hình phát hiện chính xác cú ngã" // (Tùy chọn)
+  "note": "Mô hình phát hiện chính xác cú ngã", // (Tùy chọn)
+  "camera_serial": "SN12345678" // Số serial của camera gửi phản hồi (Tùy chọn)
 }
 ```
 - **Response 200 OK**:
@@ -566,9 +567,12 @@ Authorization: Bearer <FIREBASE_ID_TOKEN>
   "household_id": "household-uuid",
   "name": "Camera Phòng Khách",
   "room": "living-room",
-  "fps": 15
+  "fps": 15,
+  "serial_number": "SN12345678" // (Tùy chọn)
 }
 ```
+*(Nếu `serial_number` trùng với một camera đang hoạt động khác, API sẽ trả về lỗi `409 Conflict` với body `{"error": {"code": "DUPLICATE_SERIAL", "message": "..."}}`)*
+
 - **Response 21Created**:
 Trả về thông tin camera cùng mã API Key để điền vào thiết bị biên (Edge Device). **Plaintext key chỉ được hiển thị 1 lần duy nhất này**.
 ```json
@@ -576,6 +580,7 @@ Trả về thông tin camera cùng mã API Key để điền vào thiết bị b
   "camera_id": "camera-uuid",
   "name": "Camera Phòng Khách",
   "room": "living-room",
+  "serial_number": "SN12345678",
   "device_api_key": "sg_live_xxxxxx...",
   "warning": "Lưu lại key này ngay — sẽ không hiển thị lại được"
 }
@@ -679,9 +684,11 @@ Authorization: Bearer <FIREBASE_ID_TOKEN>
 {
   "name": "Camera Phòng Khách VIP",
   "room": "living-room-vip",
-  "fps": 10
+  "fps": 10,
+  "serial_number": "SN87654321" // (Tùy chọn)
 }
 ```
+*(Nếu `serial_number` trùng với một camera đang hoạt động khác, API sẽ trả về lỗi `409 Conflict` với body `{"error": {"code": "DUPLICATE_SERIAL", "message": "..."}}`)*
 - **Response 200 OK**:
 ```json
 {

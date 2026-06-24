@@ -222,7 +222,8 @@ async def post_event_feedback(
             "household_id": household_id,
             "submitted_by": user["id"],
             "label": req.label,
-            "note": req.note
+            "note": req.note,
+            "camera_serial": req.camera_serial
         }
         
         insert_res = supabase.table("event_feedback").insert(feedback_data).select("id").execute()

@@ -15,23 +15,14 @@ class AiConfigCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: isDark ? theme.colorScheme.surface : AppColors.surface,
+        // Nếu là dark mode thì dùng màu surface của theme, ngược lại dùng màu trắng
+        color: isDark ? theme.colorScheme.surface : Colors.white,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
           color: isDark
               ? theme.colorScheme.outline
               : AppColors.primary.withValues(alpha: 0.01),
         ),
-        gradient: isDark
-            ? null
-            : LinearGradient(
-                colors: [
-                  AppColors.surface,
-                  AppColors.primary.withValues(alpha: 0.03),
-                ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

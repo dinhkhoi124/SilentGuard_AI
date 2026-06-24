@@ -16,6 +16,7 @@ class CameraDevice extends Equatable {
     this.model,
     this.serialNumber,
     this.productId,
+    this.room,
   });
 
   final String id;
@@ -31,6 +32,10 @@ class CameraDevice extends Equatable {
   final String? serialNumber;
   final String? productId;
 
+  /// Raw backend room key (e.g. 'bedroom', 'living_room').
+  /// Distinct from [location] which is the human-readable display string.
+  final String? room;
+
   CameraDevice copyWith({
     List<bool>? accessoryStates,
     bool? isArmed,
@@ -39,6 +44,7 @@ class CameraDevice extends Equatable {
     String? model,
     String? serialNumber,
     String? productId,
+    String? room,
   }) {
     return CameraDevice(
       id: id,
@@ -53,6 +59,7 @@ class CameraDevice extends Equatable {
       model: model ?? this.model,
       serialNumber: serialNumber ?? this.serialNumber,
       productId: productId ?? this.productId,
+      room: room ?? this.room,
     );
   }
 
@@ -70,5 +77,6 @@ class CameraDevice extends Equatable {
     model,
     serialNumber,
     productId,
+    room,
   ];
 }

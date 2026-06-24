@@ -23,10 +23,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     // Đăng ký các sự kiện (events) với các hàm xử lý tương ứng
     on<HomeStarted>((event, emit) => _loadHome(emit));
     on<HomeRetryRequested>(
-      (event, emit) => _loadHome(
-        emit,
-        silent: event.silent,
-      ),
+      (event, emit) => _loadHome(emit, silent: event.silent),
     );
     on<RoomFilterChanged>(_onRoomFilterChanged);
     on<AddDeviceTapped>(_onAddDeviceTapped);
@@ -43,20 +40,17 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
   final DeleteCameraDevice deleteCameraDevice;
   final ImouStreamRepository imouStreamRepository;
   final SessionRepository sessionRepository;
-  
+
   List<CameraDevice> _activeDevices = [];
   int _loadGeneration = 0;
   Timer? _backendRetryTimer;
 
   /// Tải dữ liệu chính cho trang chủ bao gồm thời tiết, danh sách camera, và kiểm tra session
-  Future<void> _loadHome(
-    Emitter<HomeState> emit, {
-    bool silent = false,
-  }) async {
+  Future<void> _loadHome(Emitter<HomeState> emit, {bool silent = false}) async {
     final generation = ++_loadGeneration;
     _backendRetryTimer?.cancel();
     _backendRetryTimer = null;
-    
+
     if (!silent) {
       emit(const HomeLoading());
     }
@@ -69,7 +63,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     final weatherFuture = getWeather();
     final deviceResult = await getCameraDevices();
     var devicesLoaded = false;
-    
+
     deviceResult.fold(
       (failure) {
         if (_isBackendUnavailable(failure)) {
@@ -117,7 +111,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
 
     final sessionResult = await sessionRepository.provisionSession();
     var sessionReady = false;
-    
+
     sessionResult.fold(
       (failure) {
         if (failure.kind == SessionFailureKind.backendUnavailable) {

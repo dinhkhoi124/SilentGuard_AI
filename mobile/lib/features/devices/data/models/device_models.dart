@@ -59,6 +59,7 @@ class PairedDeviceModel {
     this.model,
     this.serialNumber,
     this.productId,
+    this.room,
   });
 
   final String id;
@@ -74,8 +75,12 @@ class PairedDeviceModel {
   final String? serialNumber;
   final String? productId;
 
+  /// Raw backend room key, preserved separately from [location] (display string).
+  final String? room;
+
   factory PairedDeviceModel.fromJson(Map<String, dynamic> json) {
     final backendStatus = _readNullableString(json, ['status']);
+    final rawRoom = _readNullableString(json, ['room']);
     return PairedDeviceModel(
       id: _readString(json, ['camera_id', 'device_id', 'id']),
       name: _readString(json, ['display_name', 'name']),
@@ -97,6 +102,7 @@ class PairedDeviceModel {
         'SN',
       ]),
       productId: _readNullableString(json, ['product_id', 'pid', 'PID']),
+      room: rawRoom,
     );
   }
 
@@ -114,6 +120,7 @@ class PairedDeviceModel {
       model: model,
       serialNumber: serialNumber,
       productId: productId,
+      room: room,
     );
   }
 
@@ -122,7 +129,6 @@ class PairedDeviceModel {
   }) {
     return {
       'name': resolvedDevice.displayName,
-      'room': resolvedDevice.location ?? 'Camera IP',
       'fps': 15,
       'serial_number': resolvedDevice.serialNumber.trim(),
     };

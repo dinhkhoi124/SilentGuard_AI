@@ -15,6 +15,7 @@ class PairedDevice extends Equatable {
     this.model,
     this.serialNumber,
     this.productId,
+    this.room,
   });
 
   final String id;
@@ -30,6 +31,9 @@ class PairedDevice extends Equatable {
   final String? serialNumber;
   final String? productId;
 
+  /// Raw backend room key (e.g. 'bedroom'). Passed through to CameraDevice.
+  final String? room;
+
   CameraDevice toCameraDevice() {
     return CameraDevice(
       id: id,
@@ -44,6 +48,7 @@ class PairedDevice extends Equatable {
       model: model,
       serialNumber: serialNumber,
       productId: productId,
+      room: room,
     );
   }
 
@@ -61,5 +66,6 @@ class PairedDevice extends Equatable {
     model,
     serialNumber,
     productId,
+    room,
   ];
 }

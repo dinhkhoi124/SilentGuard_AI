@@ -58,7 +58,7 @@ class BottomNavBar extends StatelessWidget {
                 icon: Iconsax.chart,
                 label: 'Báo cáo',
                 active: selectedIndex == 2,
-                hasBadge: true,
+                hasBadge: false, // TODO: set to true if there are new reports
                 onTap: () => onSelected(2),
               ),
               _NavItem(

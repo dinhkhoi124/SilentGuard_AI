@@ -13,6 +13,9 @@ import 'package:mobile/features/home/domain/entities/camera_event.dart';
 import 'package:mobile/features/home/presentation/bloc/home_bloc.dart';
 import 'package:mobile/features/home/presentation/bloc/home_event.dart';
 import 'package:mobile/features/home/presentation/bloc/home_state.dart';
+import 'package:mobile/features/home/presentation/cubit/camera_event_history_cubit.dart';
+import 'package:mobile/features/home/presentation/cubit/camera_event_history_state.dart';
+import 'package:mobile/features/home/presentation/mappers/camera_event_adapter.dart';
 import 'package:mobile/features/home/presentation/widgets/camera_action_buttons.dart';
 import 'package:mobile/features/home/presentation/widgets/camera_event_history_header.dart';
 import 'package:mobile/features/home/presentation/widgets/camera_event_tile.dart';
@@ -29,7 +32,7 @@ class CameraDetailArgs {
   final ValueChanged<Uint8List>? onThumbnailCaptured;
 }
 
-class CameraDetailPage extends StatefulWidget {
+class CameraDetailPage extends StatelessWidget {
   const CameraDetailPage({
     super.key,
     required this.device,
@@ -40,10 +43,28 @@ class CameraDetailPage extends StatefulWidget {
   final ValueChanged<Uint8List>? onThumbnailCaptured;
 
   @override
-  State<CameraDetailPage> createState() => _CameraDetailPageState();
+  Widget build(BuildContext context) {
+    return BlocProvider<CameraEventHistoryCubit>(
+      create: (_) => sl<CameraEventHistoryCubit>()..loadForCamera(device),
+      child: _CameraDetailBody(
+        device: device,
+        onThumbnailCaptured: onThumbnailCaptured,
+      ),
+    );
+  }
 }
 
-class _CameraDetailPageState extends State<CameraDetailPage> {
+class _CameraDetailBody extends StatefulWidget {
+  const _CameraDetailBody({required this.device, this.onThumbnailCaptured});
+
+  final CameraDevice device;
+  final ValueChanged<Uint8List>? onThumbnailCaptured;
+
+  @override
+  State<_CameraDetailBody> createState() => _CameraDetailBodyState();
+}
+
+class _CameraDetailBodyState extends State<_CameraDetailBody> {
   Timer? _clockTimer;
   String _currentTime = '';
   late String? _streamUrl;
@@ -79,8 +100,6 @@ class _CameraDetailPageState extends State<CameraDetailPage> {
 
   @override
   Widget build(BuildContext context) {
-    const events = <CameraEvent>[];
-
     return BlocListener<HomeBloc, HomeState>(
       listenWhen: (_, state) =>
           state is CameraStreamUrlLoading ||
@@ -159,24 +178,60 @@ class _CameraDetailPageState extends State<CameraDetailPage> {
                 ),
               ),
               const SliverToBoxAdapter(child: SizedBox(height: 10)),
-              if (events.isNotEmpty)
-                SliverToBoxAdapter(
-                  child: CameraLatestEventCard(
-                    device: widget.device,
-                    latestEvent: events.first,
-                  ),
-                )
-              else
-                const SliverToBoxAdapter(child: _NoCameraEventsPanel()),
+              // Latest event card / no-events panel — driven by history state
+              SliverToBoxAdapter(
+                child:
+                    BlocBuilder<
+                      CameraEventHistoryCubit,
+                      CameraEventHistoryState
+                    >(
+                      builder: (context, state) {
+                        final latestEvent = switch (state) {
+                          CameraEventHistoryLoaded(:final items)
+                              when items.isNotEmpty =>
+                            CameraEventAdapter.fromEventHistoryItem(
+                              items.first,
+                            ),
+                          _ => null,
+                        };
+                        if (latestEvent != null) {
+                          return CameraLatestEventCard(
+                            device: widget.device,
+                            latestEvent: latestEvent,
+                          );
+                        }
+                        return const _NoCameraEventsPanel();
+                      },
+                    ),
+              ),
               const SliverToBoxAdapter(child: SizedBox(height: 10)),
               const SliverToBoxAdapter(child: CameraActionButtons()),
               const SliverToBoxAdapter(child: SizedBox(height: 16)),
               const SliverToBoxAdapter(child: CameraEventHistoryHeader()),
-              SliverList(
-                delegate: SliverChildBuilderDelegate((_, index) {
-                  final event = events[index];
-                  return CameraEventTile(event: event);
-                }, childCount: events.length),
+              // Event history list — driven by CameraEventHistoryCubit
+              BlocBuilder<CameraEventHistoryCubit, CameraEventHistoryState>(
+                builder: (context, state) {
+                  return switch (state) {
+                    CameraEventHistoryInitial() ||
+                    CameraEventHistoryLoading() => _SliverEventSection(
+                      child: _HistoryLoadingBody(),
+                    ),
+                    CameraEventHistoryLoaded(:final items) => _SliverEventList(
+                      events: CameraEventAdapter.fromList(items),
+                    ),
+                    CameraEventHistoryEmpty() => _SliverEventSection(
+                      child: _HistoryEmptyBody(message: 'Chưa có sự kiện nào.'),
+                    ),
+
+                    CameraEventHistoryError() => _SliverEventSection(
+                      child: _HistoryErrorBody(
+                        onRetry: () => context
+                            .read<CameraEventHistoryCubit>()
+                            .retry(widget.device),
+                      ),
+                    ),
+                  };
+                },
               ),
               const SliverToBoxAdapter(child: SizedBox(height: 24)),
             ],
@@ -322,6 +377,110 @@ class _CameraDetailPageState extends State<CameraDetailPage> {
     );
   }
 }
+
+// ─── helper sliver wrappers ───────────────────────────────────────────────────
+
+class _SliverEventSection extends StatelessWidget {
+  const _SliverEventSection({required this.child});
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return SliverToBoxAdapter(child: child);
+  }
+}
+
+class _SliverEventList extends StatelessWidget {
+  const _SliverEventList({required this.events});
+  final List<CameraEvent> events;
+
+  @override
+  Widget build(BuildContext context) {
+    return SliverList(
+      delegate: SliverChildBuilderDelegate(
+        (_, index) => CameraEventTile(event: events[index]),
+        childCount: events.length,
+      ),
+    );
+  }
+}
+
+// ─── section-level state bodies (small, focused) ─────────────────────────────
+
+class _HistoryLoadingBody extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      child: Center(
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: AppColors.primary,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Text(
+              'Đang tải lịch sử sự kiện...',
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: AppColors.mutedText),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _HistoryEmptyBody extends StatelessWidget {
+  const _HistoryEmptyBody({required this.message});
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+      child: Text(
+        message,
+        style: Theme.of(
+          context,
+        ).textTheme.bodyMedium?.copyWith(color: AppColors.mutedText),
+      ),
+    );
+  }
+}
+
+class _HistoryErrorBody extends StatelessWidget {
+  const _HistoryErrorBody({required this.onRetry});
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Không thể tải lịch sử sự kiện. Vui lòng thử lại.',
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: AppColors.mutedText),
+          ),
+          TextButton(onPressed: onRetry, child: const Text('Thử lại')),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── existing private widgets (unchanged) ────────────────────────────────────
 
 class _SheetHandle extends StatelessWidget {
   const _SheetHandle();

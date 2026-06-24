@@ -19,6 +19,24 @@ class ApiClient {
       '--dart-define=API_BASE_URL=https://<backend-domain> '
       'hoặc dùng URL backend đã triển khai.';
 
+  /// Fetches a JSON object at [path] with the given [queryParameters].
+  /// Values are URL-encoded automatically via [Uri.replace].
+  Future<Map<String, dynamic>> getObjectWithQuery(
+    String path,
+    Map<String, String> queryParameters,
+  ) async {
+    final uri = _uri(path).replace(queryParameters: queryParameters);
+    final response = await _client
+        .get(uri, headers: _headers())
+        .timeout(AppConfig.networkTimeout);
+    final decoded = _decode(response);
+    if (decoded is Map<String, dynamic>) return decoded;
+    throw const ApiException(
+      'Phản hồi máy chủ không hợp lệ.',
+      kind: ApiExceptionKind.invalidResponse,
+    );
+  }
+
   Future<Map<String, dynamic>> getObject(String path) async {
     final response = await _client
         .get(_uri(path), headers: _headers())

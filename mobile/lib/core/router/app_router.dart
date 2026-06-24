@@ -9,6 +9,7 @@ import 'package:mobile/core/router/auth_notifier.dart';
 import 'package:mobile/core/widgets/wave_text_loader.dart';
 import 'package:mobile/features/auth/presentation/pages/signup_page.dart';
 import 'package:mobile/features/auth/presentation/pages/welcome_page.dart';
+import 'package:mobile/features/automation/presentation/pages/emergency_contacts_page.dart';
 import 'package:mobile/core/utils/app_colors.dart';
 import 'package:mobile/features/account/presentation/pages/app_appearance_page.dart';
 import 'package:mobile/features/account/presentation/pages/faq_page.dart';
@@ -108,6 +109,10 @@ class AppRouter {
               sl<DevicePairingBloc>()..add(const DevicePairingStarted()),
           child: const DevicePairingPage(),
         ),
+      ),
+      GoRoute(
+        path: '/emergency-contacts',
+        builder: (context, state) => const EmergencyContactsPage(),
       ),
       GoRoute(
         path: '/app-appearance',

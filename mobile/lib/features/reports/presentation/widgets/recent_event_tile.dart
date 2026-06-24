@@ -7,17 +7,19 @@ class RecentEventTile extends StatelessWidget {
     required this.time,
     required this.title,
     required this.subtitle,
-    required this.statusBadge,
     required this.icon,
     required this.onTap,
+    this.statusBadge,
   });
 
   final String time;
   final String title;
   final String subtitle;
-  final String statusBadge;
   final IconData icon;
   final VoidCallback onTap;
+
+  /// Optional — omit to hide the badge entirely.
+  final String? statusBadge;
 
   @override
   Widget build(BuildContext context) {
@@ -33,16 +35,20 @@ class RecentEventTile extends StatelessWidget {
           children: [
             SizedBox(
               width: 44,
-              child: Text(
-                time,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: isDark
-                      ? theme.colorScheme.onSurfaceVariant
-                      : AppColors.mutedText,
-                  fontWeight: FontWeight.w600,
+              child: Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text(
+                  time,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: isDark
+                        ? theme.colorScheme.onSurfaceVariant
+                        : AppColors.mutedText,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
             ),
+            const SizedBox(width: 8),
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
@@ -62,14 +68,48 @@ class RecentEventTile extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    title,
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      color: isDark
-                          ? theme.colorScheme.onSurface
-                          : AppColors.darkText,
-                      fontWeight: FontWeight.w600,
-                    ),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          title,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            color: isDark
+                                ? theme.colorScheme.onSurface
+                                : AppColors.darkText,
+                            fontWeight: FontWeight.w600,
+                            height: 1.3,
+                          ),
+                        ),
+                      ),
+                      if (statusBadge != null) ...[
+                        const SizedBox(width: 12),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: isDark
+                                ? theme.colorScheme.surfaceContainerHighest
+                                : AppColors.background,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            statusBadge!,
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: isDark
+                                  ? theme.colorScheme.onSurfaceVariant
+                                  : AppColors.mutedText,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                   const SizedBox(height: 4),
                   Text(
@@ -81,25 +121,6 @@ class RecentEventTile extends StatelessWidget {
                     ),
                   ),
                 ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: isDark
-                    ? theme.colorScheme.surfaceContainerHighest
-                    : AppColors.background,
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Text(
-                statusBadge,
-                style: theme.textTheme.labelSmall?.copyWith(
-                  color: isDark
-                      ? theme.colorScheme.onSurfaceVariant
-                      : AppColors.mutedText,
-                  fontWeight: FontWeight.w600,
-                ),
               ),
             ),
           ],

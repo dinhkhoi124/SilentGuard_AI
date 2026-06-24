@@ -8,6 +8,7 @@ import 'package:http/http.dart' as http;
 import 'package:mobile/core/network/api_client.dart';
 import 'package:mobile/core/network/auth_interceptor.dart';
 import 'package:mobile/core/router/auth_notifier.dart';
+import 'package:mobile/core/services/phone_dialer_service.dart';
 import 'package:mobile/core/services/fcm_service.dart';
 import 'package:mobile/core/services/local_notification_service.dart';
 import 'package:mobile/core/services/onboarding_service.dart';
@@ -16,6 +17,10 @@ import 'package:mobile/features/auth/data/datasources/firebase_auth_datasource.d
 import 'package:mobile/features/auth/data/repositories/auth_repository_impl.dart';
 import 'package:mobile/features/auth/domain/repositories/auth_repository.dart';
 import 'package:mobile/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:mobile/features/automation/data/datasources/emergency_contacts_local_data_source.dart';
+import 'package:mobile/features/automation/data/repositories/emergency_contacts_repository_impl.dart';
+import 'package:mobile/features/automation/domain/repositories/emergency_contacts_repository.dart';
+import 'package:mobile/features/automation/presentation/cubit/emergency_contacts_cubit.dart';
 import 'package:mobile/features/devices/data/datasources/device_permission_data_source.dart';
 import 'package:mobile/features/devices/data/datasources/device_remote_data_source.dart';
 import 'package:mobile/features/devices/data/datasources/gallery_image_data_source.dart';
@@ -39,6 +44,12 @@ import 'package:mobile/features/home/domain/usecases/get_weather.dart';
 import 'package:mobile/features/home/domain/usecases/review_alert.dart';
 import 'package:mobile/features/home/presentation/bloc/home_bloc.dart';
 import 'package:mobile/features/home/presentation/cubit/alert_review_cubit.dart';
+import 'package:mobile/features/home/presentation/cubit/camera_event_history_cubit.dart';
+import 'package:mobile/features/home/data/datasources/event_feedback_remote_data_source.dart';
+import 'package:mobile/features/home/data/repositories/event_feedback_repository_impl.dart';
+import 'package:mobile/features/home/domain/repositories/event_feedback_repository.dart';
+import 'package:mobile/features/home/domain/usecases/submit_event_feedback.dart';
+import 'package:mobile/features/home/presentation/cubit/event_feedback_cubit.dart';
 import 'package:mobile/features/notifications/data/datasources/notification_local_data_source.dart';
 import 'package:mobile/features/notifications/presentation/cubit/notifications_cubit.dart';
 import 'package:mobile/features/session/data/datasources/session_remote_datasource.dart';
@@ -48,6 +59,11 @@ import 'package:mobile/features/video_upload/data/datasources/video_upload_remot
 import 'package:mobile/features/video_upload/data/repositories/video_upload_repository_impl.dart';
 import 'package:mobile/features/video_upload/domain/repositories/video_upload_repository.dart';
 import 'package:mobile/features/video_upload/domain/usecases/upload_video_usecase.dart';
+import 'package:mobile/features/reports/data/datasources/event_history_remote_datasource.dart';
+import 'package:mobile/features/reports/data/repositories/event_history_repository_impl.dart';
+import 'package:mobile/features/reports/domain/repositories/event_history_repository.dart';
+import 'package:mobile/features/reports/domain/usecases/get_event_history.dart';
+import 'package:mobile/features/reports/presentation/cubit/event_history_cubit.dart';
 import 'package:mobile/features/video_upload/presentation/bloc/video_upload_bloc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -65,6 +81,7 @@ Future<void> init() async {
     ..registerLazySingleton(() => ApiClient(client: sl()))
     ..registerLazySingleton(SharedPreferencesAsync.new)
     ..registerLazySingleton(() => OnboardingService(sl()))
+    ..registerLazySingleton(() => PhoneDialerService())
     ..registerLazySingleton(() => ThemeController(sl()))
     ..registerLazySingleton(() => GoogleSignIn.instance)
     ..registerLazySingleton<FirebaseAuthDataSource>(
@@ -135,6 +152,13 @@ Future<void> init() async {
     ..registerLazySingleton<ImouStreamRepository>(
       () => ImouStreamRepositoryImpl(sl()),
     )
+    ..registerLazySingleton<EmergencyContactsLocalDataSource>(
+      () => EmergencyContactsLocalDataSourceImpl(sl()),
+    )
+    ..registerLazySingleton<EmergencyContactsRepository>(
+      () => EmergencyContactsRepositoryImpl(sl()),
+    )
+    ..registerFactory(() => EmergencyContactsCubit(sl()))
     ..registerLazySingleton<DeviceRemoteDataSource>(
       () =>
           DeviceRemoteDataSourceImpl(apiClient: sl(), sessionRepository: sl()),
@@ -168,5 +192,31 @@ Future<void> init() async {
       () => AlertReviewRepositoryImpl(sl()),
     )
     ..registerLazySingleton(() => ReviewAlert(sl()))
-    ..registerFactory(() => AlertReviewCubit(sl()));
+    ..registerFactory(() => AlertReviewCubit(sl()))
+    ..registerLazySingleton<EventFeedbackRemoteDataSource>(
+      () => EventFeedbackRemoteDataSourceImpl(sl()),
+    )
+    ..registerLazySingleton<EventFeedbackRepository>(
+      () => EventFeedbackRepositoryImpl(sl()),
+    )
+    ..registerLazySingleton(() => SubmitEventFeedback(sl()))
+    ..registerFactoryParam<EventFeedbackCubit, String, dynamic>(
+      (eventId, _) => EventFeedbackCubit(sl(), eventId: eventId),
+    )
+    ..registerLazySingleton<EventHistoryRemoteDataSource>(
+      () => EventHistoryRemoteDataSourceImpl(sl()),
+    )
+    ..registerLazySingleton<EventHistoryRepository>(
+      () => EventHistoryRepositoryImpl(sl()),
+    )
+    ..registerLazySingleton(() => GetEventHistory(sl()))
+    ..registerFactory(
+      () => EventHistoryCubit(getEventHistory: sl(), sessionRepository: sl()),
+    )
+    ..registerFactory(
+      () => CameraEventHistoryCubit(
+        getEventHistory: sl(),
+        sessionRepository: sl(),
+      ),
+    );
 }

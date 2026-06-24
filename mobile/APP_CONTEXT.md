@@ -246,6 +246,7 @@ Home UI gom:
 - lang nghe URL stream qua `BlocListener`/`BlocBuilder` cua `HomeBloc` de cap nhat giao dien loading/error/success dynamic
 - live stream qua `media_kit` (su dung widget `CameraVideoPlayer` / `CameraLivePreview` ho tro loading indicator, hien thi thong bao loi va nut "Tai lai" khi ket noi stream that bai)
 - co callback chup thumbnail tra ve `HomeBloc` va tu dong dispose controller/player subscriptions
+- **Lich su su kien**: Hien tai Camera Detail tam thoi hien thi toan bo lich su su kien cua ho gia dinh (giong Reports tab) do backend chua ho tro loc theo `camera_id`. Se chuyen sang loc theo `camera_id` khi backend ho tro query param nay.
 
 ### 8.3 Device CRUD
 
@@ -315,6 +316,8 @@ Nhung khoi quan trong dang duoc dang ky trong `injection_container.dart`:
 - `VideoUploadBloc`
 - `DevicePairingBloc`
 - session, home (bao gom `AlertReviewRepository`), device (bao gom `ImouStreamRepository`), upload repositories va use cases
+- `EventHistoryCubit` (doc `SessionRepository.currentHouseholdId` noi bo; khong yeu cau truyen householdId tu ngoai)
+- `EventHistoryRepository`, `EventHistoryRemoteDataSource`, `GetEventHistory` use case
 
 ## 14. Backend/API dang dung
 
@@ -333,7 +336,13 @@ Nhom API chinh:
 
 - Alerts/events
   - `PATCH /api/alerts/{event_id}/review`
+  - `POST /api/events/{event_id}/feedback` — (Camera Detail) Submit AI accuracy feedback (`label`, `note`).
   - `POST /api/events/upload-video`
+  - `GET /api/events/history` — toan bo lich su su kien (Reports tab, `EventHistoryRemoteDataSource`)
+    - Query params: `household_id` (bat buoc), `severity`, `room`, `from_date`, `to_date`, `page`, `page_size`
+    - URI duoc xay dung qua `ApiClient.getObjectWithQuery` (su dung `Uri.replace(queryParameters: ...)` de tu dong percent-encode)
+    - Response: `{ items: [...], total, page, page_size }`
+    - Khong co truong `llm_message`; title/subtitle tu dong sinh tu severity + room + status + duration_sec
 
 - Weather
   - Open-Meteo direct mobile call
@@ -376,6 +385,15 @@ Neu lam giao dien/toi uu theme:
 - `lib/core/utils/app_colors.dart`
 - `lib/features/account/presentation/pages/account_page.dart`
 
+Neu lam Reports tab / event history:
+
+- `lib/features/reports/presentation/pages/reports_page.dart`
+- `lib/features/reports/presentation/cubit/event_history_cubit.dart`
+- `lib/features/reports/presentation/cubit/event_history_state.dart`
+- `lib/features/reports/presentation/mappers/event_history_display_mapper.dart`
+- `lib/features/reports/domain/entities/event_history_item.dart`
+- `lib/features/reports/data/datasources/event_history_remote_datasource.dart`
+
 ## 17. Tom tat mot cau
 
-SilentGuard la mot Flutter app theo Clean Architecture, dung Firebase Auth + FastAPI backend + FCM/local notifications + media live stream, trong do startup/auth/notification flow da duoc tach kha ro rang va toan bo code hien tai xoay quanh cac feature `auth`, `session`, `home`, `devices`, `notifications`, `account`, va `video_upload`.
+SilentGuard la mot Flutter app theo Clean Architecture, dung Firebase Auth + FastAPI backend + FCM/local notifications + media live stream, trong do startup/auth/notification flow da duoc tach kha ro rang va toan bo code hien tai xoay quanh cac feature `auth`, `session`, `home`, `devices`, `notifications`, `account`, `video_upload`, va `reports` (da ket noi real API cho event history).

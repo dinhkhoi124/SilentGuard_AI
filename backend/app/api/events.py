@@ -403,9 +403,8 @@ async def detect_event(
             detail={"error": {"code": "UNAUTHORIZED", "message": "Missing X-Device-Key or X-Upload-Token header"}}
         )
 
-    # Force severity to HIGH and set default duration_sec to 999 if video upload source
-    if source == "video_upload":
-        req.severity = "HIGH"
+    # Set default duration_sec to 999 if missing for video upload source
+    if source == "video_upload" and getattr(req, "duration_sec", None) is None:
         req.duration_sec = 999
 
     # Insert raw event into Supabase `events` table

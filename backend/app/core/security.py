@@ -26,7 +26,25 @@ else:
     else:
         print("Warning: Firebase service account path not found.")
 
-async def get_or_create_user(firebase_uid: str, email: str = None, name: str = None, invite_code: str = None) -> dict:
+def _normalize_phone(phone: str) -> str:
+    """
+    Normalize Vietnamese phone number to E.164 format.
+    0xxxxxxxxx → +84xxxxxxxxx
+    """
+    phone = phone.strip().replace(" ", "").replace("-", "")
+    if phone.startswith("0"):
+        return "+84" + phone[1:]
+    if phone.startswith("84") and not phone.startswith("+"):
+        return "+" + phone
+    return phone
+
+async def get_or_create_user(
+    firebase_uid: str,
+    email: str = None,
+    name: str = None,
+    phone: str = None,
+    invite_code: str = None
+) -> dict:
     """
     Find or provision a user in users table by firebase_uid.
     Ref: Section 3 Auth Flow - just-in-time provisioning
@@ -70,6 +88,7 @@ async def get_or_create_user(firebase_uid: str, email: str = None, name: str = N
             "firebase_uid": firebase_uid,
             "email": email,
             "full_name": name,
+            "phone": phone,
             "role": "family"
         }
         insert_response = supabase.table("users").insert(new_user).execute()
@@ -122,7 +141,13 @@ async def get_or_create_user(firebase_uid: str, email: str = None, name: str = N
                 detail={"error": {"code": "DATABASE_ERROR", "message": f"Failed to get or create user: {str(e)}"}}
             )
         # Development fallback
-        fallback_user = {"id": "mock-uuid-user", "firebase_uid": firebase_uid, "email": email, "full_name": name}
+        fallback_user = {
+            "id": "mock-uuid-user",
+            "firebase_uid": firebase_uid,
+            "email": email,
+            "full_name": name,
+            "phone": phone
+        }
         return fallback_user
 
 async def get_current_user(
@@ -143,7 +168,15 @@ async def get_current_user(
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid Firebase token")
 
     firebase_uid = decoded["uid"]
-    user = await get_or_create_user(firebase_uid, decoded.get("email"), decoded.get("name"), x_invite_code)
+    raw_phone = decoded.get("phone_number")
+    phone = _normalize_phone(raw_phone) if raw_phone else None
+    user = await get_or_create_user(
+        firebase_uid=firebase_uid,
+        email=decoded.get("email"),
+        name=decoded.get("name"),
+        phone=phone,
+        invite_code=x_invite_code
+    )
     return user
 
 def require_household_role(owner_only: bool = False):

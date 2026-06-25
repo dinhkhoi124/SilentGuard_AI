@@ -231,15 +231,11 @@ async def request_upload_url(
         if not upload_url:
             raise Exception("Failed to obtain signed upload URL")
             
-        signed_res = supabase.storage.from_("clips").create_signed_url(storage_path, 31536000)
-        video_url = signed_res.get("signedURL") or signed_res.get("signed_url")
-        if not video_url:
-            raise Exception("Failed to obtain signed URL")
     except Exception as e:
         print(f"File upload signing failed: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"error": {"code": "UPLOAD_ERROR", "message": f"Failed to sign video file url: {str(e)}"}}
+            detail={"error": {"code": "UPLOAD_ERROR", "message": f"Failed to generate upload url: {str(e)}"}}
         )
         
     upload_token = f"vid_{secrets.token_urlsafe(32)}"
@@ -247,7 +243,7 @@ async def request_upload_url(
         "household_id": req.household_id,
         "uploaded_by": user_id,
         "storage_path": storage_path,
-        "video_url": video_url,
+        "video_url": None,
         "upload_token": upload_token,
         "status": "pending"
     }
@@ -267,7 +263,7 @@ async def request_upload_url(
     return {
         "upload_id": inserted["id"],
         "upload_url": upload_url,
-        "video_url": video_url,
+        "video_url": None,
         "upload_token": upload_token
     }
 
@@ -306,7 +302,20 @@ async def trigger_ai(
             detail={"error": {"code": "DATABASE_ERROR", "message": str(e)}}
         )
 
-    video_url = upload_record.get("video_url")
+    storage_path = upload_record.get("storage_path")
+    try:
+        signed_res = supabase.storage.from_("clips").create_signed_url(storage_path, 31536000)
+        video_url = signed_res.get("signedURL") or signed_res.get("signed_url")
+        if not video_url:
+            raise Exception("Failed to obtain signed URL")
+            
+        supabase.table("video_uploads").update({"video_url": video_url}).eq("id", upload_record["id"]).execute()
+    except Exception as e:
+        print(f"Failed to generate signed url in trigger_ai: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={"error": {"code": "UPLOAD_ERROR", "message": f"Lỗi lấy link video sau khi upload: {str(e)}"}}
+        )
     
     ai_server_url = os.getenv("AI_SERVER_URL")
     if ai_server_url:

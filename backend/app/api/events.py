@@ -3,6 +3,7 @@ import uuid
 import secrets
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, Form, UploadFile, File, Header, Request
+from pydantic import BaseModel
 from app.core.security import verify_device_key_dependency, get_current_user, require_household_role
 from app.core.supabase_client import supabase
 from app.models.schemas import EventDetectRequest
@@ -187,6 +188,142 @@ async def get_upload_status(upload_token: str):
             detail={"error": {"code": "DATABASE_ERROR", "message": str(e)}}
         )
 
+class RequestUploadUrlRequest(BaseModel):
+    household_id: str
+    filename: str
+    content_type: str
+
+@router.post("/request-upload-url", status_code=status.HTTP_200_OK)
+async def request_upload_url(
+    req: RequestUploadUrlRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    POST /api/events/request-upload-url
+    Generates a presigned URL for direct upload to Supabase.
+    """
+    user_id = current_user.get("id")
+    try:
+        res = supabase.table("household_members")\
+            .select("*")\
+            .eq("household_id", req.household_id)\
+            .eq("user_id", user_id)\
+            .execute()
+        if not res.data or len(res.data) == 0:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={"error": {"code": "FORBIDDEN", "message": "Bạn không có quyền truy cập thông tin gia đình này"}}
+            )
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={"error": {"code": "DATABASE_ERROR", "message": f"Database verification error: {str(e)}"}}
+        )
+
+    unique_id = uuid.uuid4()
+    storage_path = f"videos/{req.household_id}/{unique_id}_{req.filename}"
+    
+    try:
+        res = supabase.storage.from_("clips").create_signed_upload_url(storage_path)
+        upload_url = res.get("signed_url")
+        if not upload_url:
+            raise Exception("Failed to obtain signed upload URL")
+            
+        signed_res = supabase.storage.from_("clips").create_signed_url(storage_path, 31536000)
+        video_url = signed_res.get("signedURL") or signed_res.get("signed_url")
+        if not video_url:
+            raise Exception("Failed to obtain signed URL")
+    except Exception as e:
+        print(f"File upload signing failed: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={"error": {"code": "UPLOAD_ERROR", "message": f"Failed to sign video file url: {str(e)}"}}
+        )
+        
+    upload_token = f"vid_{secrets.token_urlsafe(32)}"
+    upload_data = {
+        "household_id": req.household_id,
+        "uploaded_by": user_id,
+        "storage_path": storage_path,
+        "video_url": video_url,
+        "upload_token": upload_token,
+        "status": "pending"
+    }
+    
+    try:
+        db_res = supabase.table("video_uploads").insert(upload_data).select().execute()
+        if not db_res.data:
+            raise Exception("No data returned from DB insert")
+        inserted = db_res.data[0]
+    except Exception as e:
+        print(f"Database insertion for video_uploads failed: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={"error": {"code": "DATABASE_ERROR", "message": f"Failed to save video upload to database: {str(e)}"}}
+        )
+
+    return {
+        "upload_id": inserted["id"],
+        "upload_url": upload_url,
+        "video_url": video_url,
+        "upload_token": upload_token
+    }
+
+class TriggerAiRequest(BaseModel):
+    upload_token: str
+
+@router.post("/trigger-ai", status_code=status.HTTP_200_OK)
+async def trigger_ai(
+    req: TriggerAiRequest,
+    request: Request,
+    background_tasks: BackgroundTasks,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    POST /api/events/trigger-ai
+    Triggers the AI server after a client successfully uploads a video directly to Supabase.
+    """
+    try:
+        res = supabase.table("video_uploads").select("*").eq("upload_token", req.upload_token).execute()
+        if not res.data:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={"error": {"code": "NOT_FOUND", "message": "Upload token không tồn tại"}}
+            )
+        upload_record = res.data[0]
+        if upload_record.get("status") != "pending":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={"error": {"code": "BAD_REQUEST", "message": "Video đã được xử lý hoặc lỗi"}}
+            )
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={"error": {"code": "DATABASE_ERROR", "message": str(e)}}
+        )
+
+    video_url = upload_record.get("video_url")
+    
+    ai_server_url = os.getenv("AI_SERVER_URL")
+    if ai_server_url:
+        proto = request.headers.get("x-forwarded-proto", "http")
+        base_url = str(request.base_url)
+        if proto == "https" and base_url.startswith("http://"):
+            base_url = base_url.replace("http://", "https://")
+            
+        backend_detect_url = f"{base_url.rstrip('/')}/api/events/detect"
+        background_tasks.add_task(
+            notify_ai_server,
+            video_url,
+            req.upload_token,
+            backend_detect_url
+        )
+
+    return {"status": "triggered"}
 @router.post("/detect", status_code=status.HTTP_201_CREATED)
 async def detect_event(
     req: EventDetectRequest,

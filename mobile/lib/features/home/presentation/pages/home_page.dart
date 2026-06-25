@@ -24,11 +24,12 @@ import 'package:mobile/features/home/presentation/widgets/bottom_nav_bar.dart';
 import 'package:mobile/features/home/presentation/widgets/camera_card.dart';
 import 'package:mobile/features/home/presentation/widgets/empty_devices.dart';
 import 'package:mobile/features/home/presentation/widgets/room_filter_chips.dart';
-import 'package:mobile/features/home/presentation/widgets/weather_card.dart';
+import 'package:mobile/features/home/presentation/widgets/safety_weather_card.dart';
 import 'package:mobile/features/notifications/domain/entities/notification_alert.dart';
 import 'package:mobile/features/notifications/presentation/cubit/notifications_cubit.dart';
 import 'package:mobile/features/notifications/presentation/cubit/notifications_state.dart';
 import 'package:mobile/features/video_upload/presentation/bloc/video_upload_bloc.dart';
+import 'package:mobile/features/video_upload/presentation/widgets/video_upload_intro_sheet.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -67,7 +68,7 @@ class _HomePageState extends State<HomePage> {
           messenger.showSnackBar(
             const SnackBar(
               content: Text(
-                '✅ Đã gửi video thành công! Chúng tôi sẽ thông báo nếu phát hiện bất thường.',
+                '✅ Video đã được gửi. AI sẽ phân tích trong nền và gửi thông báo nếu phát hiện sự cố.',
               ),
               backgroundColor: AppColors.darkText,
             ),
@@ -75,7 +76,7 @@ class _HomePageState extends State<HomePage> {
         } else if (state is VideoUploadFailure) {
           messenger.showSnackBar(
             const SnackBar(
-              content: Text('❌ Gửi video thất bại. Vui lòng thử lại.'),
+              content: Text('❌ Không thể gửi video. Vui lòng thử lại.'),
               backgroundColor: AppColors.badgeRed,
             ),
           );
@@ -166,9 +167,7 @@ class _HomePageState extends State<HomePage> {
               ),
               onSelected: (index) => setState(() => _selectedTab = index),
               onUploadSelected: () {
-                context.read<VideoUploadBloc>().add(
-                  const VideoUploadSubmitRequested(),
-                );
+                _showVideoUploadIntroSheet(context);
               },
             ),
           ),
@@ -197,6 +196,22 @@ class _HomePageState extends State<HomePage> {
                 ),
         ),
       );
+  }
+
+  void _showVideoUploadIntroSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => VideoUploadIntroSheet(
+        onChooseVideo: () {
+          Navigator.of(ctx).pop();
+          context.read<VideoUploadBloc>().add(
+            const VideoUploadSubmitRequested(),
+          );
+        },
+      ),
+    );
   }
 }
 
@@ -253,7 +268,13 @@ class _LoadedHome extends StatelessWidget {
             ),
             sliver: SliverList.list(
               children: [
-                WeatherCard(weather: state.weather),
+                SafetyWeatherCard(
+                  weather: state.weather,
+                  totalCameras: state.devices.length,
+                  onlineCameras: state.devices
+                      .where((d) => d.status.toLowerCase() == 'online')
+                      .length,
+                ),
                 const SizedBox(height: 28),
                 const _DevicesHeader(),
                 const SizedBox(height: 16),

@@ -11,19 +11,23 @@ class CameraEvent extends Equatable {
     required this.id,
     required this.time,
     required this.title,
-    required this.description,
     required this.level,
     required this.type,
-    this.thumbnailAsset,
+    required this.room,
+    required this.statusLabel,
+    this.durationSec,
+    this.confidence,
   });
 
   final String id;
   final String time;
   final String title;
-  final String description;
   final EventLevel level;
   final EventType type;
-  final String? thumbnailAsset;
+  final String room;
+  final String statusLabel;
+  final int? durationSec;
+  final double? confidence;
 
   @override
   List<Object?> get props => [id, time, title];

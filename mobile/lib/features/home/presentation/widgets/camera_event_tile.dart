@@ -37,7 +37,6 @@ class _CameraEventTileContent extends StatelessWidget {
   Widget build(BuildContext context) {
     final appearance = _eventAppearance(event.type);
     final levelAppearance = _eventLevelAppearance(event.level);
-    final hasClip = event.type != EventType.reconnect;
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
@@ -59,55 +58,46 @@ class _CameraEventTileContent extends StatelessWidget {
                 iconColor: appearance.iconColor,
                 size: 42,
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 5,
-                      crossAxisAlignment: WrapCrossAlignment.center,
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          event.time,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: levelAppearance.timeColor,
-                            fontWeight: FontWeight.w700,
+                        Expanded(
+                          child: Text(
+                            event.title,
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.darkText,
+                              height: 1.2,
+                            ),
                           ),
                         ),
-                        ?levelAppearance.badge,
+                        if (levelAppearance.badge != null) ...[
+                          const SizedBox(width: 8),
+                          levelAppearance.badge!,
+                        ],
                       ],
                     ),
-                    const SizedBox(height: 5),
+                    const SizedBox(height: 6),
                     Text(
-                      event.title,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.darkText,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      event.description,
+                      _buildMetadata(event),
                       style: const TextStyle(
                         fontSize: 12,
                         color: AppColors.mutedText,
-                        height: 1.35,
+                        height: 1.4,
                       ),
                     ),
                   ],
                 ),
               ),
-              if (hasClip) ...[
-                const SizedBox(width: 10),
-                _Thumbnail(assetPath: event.thumbnailAsset),
-              ],
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
           BlocBuilder<EventFeedbackCubit, EventFeedbackState>(
             builder: (context, state) {
               return _FeedbackStatusRow(event: event, state: state);
@@ -116,6 +106,18 @@ class _CameraEventTileContent extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  String _buildMetadata(CameraEvent event) {
+    final parts = <String>[
+      event.time,
+      event.room,
+      if (event.durationSec != null && event.durationSec! > 0)
+        '${event.durationSec}s',
+      if (event.confidence != null)
+        '${(event.confidence! * 100).toStringAsFixed(0)}% tin cậy',
+    ];
+    return parts.join(' · ');
   }
 }
 
@@ -129,12 +131,20 @@ class _FeedbackStatusRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final appearance = _feedbackAppearance(state);
 
+    final String displayLabel = state is EventFeedbackInitial
+        ? event.statusLabel
+        : appearance.label;
+
+    final Color displayColor = state is EventFeedbackInitial
+        ? _statusColor(event.statusLabel)
+        : appearance.color;
+
     return Wrap(
       spacing: 8,
       runSpacing: 8,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
-        _FeedbackChip(label: appearance.label, color: appearance.color),
+        _FeedbackChip(label: displayLabel, color: displayColor),
         if (state is EventFeedbackInitial)
           _FeedbackActionButton(
             label: 'Xác nhận kết quả',
@@ -162,6 +172,14 @@ class _FeedbackStatusRow extends StatelessWidget {
 
     if (result == null) return;
     await cubit.submit(label: result.label, note: result.note);
+  }
+
+  Color _statusColor(String statusLabel) {
+    if (statusLabel == 'Đang chờ') return AppColors.primary;
+    if (statusLabel == 'Đã xử lý') return const Color(0xFF2E7D32);
+    if (statusLabel == 'Báo động giả') return AppColors.mutedText;
+    if (statusLabel == 'Đã chuyển tiếp') return const Color(0xFFE53935);
+    return AppColors.mutedText;
   }
 }
 
@@ -417,27 +435,6 @@ class _SheetHandle extends StatelessWidget {
           borderRadius: BorderRadius.circular(99),
         ),
         child: const SizedBox(width: 40, height: 5),
-      ),
-    );
-  }
-}
-
-class _Thumbnail extends StatelessWidget {
-  const _Thumbnail({this.assetPath});
-
-  final String? assetPath;
-
-  @override
-  Widget build(BuildContext context) {
-    final path = assetPath;
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(10),
-      child: SizedBox(
-        width: 62,
-        height: 46,
-        child: path == null || path.isEmpty
-            ? const ColoredBox(color: Color(0xFFBDBDBD))
-            : Image.asset(path, fit: BoxFit.cover),
       ),
     );
   }

@@ -17,14 +17,15 @@ class CameraEventAdapter {
 
   static CameraEvent fromEventHistoryItem(EventHistoryItem item) {
     return CameraEvent(
-      // Use event_id (EVT-…) for feedback API compatibility
       id: item.eventId,
       time: _formatTime(item.timestamp),
       title: _title(item.severity),
-      description: _description(item),
       level: _level(item.severity),
       type: _type(item.severity),
-      thumbnailAsset: null,
+      room: item.room,
+      statusLabel: _statusLabel(item.status),
+      durationSec: item.durationSec,
+      confidence: item.confidence,
     );
   }
 
@@ -50,20 +51,6 @@ class CameraEventAdapter {
       EventSeverity.system => 'Sự kiện hệ thống',
       EventSeverity.unknown => 'Sự kiện camera',
     };
-  }
-
-  static String _description(EventHistoryItem item) {
-    final statusLabel = _statusLabel(item.status);
-    final dur = item.durationSec;
-    final conf = item.confidence;
-
-    final parts = <String>[
-      item.room,
-      statusLabel,
-      if (dur != null && dur > 0) '${dur}s',
-      if (conf != null) '${(conf * 100).toStringAsFixed(0)}% tin cậy',
-    ];
-    return parts.join(' · ');
   }
 
   static String _statusLabel(EventStatus status) {

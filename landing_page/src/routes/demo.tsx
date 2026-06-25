@@ -120,24 +120,57 @@ function DemoPage() {
 
       setStatus("uploading");
       
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("household_id", DEMO_HOUSEHOLD_ID); 
-
-      const uploadRes = await fetch("https://c2-app-128-production.up.railway.app/api/events/upload-video", {
+      // Step 1: Xin link upload trực tiếp
+      const reqUploadRes = await fetch("https://c2-app-128-production.up.railway.app/api/events/request-upload-url", {
         method: "POST",
         headers: {
+          "Content-Type": "application/json",
           Authorization: `Bearer ${token}`
         },
-        body: formData,
+        body: JSON.stringify({
+          household_id: DEMO_HOUSEHOLD_ID,
+          filename: file.name,
+          content_type: file.type || "video/mp4"
+        }),
       });
 
-      if (!uploadRes.ok) {
-        const errJson = await uploadRes.json().catch(() => ({}));
-        throw new Error(errJson.detail?.error?.message || errJson.detail || "Không thể tải video lên.");
+      if (!reqUploadRes.ok) {
+        const errJson = await reqUploadRes.json().catch(() => ({}));
+        throw new Error(errJson.detail?.error?.message || errJson.detail || "Không thể khởi tạo phiên upload.");
       }
 
-      const { upload_token } = await uploadRes.json();
+      const { upload_url, upload_token } = await reqUploadRes.json();
+      
+      // Step 2: Upload trực tiếp lên Supabase Storage
+      const putRes = await fetch(upload_url, {
+        method: "PUT",
+        headers: {
+          "Content-Type": file.type || "video/mp4"
+        },
+        body: file
+      });
+      
+      if (!putRes.ok) {
+        throw new Error("Lỗi khi tải video lên hệ thống lưu trữ.");
+      }
+      
+      // Step 3: Gọi backend báo đã upload xong để trigger AI
+      const triggerRes = await fetch("https://c2-app-128-production.up.railway.app/api/events/trigger-ai", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          upload_token
+        })
+      });
+      
+      if (!triggerRes.ok) {
+        const errJson = await triggerRes.json().catch(() => ({}));
+        throw new Error(errJson.detail?.error?.message || errJson.detail || "Không thể bắt đầu luồng phân tích AI.");
+      }
+
       setUploadToken(upload_token);
       setStatus("polling");
 

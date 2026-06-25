@@ -76,6 +76,7 @@ class _CameraDetailBodyState extends State<_CameraDetailBody> {
   String _currentTime = '';
   late String? _streamUrl;
   late bool _isStreamLoading;
+  bool _isStreamRequestInFlight = false;
   bool _showLoadingForNextStreamRequest = false;
   String? _streamErrorMessage;
 
@@ -84,7 +85,9 @@ class _CameraDetailBodyState extends State<_CameraDetailBody> {
     super.initState();
     context.read<SuppressCubit>().loadState(widget.device.id);
     _streamUrl = _normalizedUrl(widget.device.rtspUrl);
+    debugPrint('[CameraDetail] initState streamUrl: $_streamUrl');
     _isStreamLoading = _streamUrl == null;
+    debugPrint('[CameraDetail] initState isLoading: $_isStreamLoading');
     _updateTime();
     _clockTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) _updateTime();
@@ -116,6 +119,9 @@ class _CameraDetailBodyState extends State<_CameraDetailBody> {
               state is CameraStreamUrlLoaded ||
               state is CameraStreamUrlFailure,
           listener: (context, state) {
+            debugPrint(
+              '[CameraDetail] BlocListener state: ${state.runtimeType}',
+            );
             if (state is CameraStreamUrlLoading &&
                 state.cameraId == widget.device.id) {
               setState(() {
@@ -125,8 +131,14 @@ class _CameraDetailBodyState extends State<_CameraDetailBody> {
               });
               return;
             }
-            if (state is CameraStreamUrlLoaded &&
-                state.cameraId == widget.device.id) {
+            if (state is CameraStreamUrlLoaded) {
+              debugPrint(
+                '[CameraDetail] URL received: ${_redactedStreamUrl(state.streamUrl)}',
+              );
+              debugPrint(
+                '[CameraDetail] URL timestamp: ${DateTime.now().toIso8601String()}',
+              );
+              _isStreamRequestInFlight = false;
               setState(() {
                 _streamUrl = state.streamUrl;
                 _isStreamLoading = false;
@@ -135,8 +147,9 @@ class _CameraDetailBodyState extends State<_CameraDetailBody> {
               });
               return;
             }
-            if (state is CameraStreamUrlFailure &&
-                state.cameraId == widget.device.id) {
+            if (state is CameraStreamUrlFailure) {
+              debugPrint('[CameraDetail] Stream FAILED: ${state.message}');
+              _isStreamRequestInFlight = false;
               setState(() {
                 _isStreamLoading = false;
                 _showLoadingForNextStreamRequest = false;
@@ -157,10 +170,10 @@ class _CameraDetailBodyState extends State<_CameraDetailBody> {
       ],
       child: Scaffold(
         backgroundColor: AppColors.background,
-        body: SafeArea(
-          child: CustomScrollView(
-            slivers: [
-              SliverToBoxAdapter(
+        body: CustomScrollView(
+          slivers: [
+            SliverSafeArea(
+              sliver: SliverToBoxAdapter(
                 child: CameraTopBar(
                   device: widget.device,
                   onBack: () {
@@ -173,7 +186,10 @@ class _CameraDetailBodyState extends State<_CameraDetailBody> {
                   onSettings: _showCameraOptions,
                 ),
               ),
-              SliverToBoxAdapter(
+            ),
+            SliverToBoxAdapter(
+              child: AspectRatio(
+                aspectRatio: 16 / 9,
                 child: BlocBuilder<HomeBloc, HomeState>(
                   buildWhen: (_, state) =>
                       state is CameraStreamUrlLoading ||
@@ -191,76 +207,69 @@ class _CameraDetailBodyState extends State<_CameraDetailBody> {
                   },
                 ),
               ),
-              const SliverToBoxAdapter(child: SizedBox(height: 12)),
-              SliverToBoxAdapter(
-                child: CameraSafetyStatus(
-                  device: widget.device,
-                  updateTime: TimeOfDay.now().format(context),
-                ),
+            ),
+            const SliverToBoxAdapter(child: SizedBox(height: 12)),
+            SliverToBoxAdapter(
+              child: CameraSafetyStatus(
+                device: widget.device,
+                updateTime: TimeOfDay.now().format(context),
               ),
-              const SliverToBoxAdapter(child: SizedBox(height: 10)),
-              // Latest event card / no-events panel — driven by history state
-              SliverToBoxAdapter(
-                child:
-                    BlocBuilder<
-                      CameraEventHistoryCubit,
-                      CameraEventHistoryState
-                    >(
-                      builder: (context, state) {
-                        final latestEvent = switch (state) {
-                          CameraEventHistoryLoaded(:final items)
-                              when items.isNotEmpty =>
-                            CameraEventAdapter.fromEventHistoryItem(
-                              items.first,
-                            ),
-                          _ => null,
-                        };
-                        if (latestEvent != null) {
-                          return CameraLatestEventCard(
-                            device: widget.device,
-                            latestEvent: latestEvent,
-                          );
-                        }
-                        return const _NoCameraEventsPanel();
-                      },
-                    ),
+            ),
+            const SliverToBoxAdapter(child: SizedBox(height: 10)),
+            // Latest event card / no-events panel — driven by history state
+            SliverToBoxAdapter(
+              child:
+                  BlocBuilder<CameraEventHistoryCubit, CameraEventHistoryState>(
+                    builder: (context, state) {
+                      final latestEvent = switch (state) {
+                        CameraEventHistoryLoaded(:final items)
+                            when items.isNotEmpty =>
+                          CameraEventAdapter.fromEventHistoryItem(items.first),
+                        _ => null,
+                      };
+                      if (latestEvent != null) {
+                        return CameraLatestEventCard(
+                          device: widget.device,
+                          latestEvent: latestEvent,
+                        );
+                      }
+                      return const _NoCameraEventsPanel();
+                    },
+                  ),
+            ),
+            const SliverToBoxAdapter(child: SizedBox(height: 10)),
+            SliverToBoxAdapter(
+              child: BlocBuilder<SuppressCubit, SuppressState>(
+                builder: (context, state) => _buildActionButtons(state),
               ),
-              const SliverToBoxAdapter(child: SizedBox(height: 10)),
-              SliverToBoxAdapter(
-                child: BlocBuilder<SuppressCubit, SuppressState>(
-                  builder: (context, state) => _buildActionButtons(state),
-                ),
-              ),
-              const SliverToBoxAdapter(child: SizedBox(height: 16)),
-              const SliverToBoxAdapter(child: CameraEventHistoryHeader()),
-              // Event history list — driven by CameraEventHistoryCubit
-              BlocBuilder<CameraEventHistoryCubit, CameraEventHistoryState>(
-                builder: (context, state) {
-                  return switch (state) {
-                    CameraEventHistoryInitial() ||
-                    CameraEventHistoryLoading() => _SliverEventSection(
-                      child: _HistoryLoadingBody(),
-                    ),
-                    CameraEventHistoryLoaded(:final items) => _SliverEventList(
-                      events: CameraEventAdapter.fromList(items),
-                    ),
-                    CameraEventHistoryEmpty() => _SliverEventSection(
-                      child: _HistoryEmptyBody(message: 'Chưa có sự kiện nào.'),
-                    ),
+            ),
+            const SliverToBoxAdapter(child: SizedBox(height: 16)),
+            const SliverToBoxAdapter(child: CameraEventHistoryHeader()),
+            // Event history list — driven by CameraEventHistoryCubit
+            BlocBuilder<CameraEventHistoryCubit, CameraEventHistoryState>(
+              builder: (context, state) {
+                return switch (state) {
+                  CameraEventHistoryInitial() || CameraEventHistoryLoading() =>
+                    _SliverEventSection(child: _HistoryLoadingBody()),
+                  CameraEventHistoryLoaded(:final items) => _SliverEventList(
+                    events: CameraEventAdapter.fromList(items),
+                  ),
+                  CameraEventHistoryEmpty() => _SliverEventSection(
+                    child: _HistoryEmptyBody(message: 'Chưa có sự kiện nào.'),
+                  ),
 
-                    CameraEventHistoryError() => _SliverEventSection(
-                      child: _HistoryErrorBody(
-                        onRetry: () => context
-                            .read<CameraEventHistoryCubit>()
-                            .retry(widget.device),
-                      ),
+                  CameraEventHistoryError() => _SliverEventSection(
+                    child: _HistoryErrorBody(
+                      onRetry: () => context
+                          .read<CameraEventHistoryCubit>()
+                          .retry(widget.device),
                     ),
-                  };
-                },
-              ),
-              const SliverToBoxAdapter(child: SizedBox(height: 24)),
-            ],
-          ),
+                  ),
+                };
+              },
+            ),
+            const SliverToBoxAdapter(child: SizedBox(height: 24)),
+          ],
         ),
       ),
     );
@@ -268,6 +277,13 @@ class _CameraDetailBodyState extends State<_CameraDetailBody> {
 
   void _requestStreamUrl({required bool showLoading}) {
     final serialNumber = widget.device.serialNumber?.trim() ?? '';
+    debugPrint(
+      '[CameraDetail] _requestStreamUrl called, serial: $serialNumber, showLoading: $showLoading',
+    );
+    if (_isStreamRequestInFlight) {
+      debugPrint('[CameraDetail] duplicate stream request ignored');
+      return;
+    }
     if (serialNumber.isEmpty) {
       setState(() {
         _streamUrl = null;
@@ -279,6 +295,7 @@ class _CameraDetailBodyState extends State<_CameraDetailBody> {
       return;
     }
 
+    _isStreamRequestInFlight = true;
     setState(() {
       _showLoadingForNextStreamRequest = showLoading;
       _isStreamLoading = showLoading || _streamUrl == null;
@@ -597,8 +614,16 @@ String _formatTime(DateTime time) {
 }
 
 String? _normalizedUrl(String? url) {
-  final trimmed = url?.trim() ?? '';
+  if (url == null) return null;
+  final trimmed = url.trim();
   return trimmed.isEmpty ? null : trimmed;
+}
+
+String _redactedStreamUrl(String url) {
+  final uri = Uri.tryParse(url);
+  if (uri == null || uri.host.isEmpty) return 'invalid';
+  final port = uri.hasPort ? ':${uri.port}' : '';
+  return '${uri.scheme}://${uri.host}$port';
 }
 
 String _formatRemainingDuration(DateTime suppressedUntil) {

@@ -64,10 +64,11 @@ class ImouCloudDataSourceImpl implements ImouCloudDataSource {
     };
 
     String? liveToken;
+    String? streamId;
     try {
       final bindResponse = await _request(bindDeviceLiveMethod, params);
       liveToken = _readString(bindResponse, const ['liveToken']);
-      final streamId = _readString(bindResponse, const ['streamId']);
+      streamId = _readString(bindResponse, const ['streamId']);
       debugPrint(
         '[Imou] bindDeviceLive session: '
         'liveToken=${liveToken == null ? 'missing' : 'present'}, '
@@ -85,8 +86,10 @@ class ImouCloudDataSourceImpl implements ImouCloudDataSource {
       'deviceId': deviceId,
       'channelId': channel,
       'liveToken': ?liveToken,
+      'streamId': ?streamId,
     };
 
+    Map<String, dynamic>? lastData;
     for (var attempt = 1; attempt <= 3; attempt++) {
       Map<String, dynamic> data;
       try {
@@ -97,10 +100,10 @@ class ImouCloudDataSourceImpl implements ImouCloudDataSource {
       }
 
       _logSafeLiveStreamInfo(data);
+      lastData = data;
 
-      if (_isStreamReady(data)) {
-        return _selectPlayableStreamUrl(data);
-      }
+      final selected = _selectPlayableStreamUrl(data, requireReady: true);
+      if (selected != null) return selected;
 
       if (attempt < 3) {
         debugPrint('[Imou] stream not ready, retrying ($attempt/3) in 1s...');
@@ -108,8 +111,13 @@ class ImouCloudDataSourceImpl implements ImouCloudDataSource {
       }
     }
 
+    if (lastData != null) {
+      final selected = _selectPlayableStreamUrl(lastData);
+      if (selected != null) return selected;
+    }
+
     throw const ImouCloudException(
-      'Camera đang trực tuyến nhưng chưa phản hồi luồng trực tiếp. Vui lòng kiểm tra mạng của camera hoặc thử lại sau.',
+      'Imou Cloud did not return a playable HLS stream.',
       code: 'device_no_response',
     );
   }
@@ -118,7 +126,9 @@ class ImouCloudDataSourceImpl implements ImouCloudDataSource {
     debugPrint('[Imou] live status: ${data['status']}');
     debugPrint('[Imou] live job: ${data['job']}');
     debugPrint('[Imou] liveType: ${data['liveType']}');
-    debugPrint('[Imou] streamId: ${data['streamId']}');
+    debugPrint(
+      '[Imou] streamId: ${data['streamId'] == null ? 'missing' : 'present'}',
+    );
     final hasHls = data.keys.any((k) => k.toLowerCase().contains('hls'));
     debugPrint('[Imou] hls exists in root: $hasHls');
 
@@ -128,43 +138,18 @@ class ImouCloudDataSourceImpl implements ImouCloudDataSource {
       for (var i = 0; i < streams.length; i++) {
         final stream = streams[i];
         if (stream is Map) {
-          final sId = stream['streamId'];
           final sType = stream['type'] ?? stream['format'];
           final sStatus = stream['status'];
           debugPrint(
-            '[Imou] streams[$i] streamId: $sId, type: $sType, status: $sStatus',
+            '[Imou] streams[$i] streamId: '
+            '${stream['streamId'] == null ? 'missing' : 'present'}, '
+            'type: $sType, status: $sStatus',
           );
         }
       }
     } else {
       debugPrint('[Imou] streams length: 0');
     }
-  }
-
-  bool _isStreamReady(Map<String, dynamic> data) {
-    bool isStatusReady(String? status) {
-      if (status == null) return false;
-      final lower = status.toLowerCase();
-      return lower == 'ready' ||
-          lower == 'normal' ||
-          lower == 'active' ||
-          lower == 'success' ||
-          lower == '1';
-    }
-
-    final rootStatus = data['status']?.toString();
-    if (isStatusReady(rootStatus)) return true;
-
-    final streams = data['streams'];
-    if (streams is List) {
-      for (final stream in streams) {
-        if (stream is Map) {
-          if (isStatusReady(stream['status']?.toString())) return true;
-        }
-      }
-    }
-
-    return false;
   }
 
   Future<String> _accessToken() async {
@@ -308,7 +293,10 @@ class ImouCloudDataSourceImpl implements ImouCloudDataSource {
     }
   }
 
-  String _selectPlayableStreamUrl(Map<String, dynamic> data) {
+  String? _selectPlayableStreamUrl(
+    Map<String, dynamic> data, {
+    bool requireReady = false,
+  }) {
     final streamMaps = <Map<String, dynamic>>[data];
     final streams = data['streams'];
     if (streams is List) {
@@ -323,17 +311,19 @@ class ImouCloudDataSourceImpl implements ImouCloudDataSource {
         streamMaps.expand((stream) => stream.keys).toSet().toList()..sort();
     debugPrint('[Imou] available response keys: $availableKeys');
 
-    final hlsCandidates = <String>[];
-    final rtmpCandidates = <String>[];
-    for (final stream in streamMaps) {
-      _addUrlCandidates(hlsCandidates, stream, const [
+    final candidates = <_StreamCandidate>[];
+    final rootStatus = data['status']?.toString();
+    for (var index = 0; index < streamMaps.length; index++) {
+      final stream = streamMaps[index];
+      final status = stream['status']?.toString() ?? rootStatus;
+      _addUrlCandidates(candidates, stream, index, status, const [
         'hls',
         'httpsHls',
         'hlsUrl',
         'm3u8',
         'url',
       ]);
-      _addUrlCandidates(rtmpCandidates, stream, const [
+      _addUrlCandidates(candidates, stream, index, status, const [
         'rtmp',
         'rtmps',
         'rtmpHD',
@@ -342,27 +332,35 @@ class ImouCloudDataSourceImpl implements ImouCloudDataSource {
       ]);
     }
 
-    final httpsHls = hlsCandidates.firstWhere(
-      (url) => _isHlsUrl(url, requireHttps: true),
-      orElse: () => '',
+    for (final candidate in candidates) {
+      _logStreamCandidate(candidate);
+    }
+
+    final playable =
+        candidates
+            .where(
+              (candidate) =>
+                  _isHlsUrl(candidate.url) &&
+                  (!requireReady || _isReadyStatus(candidate.status)),
+            )
+            .toList()
+          ..sort(_compareCandidates);
+    if (playable.isNotEmpty) {
+      final selected = playable.first;
+      _logSelectedStream(
+        selected.uri.scheme == 'https' ? 'httpsHls' : 'hls',
+        selected.url,
+      );
+      return selected.url;
+    }
+
+    if (requireReady) return null;
+
+    final unsupportedRtmp = candidates.where(
+      (candidate) => _isRtmpUrl(candidate.url),
     );
-    if (httpsHls.isNotEmpty) {
-      _logSelectedStream('httpsHls', httpsHls);
-      return httpsHls;
-    }
-
-    final hls = hlsCandidates.firstWhere(_isHlsUrl, orElse: () => '');
-    if (hls.isNotEmpty) {
-      _logSelectedStream('hls', hls);
-      return hls;
-    }
-
-    final unsupportedRtmp = [
-      ...rtmpCandidates,
-      ...hlsCandidates,
-    ].firstWhere(_isRtmpUrl, orElse: () => '');
     if (unsupportedRtmp.isNotEmpty) {
-      _logSelectedStream('unsupportedRtmp', unsupportedRtmp);
+      _logSelectedStream('unsupportedRtmp', unsupportedRtmp.first.url);
       throw const ImouCloudException(
         'Imou Cloud returned only an unsupported RTMP stream.',
         code: unsupportedStreamFormatCode,
@@ -370,27 +368,37 @@ class ImouCloudDataSourceImpl implements ImouCloudDataSource {
     }
 
     debugPrint('[Imou] selected stream format: unavailable');
-    throw const ImouCloudException(
-      'Imou Cloud did not return a supported HLS stream.',
-    );
+    return null;
   }
 
   void _addUrlCandidates(
-    List<String> target,
+    List<_StreamCandidate> target,
     Map<String, dynamic> stream,
+    int sourceIndex,
+    String? status,
     List<String> keys,
   ) {
     for (final key in keys) {
       final value = stream[key]?.toString().trim() ?? '';
-      if (value.isNotEmpty && !target.contains(value)) target.add(value);
+      if (value.isEmpty || target.any((candidate) => candidate.url == value)) {
+        continue;
+      }
+      target.add(
+        _StreamCandidate(
+          url: value,
+          key: key,
+          status: status,
+          sourceIndex: sourceIndex,
+        ),
+      );
     }
   }
 
-  bool _isHlsUrl(String url, {bool requireHttps = false}) {
+  bool _isHlsUrl(String url) {
     final uri = Uri.tryParse(url);
     if (uri == null || uri.host.isEmpty) return false;
-    if (requireHttps && uri.scheme.toLowerCase() != 'https') return false;
     final scheme = uri.scheme.toLowerCase();
+    if (uri.port == 8890) return false;
     return (scheme == 'http' || scheme == 'https') &&
         uri.path.toLowerCase().endsWith('.m3u8');
   }
@@ -401,10 +409,45 @@ class ImouCloudDataSourceImpl implements ImouCloudDataSource {
   }
 
   void _logSelectedStream(String format, String url) {
-    final uri = Uri.tryParse(url);
     debugPrint('[Imou] selected stream format: $format');
-    debugPrint('[Imou] selected stream URL: ${uri?.scheme}://${uri?.host}');
-    debugPrint('[Imou] FULL stream URL: $url');
+    debugPrint('[Imou] selected stream URL: ${_redactedUrl(url)}');
+  }
+
+  void _logStreamCandidate(_StreamCandidate candidate) {
+    final valid = _isHlsUrl(candidate.url);
+    debugPrint(
+      '[Imou] candidate source=${candidate.sourceIndex}, key=${candidate.key}, '
+      'status=${candidate.status ?? 'missing'}, validHls=$valid, '
+      'url=${_redactedUrl(candidate.url)}',
+    );
+  }
+
+  int _compareCandidates(_StreamCandidate left, _StreamCandidate right) {
+    final statusComparison =
+        (_isReadyStatus(right.status) ? 1 : 0) -
+        (_isReadyStatus(left.status) ? 1 : 0);
+    if (statusComparison != 0) return statusComparison;
+    final httpsComparison =
+        (right.uri.scheme == 'https' ? 1 : 0) -
+        (left.uri.scheme == 'https' ? 1 : 0);
+    if (httpsComparison != 0) return httpsComparison;
+    return left.sourceIndex.compareTo(right.sourceIndex);
+  }
+
+  bool _isReadyStatus(String? status) {
+    final normalized = status?.trim().toLowerCase();
+    return normalized == 'ready' ||
+        normalized == 'normal' ||
+        normalized == 'active' ||
+        normalized == 'success' ||
+        normalized == '1';
+  }
+
+  String _redactedUrl(String url) {
+    final uri = Uri.tryParse(url);
+    if (uri == null || uri.host.isEmpty) return 'invalid';
+    final port = uri.hasPort ? ':${uri.port}' : '';
+    return '${uri.scheme}://${uri.host}$port';
   }
 
   bool _isLiveMethod(String method) {
@@ -488,4 +531,20 @@ class _ImouToken {
   bool get isValid {
     return DateTime.now().add(const Duration(minutes: 5)).isBefore(expiresAt);
   }
+}
+
+class _StreamCandidate {
+  const _StreamCandidate({
+    required this.url,
+    required this.key,
+    required this.status,
+    required this.sourceIndex,
+  });
+
+  final String url;
+  final String key;
+  final String? status;
+  final int sourceIndex;
+
+  Uri get uri => Uri.parse(url);
 }

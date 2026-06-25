@@ -20,16 +20,16 @@ class UploadUrlResponse(BaseModel):
 # 4.1 Event Detect Request
 # ----------------------------------------------------
 class EventDetectRequest(BaseModel):
-    event_id: str
-    event_type: str = "fall"
-    severity: str = Field(..., description="LOW, MEDIUM, HIGH, CRITICAL, SYSTEM")
-    confidence: float
+    event_id: str = Field(..., max_length=100)
+    event_type: str = Field("fall", max_length=50)
+    severity: str = Field(..., description="LOW, MEDIUM, HIGH, CRITICAL, SYSTEM", max_length=20)
+    confidence: float = Field(..., ge=0.0, le=1.0)
     timestamp: datetime
-    duration_sec: Optional[int] = None
-    room: Optional[str] = None
-    clip_path: Optional[str] = None
-    clip_url: Optional[str] = None
-    model_ver: Optional[str] = "v1.0.0"
+    duration_sec: Optional[int] = Field(None, ge=0)
+    room: Optional[str] = Field(None, max_length=100)
+    clip_path: Optional[str] = Field(None, max_length=1000)
+    clip_url: Optional[str] = Field(None, max_length=1000)
+    model_ver: Optional[str] = Field("v1.0.0", max_length=50)
 
 # ----------------------------------------------------
 # 4.2 Alerts List
@@ -86,7 +86,7 @@ class FCMTokenUpdateRequest(BaseModel):
 class ContactCreate(BaseModel):
     household_id: UUID
     user_id: UUID
-    priority_order: int
+    priority_order: int = Field(..., ge=1)
 
 # ----------------------------------------------------
 # 4.8 Thresholds / Settings
@@ -104,11 +104,11 @@ class SuppressWindow(BaseModel):
         return v
 
 class ThresholdUpdate(BaseModel):
-    household_id: str
-    low_max_sec: int = 30
-    medium_max_sec: int = 120
-    high_max_sec: int = 300
-    dedup_window_sec: int = 60
+    household_id: str = Field(..., max_length=100)
+    low_max_sec: int = Field(30, ge=0)
+    medium_max_sec: int = Field(120, ge=0)
+    high_max_sec: int = Field(300, ge=0)
+    dedup_window_sec: int = Field(60, ge=0)
     suppress_windows: List[SuppressWindow] = []
 
 # ----------------------------------------------------
@@ -121,36 +121,36 @@ class LLMConfigRequest(BaseModel):
 # 4.12 Multi-Household
 # ----------------------------------------------------
 class HouseholdCreateRequest(BaseModel):
-    name: str
-    elderly_name: str
-    address: Optional[str] = None
+    name: str = Field(..., min_length=1, max_length=255)
+    elderly_name: str = Field(..., min_length=1, max_length=255)
+    address: Optional[str] = Field(None, max_length=1000)
 
 class SwitchHouseholdRequest(BaseModel):
     household_id: str
 
 
+from enum import Enum
+
+class FeedbackLabel(str, Enum):
+    correct = "correct"
+    false_positive = "false_positive"
+    false_negative = "false_negative"
+
 class FeedbackRequest(BaseModel):
-    label: str
+    label: FeedbackLabel
     note: Optional[str] = None
     camera_serial: Optional[str] = None
 
-    @field_validator("label")
-    @classmethod
-    def validate_label(cls, v: str) -> str:
-        if v not in ("correct", "incorrect", "uncertain"):
-            raise ValueError("Label must be 'correct', 'incorrect', or 'uncertain'")
-        return v
-
 
 class HouseholdUpdateRequest(BaseModel):
-    name: Optional[str] = None
-    elderly_name: Optional[str] = None
-    address: Optional[str] = None
+    name: Optional[str] = Field(None, max_length=255)
+    elderly_name: Optional[str] = Field(None, max_length=255)
+    address: Optional[str] = Field(None, max_length=1000)
 
 
 class InviteByEmailRequest(BaseModel):
-    household_id: str
-    email: str
+    household_id: str = Field(..., max_length=100)
+    email: str = Field(..., pattern=r"^[\w\.-]+@[\w\.-]+\.\w+$", max_length=255)
 
 
 class RespondInviteRequest(BaseModel):

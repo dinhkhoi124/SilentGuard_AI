@@ -39,11 +39,11 @@ app = FastAPI(
 
 from fastapi.middleware.cors import CORSMiddleware
 
+cors_origins = [o.strip() for o in settings.CORS_ORIGINS.split(",")] if settings.CORS_ORIGINS else ["*"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://silentguard-production-4485.up.railway.app",
-    ],
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

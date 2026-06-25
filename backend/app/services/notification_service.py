@@ -3,6 +3,7 @@ Notification Service (FCM & Calling)
 Ref: Section 7 - Notification Service in design document.
 """
 from typing import Any
+import asyncio
 from firebase_admin import messaging
 from app.core.supabase_client import supabase
 
@@ -56,7 +57,7 @@ async def send_push(user_id: str, event_data: dict) -> bool:
         )
 
         # Send message
-        response_id = messaging.send(message)
+        response_id = await asyncio.to_thread(messaging.send, message)
         print(f"Push notification sent successfully, msg ID: {response_id}")
         return True
     except Exception as e:
@@ -101,7 +102,7 @@ async def send_fcm_notification(token: str, title: str, body: str, data: dict = 
             token=token
         )
         # messaging.send is blocking, but we keep the signature async as expected
-        response_id = messaging.send(message)
+        response_id = await asyncio.to_thread(messaging.send, message)
         print(f"[Notification Service] Push notification sent successfully, msg ID: {response_id}")
         return True
     except Exception as e:

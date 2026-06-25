@@ -1,6 +1,7 @@
 import os
 import uuid
 import secrets
+import asyncio
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, Form, UploadFile, File, Header, Request
 from pydantic import BaseModel
@@ -31,6 +32,11 @@ async def notify_ai_server(video_url: str, upload_token: str, backend_detect_url
             print(f"[Backend] AI Server response: {response.status_code} - {response.text}")
     except Exception as e:
         print(f"[Backend] Failed to trigger AI Server: {e}")
+        try:
+            from app.core.supabase_client import supabase
+            supabase.table("video_uploads").update({"status": "failed"}).eq("upload_token", upload_token).execute()
+        except Exception as db_e:
+            print(f"[Backend] Failed to update video_uploads status: {db_e}")
 
 @router.post("/upload-video", status_code=status.HTTP_201_CREATED)
 async def upload_video(
@@ -63,27 +69,34 @@ async def upload_video(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"error": {"code": "DATABASE_ERROR", "message": f"Database verification error: {str(e)}"}}
+            detail={"error": {"code": "DATABASE_ERROR", "message": "Lỗi hệ thống nội bộ, vui lòng thử lại sau"}}
         )
 
-    filename = file.filename
+    if file.size and file.size > 50 * 1024 * 1024:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail={"error": {"code": "FILE_TOO_LARGE", "message": "Video không được vượt quá 50MB"}}
+        )
+
+    safe_filename = os.path.basename(file.filename) if file.filename else "upload.mp4"
     unique_id = uuid.uuid4()
-    storage_path = f"videos/{household_id}/{unique_id}_{filename}"
+    storage_path = f"videos/{household_id}/{unique_id}_{safe_filename}"
     
     try:
         # Read file content
         file_bytes = await file.read()
         
         # Upload to Supabase Storage 'clips' bucket
-        supabase.storage.from_("clips").upload(
-            path=storage_path,
-            file=file_bytes,
-            file_options={"content-type": file.content_type}
+        await asyncio.to_thread(
+            supabase.storage.from_("clips").upload,
+            storage_path,
+            file_bytes,
+            {"content-type": file.content_type}
         )
         
-        # Create a signed URL valid for 1 year (or similar long duration for demo)
-        # 31536000 seconds = 1 year
-        signed_res = supabase.storage.from_("clips").create_signed_url(storage_path, 31536000)
+        # Create a signed URL valid for 7 days
+        # 604800 seconds = 7 days
+        signed_res = supabase.storage.from_("clips").create_signed_url(storage_path, 604800)
         video_url = signed_res.get("signedURL") or signed_res.get("signed_url")
         if not video_url:
             raise Exception("Failed to obtain signed URL")
@@ -92,7 +105,7 @@ async def upload_video(
         print(f"File upload or signing failed: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"error": {"code": "UPLOAD_ERROR", "message": f"Failed to upload/sign video file: {str(e)}"}}
+            detail={"error": {"code": "UPLOAD_ERROR", "message": "Lỗi hệ thống nội bộ, vui lòng thử lại sau"}}
         )
         
     upload_token = f"vid_{secrets.token_urlsafe(32)}"
@@ -113,9 +126,13 @@ async def upload_video(
         inserted = db_res.data[0]
     except Exception as e:
         print(f"Database insertion for video_uploads failed: {e}")
+        try:
+            supabase.storage.from_("clips").remove([storage_path])
+        except Exception as cleanup_e:
+            print(f"Failed to cleanup orphaned file: {cleanup_e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"error": {"code": "DATABASE_ERROR", "message": f"Failed to save video upload to database: {str(e)}"}}
+            detail={"error": {"code": "DATABASE_ERROR", "message": "Lỗi hệ thống nội bộ, vui lòng thử lại sau"}}
         )
         
     # Auto-trigger AI server if configured
@@ -185,7 +202,7 @@ async def get_upload_status(upload_token: str):
         print(f"Error in get_upload_status: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"error": {"code": "DATABASE_ERROR", "message": str(e)}}
+            detail={"error": {"code": "DATABASE_ERROR", "message": "Lỗi hệ thống nội bộ, vui lòng thử lại sau"}}
         )
 
 class RequestUploadUrlRequest(BaseModel):
@@ -219,11 +236,12 @@ async def request_upload_url(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"error": {"code": "DATABASE_ERROR", "message": f"Database verification error: {str(e)}"}}
+            detail={"error": {"code": "DATABASE_ERROR", "message": "Lỗi hệ thống nội bộ, vui lòng thử lại sau"}}
         )
 
+    safe_filename = os.path.basename(req.filename) if req.filename else "upload.mp4"
     unique_id = uuid.uuid4()
-    storage_path = f"videos/{req.household_id}/{unique_id}_{req.filename}"
+    storage_path = f"videos/{req.household_id}/{unique_id}_{safe_filename}"
     
     try:
         res = supabase.storage.from_("clips").create_signed_upload_url(storage_path)
@@ -235,7 +253,7 @@ async def request_upload_url(
         print(f"File upload signing failed: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"error": {"code": "UPLOAD_ERROR", "message": f"Failed to generate upload url: {str(e)}"}}
+            detail={"error": {"code": "UPLOAD_ERROR", "message": "Lỗi hệ thống nội bộ, vui lòng thử lại sau"}}
         )
         
     upload_token = f"vid_{secrets.token_urlsafe(32)}"
@@ -255,9 +273,13 @@ async def request_upload_url(
         inserted = db_res.data[0]
     except Exception as e:
         print(f"Database insertion for video_uploads failed: {e}")
+        try:
+            supabase.storage.from_("clips").remove([storage_path])
+        except Exception as cleanup_e:
+            print(f"Failed to cleanup orphaned file: {cleanup_e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"error": {"code": "DATABASE_ERROR", "message": f"Failed to save video upload to database: {str(e)}"}}
+            detail={"error": {"code": "DATABASE_ERROR", "message": "Lỗi hệ thống nội bộ, vui lòng thử lại sau"}}
         )
 
     return {
@@ -299,12 +321,12 @@ async def trigger_ai(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"error": {"code": "DATABASE_ERROR", "message": str(e)}}
+            detail={"error": {"code": "DATABASE_ERROR", "message": "Lỗi hệ thống nội bộ, vui lòng thử lại sau"}}
         )
 
     storage_path = upload_record.get("storage_path")
     try:
-        signed_res = supabase.storage.from_("clips").create_signed_url(storage_path, 31536000)
+        signed_res = supabase.storage.from_("clips").create_signed_url(storage_path, 604800)
         video_url = signed_res.get("signedURL") or signed_res.get("signed_url")
         if not video_url:
             raise Exception("Failed to obtain signed URL")
@@ -314,7 +336,7 @@ async def trigger_ai(
         print(f"Failed to generate signed url in trigger_ai: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"error": {"code": "UPLOAD_ERROR", "message": f"Lỗi lấy link video sau khi upload: {str(e)}"}}
+            detail={"error": {"code": "UPLOAD_ERROR", "message": "Lỗi hệ thống nội bộ, vui lòng thử lại sau"}}
         )
     
     ai_server_url = os.getenv("AI_SERVER_URL")
@@ -420,7 +442,7 @@ async def detect_event(
         if settings.APP_ENV == "production":
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail={"error": {"code": "DATABASE_ERROR", "message": f"Failed to save event to database: {str(e)}"}}
+                detail={"error": {"code": "DATABASE_ERROR", "message": "Lỗi hệ thống nội bộ, vui lòng thử lại sau"}}
             )
         inserted_event = event_data
 

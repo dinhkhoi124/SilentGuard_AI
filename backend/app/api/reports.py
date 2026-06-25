@@ -80,5 +80,5 @@ async def get_daily_report(
         print(f"Error in get_daily_report: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"error": {"code": "DATABASE_ERROR", "message": f"Failed to retrieve or generate daily report: {str(e)}"}}
+            detail={"error": {"code": "DATABASE_ERROR", "message": "Lỗi hệ thống nội bộ, vui lòng thử lại sau"}}
         )

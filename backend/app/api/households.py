@@ -46,7 +46,7 @@ async def invite_by_email(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"error": {"code": "DATABASE_ERROR", "message": str(e)}}
+            detail={"error": {"code": "DATABASE_ERROR", "message": "Lỗi hệ thống nội bộ, vui lòng thử lại sau"}}
         )
 
     # Check if already a member
@@ -84,7 +84,7 @@ async def invite_by_email(
             )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"error": {"code": "DATABASE_ERROR", "message": str(e)}}
+            detail={"error": {"code": "DATABASE_ERROR", "message": "Lỗi hệ thống nội bộ, vui lòng thử lại sau"}}
         )
 
     # Get household name for notification
@@ -118,11 +118,11 @@ async def invite_by_email(
 
 
 class InviteRequest(BaseModel):
-    household_id: Optional[str] = None
+    household_id: str
 
 @router.post("/invite", status_code=status.HTTP_201_CREATED)
 async def create_invite(
-    req: Optional[InviteRequest] = None,
+    req: InviteRequest,
     current_user: dict = Depends(get_current_user)
 ):
     """
@@ -130,26 +130,12 @@ async def create_invite(
     Generates an invite code for the household. Owner-only.
     """
     user_id = current_user.get("id")
-    household_id = None
-    if req and req.household_id:
-        household_id = req.household_id
+    household_id = req.household_id
     
     if not household_id:
-        # Get from active_household_id
-        u_res = supabase.table("users").select("active_household_id").eq("id", user_id).execute()
-        if u_res.data:
-            household_id = u_res.data[0].get("active_household_id")
-            
-    if not household_id:
-        # Fallback to first household
-        mem_res = supabase.table("household_members").select("household_id").eq("user_id", user_id).order("joined_at").execute()
-        if mem_res.data:
-            household_id = mem_res.data[0]["household_id"]
-            
-    if not household_id:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail={"error": {"code": "FORBIDDEN", "message": "Bạn không thuộc về hộ gia đình nào"}}
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"error": {"code": "BAD_REQUEST", "message": "Yêu cầu household_id"}}
         )
         
     # Verify owner role
@@ -180,7 +166,7 @@ async def create_invite(
         print(f"Error in create_invite: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"error": {"code": "DATABASE_ERROR", "message": f"Failed to create invite: {str(e)}"}}
+            detail={"error": {"code": "DATABASE_ERROR", "message": "Lỗi hệ thống nội bộ, vui lòng thử lại sau"}}
         )
 
 @router.get("/invite-requests/pending", status_code=status.HTTP_200_OK)
@@ -214,7 +200,7 @@ async def get_pending_invites(
         print(f"Error in get_pending_invites: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"error": {"code": "DATABASE_ERROR", "message": str(e)}}
+            detail={"error": {"code": "DATABASE_ERROR", "message": "Lỗi hệ thống nội bộ, vui lòng thử lại sau"}}
         )
 
 
@@ -249,7 +235,7 @@ async def respond_invite(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"error": {"code": "DATABASE_ERROR", "message": str(e)}}
+            detail={"error": {"code": "DATABASE_ERROR", "message": "Lỗi hệ thống nội bộ, vui lòng thử lại sau"}}
         )
 
     household_id = invite["household_id"]
@@ -266,7 +252,7 @@ async def respond_invite(
         except Exception as e:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail={"error": {"code": "DATABASE_ERROR", "message": f"Failed to add member: {str(e)}"}}
+                detail={"error": {"code": "DATABASE_ERROR", "message": "Lỗi hệ thống nội bộ, vui lòng thử lại sau"}}
             )
 
         # Insert into contacts with last priority
@@ -296,7 +282,7 @@ async def respond_invite(
                 pass
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail={"error": {"code": "DATABASE_ERROR", "message": f"Failed to add contact: {str(e)}"}}
+                detail={"error": {"code": "DATABASE_ERROR", "message": "Lỗi hệ thống nội bộ, vui lòng thử lại sau"}}
             )
 
     # Update invite status
@@ -369,7 +355,7 @@ async def get_my_household(
         print(f"Error in get_my_household: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"error": {"code": "DATABASE_ERROR", "message": f"Failed to retrieve household data: {str(e)}"}}
+            detail={"error": {"code": "DATABASE_ERROR", "message": "Lỗi hệ thống nội bộ, vui lòng thử lại sau"}}
         )
 
 @router.post("", status_code=status.HTTP_201_CREATED)
@@ -421,7 +407,7 @@ async def create_household(
         print(f"Error in create_household: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"error": {"code": "DATABASE_ERROR", "message": f"Failed to create household: {str(e)}"}}
+            detail={"error": {"code": "DATABASE_ERROR", "message": "Lỗi hệ thống nội bộ, vui lòng thử lại sau"}}
         )
 
 @router.get("")
@@ -460,7 +446,7 @@ async def list_households(
         print(f"Error in list_households: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"error": {"code": "DATABASE_ERROR", "message": f"Failed to list households: {str(e)}"}}
+            detail={"error": {"code": "DATABASE_ERROR", "message": "Lỗi hệ thống nội bộ, vui lòng thử lại sau"}}
         )
 
 @router.get("/{household_id}/members", status_code=status.HTTP_200_OK)
@@ -519,7 +505,7 @@ async def get_household_members(
         print(f"Error in get_household_members: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"error": {"code": "DATABASE_ERROR", "message": str(e)}}
+            detail={"error": {"code": "DATABASE_ERROR", "message": "Lỗi hệ thống nội bộ, vui lòng thử lại sau"}}
         )
 
 
@@ -570,7 +556,7 @@ async def update_household(
         print(f"Error in update_household: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"error": {"code": "DATABASE_ERROR", "message": f"Failed to update household: {str(e)}"}}
+            detail={"error": {"code": "DATABASE_ERROR", "message": "Lỗi hệ thống nội bộ, vui lòng thử lại sau"}}
         )
 
 

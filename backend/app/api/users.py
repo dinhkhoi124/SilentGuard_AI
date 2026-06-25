@@ -50,7 +50,7 @@ async def logout_user(user: dict = Depends(get_current_user)):
         print(f"Error in logout_user: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"error": {"code": "DATABASE_ERROR", "message": f"Failed to clear FCM token on logout: {str(e)}"}}
+            detail={"error": {"code": "DATABASE_ERROR", "message": "Lỗi hệ thống nội bộ, vui lòng thử lại sau"}}
         )
 
 @router.post("/device-token")
@@ -70,7 +70,7 @@ async def register_device_token(
         print(f"Error in register_device_token: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"error": {"code": "DATABASE_ERROR", "message": f"Failed to register FCM token: {str(e)}"}}
+            detail={"error": {"code": "DATABASE_ERROR", "message": "Lỗi hệ thống nội bộ, vui lòng thử lại sau"}}
         )
 
 @router.post("/switch-household", status_code=status.HTTP_200_OK)
@@ -104,7 +104,7 @@ async def switch_household(
         print(f"Error in switch_household: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"error": {"code": "DATABASE_ERROR", "message": f"Failed to switch household: {str(e)}"}}
+            detail={"error": {"code": "DATABASE_ERROR", "message": "Lỗi hệ thống nội bộ, vui lòng thử lại sau"}}
         )
 
 class UpdatePhoneRequest(BaseModel):
@@ -136,7 +136,24 @@ async def update_phone(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"error": {"code": "DATABASE_ERROR", "message": str(e)}}
+            detail={"error": {"code": "DATABASE_ERROR", "message": "Lỗi hệ thống nội bộ, vui lòng thử lại sau"}}
+        )
+
+@router.delete("/me", status_code=status.HTTP_200_OK)
+async def delete_account(user: dict = Depends(get_current_user)):
+    """
+    DELETE /api/users/me
+    Deletes the user's account and personal data (GDPR/CCPA compliance).
+    """
+    user_id = user.get("id")
+    try:
+        supabase.table("users").delete().eq("id", user_id).execute()
+        return {"status": "ok", "message": "Tài khoản đã được xóa thành công"}
+    except Exception as e:
+        print(f"Error in delete_account: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={"error": {"code": "DATABASE_ERROR", "message": "Lỗi hệ thống nội bộ, vui lòng thử lại sau"}}
         )
 
 

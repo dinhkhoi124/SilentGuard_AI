@@ -66,7 +66,6 @@ class _NotificationsPageState extends State<NotificationsPage>
             (_tabController.index == 1 && unreadInvites > 0);
 
         return Scaffold(
-          backgroundColor: Theme.of(context).colorScheme.surface,
           appBar: AppBar(
             title: const Text('Thông báo'),
             centerTitle: true,
@@ -137,7 +136,7 @@ class _NotificationsPageState extends State<NotificationsPage>
     return ListView.builder(
       padding: const EdgeInsets.fromLTRB(
         AppSpacing.pagePadding,
-        10,
+        0,
         AppSpacing.pagePadding,
         28,
       ),
@@ -146,7 +145,7 @@ class _NotificationsPageState extends State<NotificationsPage>
         final item = grouped[index];
         if (item is String) {
           return Padding(
-            padding: const EdgeInsets.only(top: 16, bottom: 12),
+            padding: const EdgeInsets.only(top: 8, bottom: 8),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [

@@ -251,44 +251,59 @@ class _SafetyWeatherCardState extends State<SafetyWeatherCard>
                       ],
                     ),
                     const SizedBox(height: 24),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
+                    Column(
                       children: [
-                        _SafetyMetricChip(
-                          icon: Iconsax.camera,
-                          label: display.cameraLabel,
-                          isActive: display.hasCameras,
-                        ),
-                        _SafetyMetricChip(
-                          icon: display.hasCameras
-                              ? Iconsax.shield_tick
-                              : Iconsax.shield_cross,
-                          label: display.alertLabel,
-                          isActive: display.hasCameras,
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _SafetyMetricChip(
+                                icon: Iconsax.camera,
+                                label: display.cameraLabel,
+                                isActive: display.hasCameras,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: _SafetyMetricChip(
+                                icon: display.hasCameras
+                                    ? Iconsax.shield_tick
+                                    : Iconsax.shield_cross,
+                                label: display.alertLabel,
+                                isActive: display.hasCameras,
+                              ),
+                            ),
+                          ],
                         ),
                         if (widget.weather != null &&
-                            widget.weather!.humidity > 0)
-                          _SafetyMetricChip(
-                            icon: Iconsax.drop,
-                            label:
-                                '${widget.weather!.humidity.toStringAsFixed(0)}% độ ẩm',
-                            isActive: true,
+                            (widget.weather!.humidity >= 0 ||
+                                widget.weather!.windSpeed >= 0)) ...[
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              if (widget.weather!.humidity >= 0) ...[
+                                Expanded(
+                                  child: _SafetyMetricChip(
+                                    icon: Iconsax.drop,
+                                    label:
+                                        '${widget.weather!.humidity.toStringAsFixed(0)}% độ ẩm',
+                                    isActive: true,
+                                  ),
+                                ),
+                                if (widget.weather!.windSpeed >= 0)
+                                  const SizedBox(width: 8),
+                              ],
+                              if (widget.weather!.windSpeed >= 0)
+                                Expanded(
+                                  child: _SafetyMetricChip(
+                                    icon: Iconsax.wind,
+                                    label:
+                                        '${widget.weather!.windSpeed.toStringAsFixed(1)} m/s gió',
+                                    isActive: true,
+                                  ),
+                                ),
+                            ],
                           ),
-                        if (widget.weather != null &&
-                            widget.weather!.windSpeed > 0)
-                          _SafetyMetricChip(
-                            icon: Iconsax.wind,
-                            label:
-                                '${widget.weather!.windSpeed.toStringAsFixed(1)} m/s gió',
-                            isActive: true,
-                          ),
-                        if (widget.weather != null && widget.weather!.aqi > 0)
-                          _SafetyMetricChip(
-                            icon: Iconsax.health,
-                            label: '${widget.weather!.aqi} AQI',
-                            isActive: true,
-                          ),
+                        ],
                       ],
                     ),
                   ],
@@ -390,7 +405,7 @@ class _SafetyMetricChip extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
-        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(
             icon,
@@ -400,8 +415,7 @@ class _SafetyMetricChip extends StatelessWidget {
                 : Colors.white.withValues(alpha: 0.7),
           ),
           const SizedBox(width: 6),
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 140),
+          Flexible(
             child: Text(
               label,
               style: TextStyle(

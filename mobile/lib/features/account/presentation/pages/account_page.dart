@@ -19,30 +19,6 @@ class AccountPage extends StatefulWidget {
 }
 
 class _AccountPageState extends State<AccountPage> {
-  bool _logoutDialogVisible = false;
-
-  @override
-  void dispose() {
-    _logoutDialogVisible = false;
-    super.dispose();
-  }
-
-  void _showLogoutDialog() {
-    if (_logoutDialogVisible || !mounted) return;
-    _logoutDialogVisible = true;
-    showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => const _LogoutProgressDialog(),
-    );
-  }
-
-  void _hideLogoutDialog() {
-    if (!_logoutDialogVisible || !mounted) return;
-    _logoutDialogVisible = false;
-    Navigator.of(context, rootNavigator: true).pop();
-  }
-
   void _showComingSoonSnackBar(BuildContext context) {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
@@ -57,18 +33,7 @@ class _AccountPageState extends State<AccountPage> {
 
     return BlocListener<AuthBloc, AuthState>(
       listener: (context, state) {
-        if (state is AuthLoading) {
-          _showLogoutDialog();
-          return;
-        }
-
-        if (state is AuthSignedOut) {
-          _hideLogoutDialog();
-          return;
-        }
-
         if (state is AuthFailure) {
-          _hideLogoutDialog();
           ScaffoldMessenger.of(context)
             ..hideCurrentSnackBar()
             ..showSnackBar(
@@ -401,13 +366,12 @@ class _LogoutTile extends StatelessWidget {
         children: [
           SizedBox(
             width: 42,
-            child: Icon(
-              Iconsax.logout,
-              color: AppColors.destructive.withValues(
-                alpha: isLoading ? 0.55 : 1,
-              ),
-              size: 24,
-            ),
+            child: isLoading
+                ? const SizedBox.square(
+                    dimension: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : Icon(Iconsax.logout, color: AppColors.destructive, size: 24),
           ),
           const SizedBox(width: 10),
           Expanded(
@@ -422,69 +386,6 @@ class _LogoutTile extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _LogoutProgressDialog extends StatelessWidget {
-  const _LogoutProgressDialog();
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return PopScope(
-      canPop: false,
-      child: Dialog(
-        insetPadding: const EdgeInsets.symmetric(horizontal: 32),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(22, 22, 22, 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              DecoratedBox(
-                decoration: BoxDecoration(
-                  color: AppColors.destructive.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(18),
-                ),
-                child: const SizedBox.square(
-                  dimension: 48,
-                  child: Icon(
-                    Iconsax.logout,
-                    color: AppColors.destructive,
-                    size: 24,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 18),
-              Text(
-                'Đang đăng xuất',
-                style: theme.textTheme.titleLarge?.copyWith(
-                  color: AppColors.darkText,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'SlientGuard đang kết thúc phiên làm việc của bạn.',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: AppColors.mutedText,
-                ),
-              ),
-              const SizedBox(height: 18),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(99),
-                child: const LinearProgressIndicator(
-                  minHeight: 5,
-                  color: AppColors.destructive,
-                  backgroundColor: AppColors.border,
-                ),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }

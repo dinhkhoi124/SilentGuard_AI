@@ -35,32 +35,40 @@ class RecentEventTile extends StatelessWidget {
           children: [
             SizedBox(
               width: 44,
-              child: Padding(
-                padding: const EdgeInsets.only(top: 6),
-                child: Text(
-                  time,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: isDark
-                        ? theme.colorScheme.onSurfaceVariant
-                        : AppColors.mutedText,
-                    fontWeight: FontWeight.w600,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Text(
+                      time,
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: isDark
+                            ? theme.colorScheme.onSurfaceVariant
+                            : AppColors.mutedText,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: isDark
-                    ? theme.colorScheme.surfaceContainerHighest
-                    : AppColors.lightBlue,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                icon,
-                color: isDark ? theme.colorScheme.primary : AppColors.primary,
-                size: 16,
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: isDark
+                          ? theme.colorScheme.surfaceContainerHighest
+                          : AppColors.lightBlue,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      icon,
+                      color: isDark
+                          ? theme.colorScheme.primary
+                          : AppColors.primary,
+                      size: 16,
+                    ),
+                  ),
+                ],
               ),
             ),
             const SizedBox(width: 16),

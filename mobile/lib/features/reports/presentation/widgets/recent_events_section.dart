@@ -25,6 +25,7 @@ class RecentEventsSection extends StatelessWidget {
         const ReportSectionHeader(title: 'Sự kiện gần đây'),
         const SizedBox(height: 12),
         Container(
+          width: double.infinity,
           decoration: BoxDecoration(
             color: isDark ? theme.colorScheme.surface : AppColors.surface,
             borderRadius: BorderRadius.circular(20),
@@ -137,24 +138,14 @@ class _ErrorBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
-      child: Column(
-        children: [
-          Text(
-            'Không thể tải lịch sử sự kiện. Vui lòng thử lại.',
-            textAlign: TextAlign.center,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: isDark
-                  ? theme.colorScheme.onSurfaceVariant
-                  : AppColors.mutedText,
-            ),
-          ),
-          const SizedBox(height: 12),
-          TextButton(onPressed: onRetry, child: const Text('Thử lại')),
-        ],
-      ),
+    return AppEmptyState(
+      icon: Icons.cloud_off_rounded,
+      title: 'Lỗi kết nối',
+      message:
+          'Không thể tải lịch sử sự kiện. Vui lòng kiểm tra mạng và thử lại.',
+      primaryActionLabel: 'Thử lại',
+      onPrimaryAction: onRetry,
+      compact: true,
     );
   }
 }
@@ -198,7 +189,7 @@ class _LoadedBody extends StatelessWidget {
             onTap: () => onEventTap(items[i]),
           ),
           if (i < items.length - 1)
-            Divider(height: 1, indent: 120, endIndent: 20, color: dividerColor),
+            Divider(height: 1, indent: 80, endIndent: 20, color: dividerColor),
         ],
       ],
     );

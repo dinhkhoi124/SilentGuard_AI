@@ -27,19 +27,32 @@ class _WeeklyMetric {
 String _getDayName(int index) =>
     const ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'][index];
 
+String _formatDuration(int seconds) {
+  if (seconds < 60) return '$seconds giây';
+  final minutes = seconds ~/ 60;
+  final remainingSeconds = seconds % 60;
+  if (remainingSeconds == 0) return '$minutes phút';
+  return '$minutes phút $remainingSeconds giây';
+}
+
 String _formatAlertMessage(int dayIndex, int value) {
   if (value == 0) return 'Không có cảnh báo trong ngày này.';
   return '${_getDayName(dayIndex)} có $value cảnh báo được ghi nhận.';
 }
 
-String _formatEmergencyMessage(int dayIndex, int value) {
-  if (value == 0) return 'Không có cảnh báo khẩn cấp trong ngày này.';
-  return '${_getDayName(dayIndex)} có $value cảnh báo khẩn cấp.';
+String _formatHighSeverityMessage(int dayIndex, int value) {
+  if (value == 0) return 'Không có cảnh báo mức cao trong ngày này.';
+  return '${_getDayName(dayIndex)} có $value cảnh báo mức cao cần chú ý.';
 }
 
-String _formatFeedbackMessage(int dayIndex, int value) {
-  if (value == 0) return 'Không có phản hồi trong ngày này.';
-  return '${_getDayName(dayIndex)} có $value phản hồi từ gia đình.';
+String _formatHandledMessage(int dayIndex, int value) {
+  if (value == 0) return 'Chưa có cảnh báo nào được xử lý trong ngày này.';
+  return '${_getDayName(dayIndex)} có $value cảnh báo đã được xử lý.';
+}
+
+String _formatImmobilityMessage(int dayIndex, int value) {
+  if (value == 0) return 'Không có dữ liệu bất động trong ngày này.';
+  return '${_getDayName(dayIndex)} ghi nhận bất động lâu nhất ${_formatDuration(value)}.';
 }
 
 class WeeklyTrendChartCard extends StatefulWidget {
@@ -290,23 +303,22 @@ class _WeeklyTrendChartCardState extends State<WeeklyTrendChartCard> {
         selectedDayMessage: _formatAlertMessage,
       ),
       _WeeklyMetric(
-        label: 'Khẩn cấp',
-        values: aggregator.emergencies.values,
-        insight: aggregator.emergencies.insight,
-        selectedDayMessage: _formatEmergencyMessage,
+        label: 'Mức cao',
+        values: aggregator.highSeverity.values,
+        insight: aggregator.highSeverity.insight,
+        selectedDayMessage: _formatHighSeverityMessage,
       ),
       _WeeklyMetric(
-        label: 'Phản hồi',
-        values: aggregator.feedback.values,
-        insight: aggregator.feedback.insight,
-        selectedDayMessage: _formatFeedbackMessage,
+        label: 'Đã xử lý',
+        values: aggregator.handled.values,
+        insight: aggregator.handled.insight,
+        selectedDayMessage: _formatHandledMessage,
       ),
       _WeeklyMetric(
-        label: 'Thời gian',
-        values: List.filled(7, 0),
-        insight: 'Chưa có dữ liệu phản hồi.',
-        selectedDayMessage: (dayIndex, value) =>
-            'Thời gian phản hồi chưa khả dụng.',
+        label: 'Bất động',
+        values: aggregator.immobility.values,
+        insight: aggregator.immobility.insight,
+        selectedDayMessage: _formatImmobilityMessage,
       ),
     ];
   }

@@ -5,7 +5,7 @@ import 'package:mobile/features/session/domain/entities/household.dart';
 abstract interface class SessionRemoteDataSource {
   Future<BackendUser> login({String? inviteCode});
   Future<Household> getCurrentHousehold();
-  Future<void> logout();
+  Future<void> logout({String? idToken});
 }
 
 class SessionRemoteDataSourceImpl implements SessionRemoteDataSource {
@@ -48,8 +48,18 @@ class SessionRemoteDataSourceImpl implements SessionRemoteDataSource {
   }
 
   @override
-  Future<void> logout() async {
-    await _apiClient.postObject('/api/users/logout');
+  Future<void> logout({String? idToken}) async {
+    final extraHeaders = idToken != null && idToken.isNotEmpty
+        ? {'Authorization': 'Bearer $idToken'}
+        : null;
+    await _apiClient.postObject(
+      '/api/users/logout',
+      null,
+      extraHeaders,
+      const Duration(
+        seconds: 5,
+      ), // short timeout so it doesn't block local logout long if awaited
+    );
   }
 
   Map<String, String>? _inviteHeaders(String? inviteCode) {

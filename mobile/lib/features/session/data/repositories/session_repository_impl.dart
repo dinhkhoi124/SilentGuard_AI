@@ -53,9 +53,9 @@ class SessionRepositoryImpl implements SessionRepository {
   }
 
   @override
-  Future<Either<SessionFailure, void>> logout() async {
+  Future<Either<SessionFailure, void>> logout({String? idToken}) async {
     try {
-      await _remoteDataSource.logout();
+      await _remoteDataSource.logout(idToken: idToken);
       return const Right(null);
     } on ApiException catch (error, stackTrace) {
       _logFailure(error, stackTrace);

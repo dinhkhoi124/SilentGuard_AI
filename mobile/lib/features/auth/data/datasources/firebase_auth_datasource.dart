@@ -22,6 +22,8 @@ abstract interface class FirebaseAuthDataSource {
   Future<User?> signInWithGoogle();
 
   Future<void> signOut();
+
+  Future<String?> getIdToken();
 }
 
 class FirebaseAuthDataSourceImpl implements FirebaseAuthDataSource {
@@ -143,6 +145,11 @@ class FirebaseAuthDataSourceImpl implements FirebaseAuthDataSource {
     await _firebaseAuth.signOut();
     await _ensureGoogleInitialized();
     await _googleSignIn.signOut();
+  }
+
+  @override
+  Future<String?> getIdToken() async {
+    return _firebaseAuth.currentUser?.getIdToken();
   }
 
   Future<void> _ensureGoogleInitialized() async {

@@ -12,7 +12,7 @@ abstract interface class SessionRepository {
     String? inviteCode,
   });
 
-  Future<Either<SessionFailure, void>> logout();
+  Future<Either<SessionFailure, void>> logout({String? idToken});
 
   void clearCachedSession();
 }

@@ -112,15 +112,9 @@ class AuthRepositoryImpl implements AuthRepository {
   @override
   Future<Either<AuthFailure, void>> signOut() async {
     try {
-      final backendLogoutResult = await _sessionRepository.logout();
-      backendLogoutResult.fold(
-        (failure) => developer.log(
-          '[GoogleAuth] Backend logout failed before Firebase signOut: '
-          '${failure.message}.',
-          name: 'AuthRepository',
-        ),
-        (_) {},
-      );
+      final token = await _dataSource.getIdToken();
+      // Fire and forget backend logout so it doesn't block local sign-out.
+      _sessionRepository.logout(idToken: token).ignore();
       await _dataSource.signOut();
       return const Right(null);
     } on FirebaseAuthException catch (error) {

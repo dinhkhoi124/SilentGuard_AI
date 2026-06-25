@@ -457,8 +457,8 @@ async def detect_event(
         except Exception as e:
             print(f"Failed to update video_uploads record: {e}")
 
-    # Step 4: Nếu severity != LOW -> gọi AlertEngine.process(event)
-    if req.severity != "LOW":
+    # Step 4: Nếu event_type == 'fall' -> gọi AlertEngine.process(event)
+    if req.event_type == "fall":
         background_tasks.add_task(process_event, inserted_event)
 
     return {

@@ -243,7 +243,7 @@ async def request_upload_url(
         "household_id": req.household_id,
         "uploaded_by": user_id,
         "storage_path": storage_path,
-        "video_url": None,
+        "video_url": "pending",
         "upload_token": upload_token,
         "status": "pending"
     }
@@ -263,7 +263,7 @@ async def request_upload_url(
     return {
         "upload_id": inserted["id"],
         "upload_url": upload_url,
-        "video_url": None,
+        "video_url": "pending",
         "upload_token": upload_token
     }
 

@@ -1,17 +1,18 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { motion, useScroll, useTransform, useReducedMotion, AnimatePresence } from "framer-motion";
 import { useRef, useState, useEffect } from "react";
-import { Activity, Bell, Camera, ChevronDown, Eye, EyeOff, Loader2, Moon, PlayCircle, ShieldCheck, Sparkles, Users, Wifi, X, Download, ArrowUp, HelpCircle, Laptop, Smartphone, Key, Settings, Info } from "lucide-react";
+import { Activity, Bell, Camera, ChevronDown, Eye, EyeOff, Loader2, Moon, PlayCircle, ShieldCheck, Sparkles, Users, Wifi, X, Download, ArrowUp, HelpCircle, Laptop, Smartphone, Key, Settings, Info, BookOpen, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 
 import { ClientOnly } from "@/components/ClientOnly";
 import { Hero3D } from "@/components/Hero3D";
 import lifestyleImg from "@/assets/lifestyle.jpg";
 import appScreenImg from "@/assets/app-screen.jpg";
+import downloadAndroidIcon from "@/assets/download-android.png";
+import conceptCameraAiImg from "@/assets/concept_camera_ai.png";
+import conceptMobileAppImg from "@/assets/concept_mobile_app.png";
+import conceptFamilyCareImg from "@/assets/concept_family_care.png";
 import logoAsset from "@/assets/logo.png";
-import produce1 from "@/assets/produce1.jpg";
-import produce2 from "@/assets/produce2.jpg";
-import produce3 from "@/assets/produce3.jpg";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -79,6 +80,7 @@ function Nav() {
           <span className="font-semibold tracking-tight">SilentGuard</span>
         </a>
         <div className="hidden items-center gap-8 text-sm text-ink-soft md:flex">
+          <a href="#intro" className="transition-colors hover:text-brand">Giới thiệu</a>
           <a href="#how" className="transition-colors hover:text-brand">Cách hoạt động</a>
           <a href="#features" className="transition-colors hover:text-brand">Tính năng</a>
           <Link to="/demo" className="transition-colors hover:text-brand">Thử AI</Link>
@@ -273,6 +275,42 @@ const STEPS = [
   },
 ];
 
+function Introduction() {
+  return (
+    <Section id="intro" className="py-24">
+      <div className="mx-auto max-w-4xl px-6">
+        <motion.div 
+          variants={fadeUp} 
+          className="relative overflow-hidden rounded-3xl border border-border bg-surface-2 p-8 sm:p-12 text-center shadow-soft"
+        >
+          <div className="absolute top-0 right-0 -mr-16 -mt-16 opacity-5 pointer-events-none">
+            <BookOpen className="size-64" />
+          </div>
+          
+          <div className="mx-auto flex size-16 items-center justify-center rounded-full bg-brand/10 text-brand mb-6">
+            <BookOpen className="size-8" />
+          </div>
+          <h2 className="text-balance text-2xl font-semibold sm:text-3xl lg:text-4xl">
+            Tài liệu giới thiệu giải pháp
+          </h2>
+          <p className="mx-auto mt-4 max-w-[50ch] text-pretty text-ink-soft">
+            Tìm hiểu chi tiết về cơ chế hoạt động, các tính năng cốt lõi và chính sách bảo mật của SilentGuard qua cuốn brochure tương tác.
+          </p>
+          <div className="mt-8">
+            <Link
+              to="/brochure"
+              className="inline-flex items-center gap-2 rounded-full bg-brand px-6 py-3 text-sm font-medium text-brand-foreground shadow-soft ring-1 ring-brand transition-all hover:scale-[1.02] hover:shadow-glow"
+            >
+              <span>📖 Đọc tài liệu giới thiệu</span>
+              <ArrowRight className="size-4" />
+            </Link>
+          </div>
+        </motion.div>
+      </div>
+    </Section>
+  );
+}
+
 function HowItWorks() {
   return (
     <Section id="how" className="bg-surface-2 py-24">
@@ -450,9 +488,9 @@ import useEmblaCarousel from "embla-carousel-react";
 
 function ProductGallery() {
   const galleryImages = [
-    { src: produce1, alt: "Thiết bị camera SilentGuard phát hiện té ngã", title: "Thiết bị Camera AI", desc: "Thiết kế nhỏ gọn, hiện đại, lắp đặt linh hoạt ở mọi góc phòng." },
-    { src: produce2, alt: "Ứng dụng theo dõi SilentGuard", title: "Ứng dụng di động", desc: "Giao diện trực quan, cảnh báo tức thì, cập nhật trạng thái mọi lúc." },
-    { src: produce3, alt: "SilentGuard bảo vệ người thân", title: "Giải pháp bảo vệ toàn diện", desc: "An tâm cho cha mẹ cao tuổi, kết nối con cái dù ở bất cứ đâu." }
+    { src: conceptMobileAppImg, alt: "Cảnh báo an toàn thông minh", title: "Ứng dụng di động", desc: "Giao diện trực quan, cảnh báo tức thì, cập nhật trạng thái mọi lúc." },
+    { src: conceptFamilyCareImg, alt: "Bảo vệ gia đình bằng AI", title: "Giải pháp bảo vệ toàn diện", desc: "An tâm cho cha mẹ cao tuổi, kết nối con cái dù ở bất cứ đâu." },
+    { src: conceptCameraAiImg, alt: "Công nghệ Camera AI hiện đại", title: "Thiết bị Camera AI", desc: "Thiết kế nhỏ gọn, hiện đại, lắp đặt linh hoạt ở mọi góc phòng." }
   ];
 
   // Nhân bản danh sách ảnh để đảm bảo Embla Carousel có đủ số lượng slide (ít nhất 6) để loop mượt mà
@@ -516,17 +554,17 @@ function ProductGallery() {
             {displayImages.map((img, i) => (
               <div 
                 key={i} 
-                className="flex-[0_0_85%] sm:flex-[0_0_55%] lg:flex-[0_0_36%] min-w-0 px-3"
+                className="flex-[0_0_85%] sm:flex-[0_0_45%] lg:flex-[0_0_30%] min-w-0 px-3"
               >
                 <div
                   className="group h-full flex flex-col overflow-hidden rounded-3xl bg-surface border border-border shadow-soft transition-all duration-300 hover:-translate-y-1.5 hover:shadow-glow"
                 >
-                  <div className="relative w-full overflow-hidden aspect-[4/5] bg-surface-2 p-6 flex items-center justify-center">
+                  <div className="relative w-full overflow-hidden aspect-[4/3] sm:aspect-[16/9] bg-surface-2 flex items-center justify-center">
                     <img
                       src={img.src}
                       alt={img.alt}
                       loading="lazy"
-                      className="w-full h-full object-contain drop-shadow-xl group-hover:scale-105 transition-all duration-700 pointer-events-none rounded-[1rem]"
+                      className="w-full h-full object-cover group-hover:scale-105 transition-all duration-700 pointer-events-none"
                     />
                   </div>
                   <div className="p-6 flex-1 flex flex-col justify-center">
@@ -708,12 +746,12 @@ function AppDownload() {
                 <button
                   type="button"
                   onClick={() => setIsIosModalOpen(true)}
-                  className="inline-flex items-center gap-3 rounded-2xl bg-background px-5 py-3 text-ink ring-1 ring-white/10 transition-all hover:scale-[1.02] cursor-pointer"
+                  className="inline-flex w-full sm:w-[200px] justify-center items-center gap-3 rounded-2xl bg-background px-5 py-3 text-ink ring-1 ring-white/10 transition-all hover:scale-[1.02] cursor-pointer"
                 >
-                  <svg viewBox="0 0 24 24" className="size-6" fill="currentColor" aria-hidden>
+                  <svg viewBox="0 0 24 24" className="size-6 shrink-0" fill="currentColor" aria-hidden>
                     <path d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701"/>
                   </svg>
-                  <div className="text-left leading-tight">
+                  <div className="text-left leading-tight w-full flex flex-col items-start">
                     <div className="text-[10px] uppercase tracking-wider text-ink-soft">Tải về bản</div>
                     <div className="text-sm font-semibold">iOS (.IPA)</div>
                   </div>
@@ -721,9 +759,9 @@ function AppDownload() {
                 <button
                   type="button"
                   onClick={() => setIsAndroidModalOpen(true)}
-                  className="inline-flex items-center gap-3 rounded-2xl bg-background px-5 py-3 text-ink ring-1 ring-white/10 transition-all hover:scale-[1.02] cursor-pointer self-start"
+                  className="inline-flex w-full sm:w-[200px] justify-center items-center gap-3 rounded-2xl bg-background px-5 py-3 text-ink ring-1 ring-white/10 transition-all hover:scale-[1.02] cursor-pointer"
                 >
-                  <svg viewBox="0 0 28.99 31.99" className="size-6" aria-hidden>
+                  <svg viewBox="0 0 28.99 31.99" className="size-6 shrink-0" aria-hidden>
                     <g fillRule="nonzero">
                       <path d="M13.54 15.28.12 29.34a3.66 3.66 0 0 0 5.33 2.16l15.1-8.6Z" fill="#ea4335" />
                       <path d="m27.11 12.89-6.53-3.74-7.35 6.45 7.38 7.28 6.48-3.7a3.54 3.54 0 0 0 1.5-4.79 3.62 3.62 0 0 0-1.5-1.5z" fill="#fbbc04" />
@@ -731,7 +769,7 @@ function AppDownload() {
                       <path d="m13.64 16 6.94-6.85L5.5.51A3.73 3.73 0 0 0 3.63 0 3.64 3.64 0 0 0 .12 2.65Z" fill="#34a853" />
                     </g>
                   </svg>
-                  <div className="text-left leading-tight">
+                  <div className="text-left leading-tight w-full flex flex-col items-start">
                     <div className="text-[10px] uppercase tracking-wider text-ink-soft">Tải về bản</div>
                     <div className="text-sm font-semibold">Android (.APK)</div>
                   </div>
@@ -1260,6 +1298,7 @@ function Index() {
     <main className="min-h-screen bg-background text-foreground">
       <Nav />
       <Hero />
+      <Introduction />
       <HowItWorks />
       <Features />
       <ProductGallery />

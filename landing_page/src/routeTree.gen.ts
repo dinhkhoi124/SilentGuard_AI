@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as FaqRouteImport } from './routes/faq'
 import { Route as DemoRouteImport } from './routes/demo'
+import { Route as BrochureRouteImport } from './routes/brochure'
 import { Route as IndexRouteImport } from './routes/index'
 
 const PrivacyRoute = PrivacyRouteImport.update({
@@ -29,6 +30,11 @@ const DemoRoute = DemoRouteImport.update({
   path: '/demo',
   getParentRoute: () => rootRouteImport,
 } as any)
+const BrochureRoute = BrochureRouteImport.update({
+  id: '/brochure',
+  path: '/brochure',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -37,12 +43,14 @@ const IndexRoute = IndexRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/brochure': typeof BrochureRoute
   '/demo': typeof DemoRoute
   '/faq': typeof FaqRoute
   '/privacy': typeof PrivacyRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/brochure': typeof BrochureRoute
   '/demo': typeof DemoRoute
   '/faq': typeof FaqRoute
   '/privacy': typeof PrivacyRoute
@@ -50,20 +58,22 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/brochure': typeof BrochureRoute
   '/demo': typeof DemoRoute
   '/faq': typeof FaqRoute
   '/privacy': typeof PrivacyRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/demo' | '/faq' | '/privacy'
+  fullPaths: '/' | '/brochure' | '/demo' | '/faq' | '/privacy'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/demo' | '/faq' | '/privacy'
-  id: '__root__' | '/' | '/demo' | '/faq' | '/privacy'
+  to: '/' | '/brochure' | '/demo' | '/faq' | '/privacy'
+  id: '__root__' | '/' | '/brochure' | '/demo' | '/faq' | '/privacy'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  BrochureRoute: typeof BrochureRoute
   DemoRoute: typeof DemoRoute
   FaqRoute: typeof FaqRoute
   PrivacyRoute: typeof PrivacyRoute
@@ -92,6 +102,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DemoRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/brochure': {
+      id: '/brochure'
+      path: '/brochure'
+      fullPath: '/brochure'
+      preLoaderRoute: typeof BrochureRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -104,6 +121,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  BrochureRoute: BrochureRoute,
   DemoRoute: DemoRoute,
   FaqRoute: FaqRoute,
   PrivacyRoute: PrivacyRoute,

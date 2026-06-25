@@ -58,6 +58,7 @@ function DemoPage() {
   const [error, setError] = useState<string | null>(null);
   const [uploadToken, setUploadToken] = useState<string | null>(null);
   const [eventResult, setEventResult] = useState<{
+    event_type: string | null;
     severity: string | null;
     confidence: number | null;
     llm_message: string | null;
@@ -197,6 +198,7 @@ function DemoPage() {
           if (statusData.status === "processed") {
             clearInterval(pollInterval);
             setEventResult({
+              event_type: statusData.event?.event_type || null,
               severity: statusData.event?.severity || null,
               confidence: statusData.event?.confidence || null,
               llm_message: statusData.event?.llm_message || null,
@@ -425,10 +427,8 @@ function DemoPage() {
   );
 }
 
-function ResultCard({ r }: { r: { severity: string | null; confidence: number | null; llm_message: string | null; room: string | null } }) {
-  const isFall = r.severity !== null && 
-                 r.severity.toUpperCase() !== "LOW" && 
-                 r.severity.toUpperCase() !== "NONE";
+function ResultCard({ r }: { r: { event_type: string | null; severity: string | null; confidence: number | null; llm_message: string | null; room: string | null } }) {
+  const isFall = r.event_type === "fall";
                  
   const sevColor =
     r.severity?.toUpperCase() === "HIGH" || r.severity?.toUpperCase() === "CRITICAL"

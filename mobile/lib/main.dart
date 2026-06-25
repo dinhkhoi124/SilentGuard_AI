@@ -11,6 +11,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:mobile/core/bootstrap/app_initializer.dart';
 import 'package:mobile/core/router/app_router.dart';
+import 'package:mobile/core/services/local_notification_service.dart';
+import 'package:mobile/core/services/monitoring_suppress_service.dart';
 import 'package:mobile/core/theme/app_theme.dart';
 import 'package:mobile/core/theme/theme_controller.dart';
 import 'package:mobile/features/auth/presentation/bloc/auth_bloc.dart';
@@ -19,14 +21,34 @@ import 'package:mobile/features/notifications/presentation/cubit/notifications_c
 import 'package:mobile/features/video_upload/presentation/bloc/video_upload_bloc.dart';
 import 'package:mobile/firebase_options.dart';
 import 'package:mobile/injection_container.dart' as di;
+import 'package:shared_preferences/shared_preferences.dart';
 
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   try {
+    WidgetsFlutterBinding.ensureInitialized();
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     ).timeout(const Duration(seconds: 5));
+    final type = message.data['type']?.toString();
+    final cameraId = _cameraIdFromPayload(message.data);
+    if (type == 'fall_alert' && cameraId != null) {
+      final isSuppressed =
+          await MonitoringSuppressService.isSuppressedInBackground(
+            sharedPreferences: SharedPreferencesAsync(),
+            cameraId: cameraId,
+          );
+      if (isSuppressed) {
+        await NotificationLocalDataSource.saveBackgroundMessage(message);
+        developer.log(
+          '[FCM] background message suppressed locally; persisted=true.',
+          name: 'FcmBackground',
+        );
+        return;
+      }
+    }
     await NotificationLocalDataSource.saveBackgroundMessage(message);
+    await LocalNotificationService.showBackgroundMessage(message);
     developer.log(
       '[FCM] background received: messageId=${message.messageId}, '
       'event_id=${message.data['event_id'] ?? message.data['eventId']}, '
@@ -35,12 +57,20 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
     );
   } catch (error, stackTrace) {
     developer.log(
-      'Background FCM initialization failed; message handling skipped.',
+      'Background FCM handling failed.',
       name: 'FcmBackground',
       error: error,
       stackTrace: stackTrace,
     );
   }
+}
+
+String? _cameraIdFromPayload(Map<String, dynamic> data) {
+  for (final key in const ['camera_id', 'cameraId', 'device_id', 'deviceId']) {
+    final value = data[key]?.toString().trim() ?? '';
+    if (value.isNotEmpty) return value;
+  }
+  return null;
 }
 
 Future<void> main() async {

@@ -7,6 +7,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/widgets.dart';
 import 'package:mobile/core/network/api_client.dart';
 import 'package:mobile/core/services/local_notification_service.dart';
+import 'package:mobile/core/services/monitoring_suppress_service.dart';
 import 'package:mobile/features/notifications/domain/entities/notification_alert.dart';
 import 'package:mobile/features/notifications/presentation/cubit/notifications_cubit.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -16,15 +17,18 @@ class FcmService with WidgetsBindingObserver {
     required ApiClient apiClient,
     required FirebaseAuth firebaseAuth,
     required LocalNotificationService localNotificationService,
+    required MonitoringSuppressService monitoringSuppressService,
     FirebaseMessaging? messaging,
   }) : _apiClient = apiClient,
        _firebaseAuth = firebaseAuth,
        _localNotificationService = localNotificationService,
+       _monitoringSuppressService = monitoringSuppressService,
        _messaging = messaging ?? FirebaseMessaging.instance;
 
   final ApiClient _apiClient;
   final FirebaseAuth _firebaseAuth;
   final LocalNotificationService _localNotificationService;
+  final MonitoringSuppressService _monitoringSuppressService;
   final FirebaseMessaging _messaging;
   static const _messagingTimeout = Duration(seconds: 5);
   static const _backendRegistrationTimeout = Duration(seconds: 5);
@@ -44,42 +48,17 @@ class FcmService with WidgetsBindingObserver {
     _notificationsCubit = notificationsCubit;
     WidgetsBinding.instance.addObserver(this);
 
-    _foregroundSubscription = FirebaseMessaging.onMessage.listen((message) {
-      final alert = _alertFromMessage(message);
-      developer.log(
-        '[FCM] foreground received: messageId=${message.messageId}, '
-        'event_id=${alert.eventId}, severity=${alert.severity}, '
-        'persisted=true, navigationTriggered=false.',
-        name: 'FcmService',
-      );
-      notificationsCubit.receiveForegroundMessage(message);
-      unawaited(
-        _localNotificationService.showFallAlert(alert).catchError((
-          Object error,
-          StackTrace stackTrace,
-        ) {
-          developer.log(
-            '[FCM] foreground local notification display failed.',
-            name: 'FcmService',
-            error: error,
-            stackTrace: stackTrace,
-          );
-        }),
-      );
-    });
+    _foregroundSubscription = FirebaseMessaging.onMessage.listen(
+      (message) =>
+          unawaited(_handleForegroundMessage(message, notificationsCubit)),
+    );
 
     _openedSubscription = FirebaseMessaging.onMessageOpenedApp.listen((
       message,
     ) {
-      final alert = _alertFromMessage(message);
-      developer.log(
-        '[FCM] opened from background: messageId=${message.messageId}, '
-        'event_id=${alert.eventId}, severity=${alert.severity}, '
-        'persisted=true, navigationTriggered=true.',
-        name: 'FcmService',
+      unawaited(
+        _handleOpenedMessage(message, notificationsCubit, onNotificationTap),
       );
-      notificationsCubit.receiveOpenedMessage(message);
-      onNotificationTap(alert);
     });
 
     _tokenRefreshSubscription = _messaging.onTokenRefresh.listen(
@@ -108,6 +87,13 @@ class FcmService with WidgetsBindingObserver {
         _messagingTimeout,
       );
       if (message == null) return null;
+      if (await _isMessageSuppressed(message)) {
+        developer.log(
+          '[FCM] terminated message suppressed locally.',
+          name: 'FcmService',
+        );
+        return null;
+      }
       return _alertFromMessage(message);
     } catch (error, stackTrace) {
       developer.log(
@@ -149,9 +135,9 @@ class FcmService with WidgetsBindingObserver {
         .timeout(_messagingTimeout);
     await _messaging
         .setForegroundNotificationPresentationOptions(
-          alert: true,
-          badge: true,
-          sound: true,
+          alert: false,
+          badge: false,
+          sound: false,
         )
         .timeout(_messagingTimeout);
     developer.log(
@@ -201,10 +187,87 @@ class FcmService with WidgetsBindingObserver {
     return NotificationAlert.fromPayload(
       Map<String, dynamic>.from(message.data),
       messageId: message.messageId,
-      title: message.notification?.title,
-      body: message.notification?.body,
+      title: message.notification?.title ?? message.data['title']?.toString(),
+      body: message.notification?.body ?? message.data['body']?.toString(),
       receivedAt: message.sentTime,
     );
+  }
+
+  Future<void> _handleForegroundMessage(
+    RemoteMessage message,
+    NotificationsCubit notificationsCubit,
+  ) async {
+    if (await _isMessageSuppressed(message)) {
+      developer.log(
+        '[FCM] foreground message suppressed locally.',
+        name: 'FcmService',
+      );
+      notificationsCubit.receiveForegroundMessage(message);
+      return;
+    }
+
+    final alert = _alertFromMessage(message);
+    developer.log(
+      '[FCM] foreground received: messageId=${message.messageId}, '
+      'event_id=${alert.eventId}, severity=${alert.severity}, '
+      'persisted=true, navigationTriggered=false.',
+      name: 'FcmService',
+    );
+    notificationsCubit.receiveForegroundMessage(message);
+    try {
+      await _localNotificationService.showAlert(alert);
+    } catch (error, stackTrace) {
+      developer.log(
+        '[FCM] foreground local notification display failed.',
+        name: 'FcmService',
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+  }
+
+  Future<void> _handleOpenedMessage(
+    RemoteMessage message,
+    NotificationsCubit notificationsCubit,
+    void Function(NotificationAlert alert) onNotificationTap,
+  ) async {
+    if (await _isMessageSuppressed(message)) {
+      developer.log(
+        '[FCM] opened message suppressed locally; navigation skipped.',
+        name: 'FcmService',
+      );
+      return;
+    }
+
+    final alert = _alertFromMessage(message);
+    developer.log(
+      '[FCM] opened from background: messageId=${message.messageId}, '
+      'event_id=${alert.eventId}, severity=${alert.severity}, '
+      'persisted=true, navigationTriggered=true.',
+      name: 'FcmService',
+    );
+    notificationsCubit.receiveOpenedMessage(message);
+    onNotificationTap(alert);
+  }
+
+  Future<bool> _isMessageSuppressed(RemoteMessage message) async {
+    if (message.data['type']?.toString() != 'fall_alert') return false;
+    final cameraId = _cameraIdFromData(message.data);
+    if (cameraId == null) return false;
+    return _monitoringSuppressService.isSuppressed(cameraId);
+  }
+
+  String? _cameraIdFromData(Map<String, dynamic> data) {
+    for (final key in const [
+      'camera_id',
+      'cameraId',
+      'device_id',
+      'deviceId',
+    ]) {
+      final value = data[key]?.toString().trim() ?? '';
+      if (value.isNotEmpty) return value;
+    }
+    return null;
   }
 
   @override

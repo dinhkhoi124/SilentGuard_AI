@@ -7,6 +7,7 @@ import 'package:mobile/core/router/app_router.dart';
 import 'package:mobile/core/router/auth_notifier.dart';
 import 'package:mobile/core/services/fcm_service.dart';
 import 'package:mobile/core/services/local_notification_service.dart';
+import 'package:mobile/core/services/monitoring_suppress_service.dart';
 import 'package:mobile/features/household_invite/data/datasources/household_invite_remote_data_source.dart';
 import 'package:mobile/features/notifications/domain/entities/notification_alert.dart';
 import 'package:mobile/features/notifications/presentation/cubit/notifications_cubit.dart';
@@ -34,6 +35,7 @@ class AppInitializer {
     // GetIt registration is lazy, but keep it post-frame so plugin singletons
     // cannot be resolved before the native splash has handed off to Flutter.
     await di.init();
+    await di.sl<MonitoringSuppressService>().pruneExpired();
     await _yieldToUi();
 
     final notificationsCubit = di.sl<NotificationsCubit>();
@@ -59,13 +61,21 @@ class AppInitializer {
       Future.microtask(() async {
         final initialLocalAlert = await _initializeLocalNotifications(
           onAlertTap: (alert) {
-            notificationsCubit.receiveOpenedAlert(alert);
-            _openNotificationAlert(resolvedRouter, alert);
+            unawaited(
+              _handleLocalNotificationTap(
+                notificationsCubit,
+                resolvedRouter,
+                alert,
+              ),
+            );
           },
         );
         if (initialLocalAlert != null) {
-          notificationsCubit.receiveOpenedAlert(initialLocalAlert);
-          _openNotificationAlert(resolvedRouter, initialLocalAlert);
+          await _handleLocalNotificationTap(
+            notificationsCubit,
+            resolvedRouter,
+            initialLocalAlert,
+          );
         }
       }),
     );
@@ -193,6 +203,26 @@ class AppInitializer {
       name: 'AppInitializer',
     );
     appRouter.router.go('/home');
+  }
+
+  Future<void> _handleLocalNotificationTap(
+    NotificationsCubit notificationsCubit,
+    AppRouter appRouter,
+    NotificationAlert alert,
+  ) async {
+    final cameraId = alert.cameraId?.trim();
+    if (cameraId != null &&
+        cameraId.isNotEmpty &&
+        await di.sl<MonitoringSuppressService>().isSuppressed(cameraId)) {
+      developer.log(
+        '[FCM] local notification tap suppressed; navigation skipped.',
+        name: 'AppInitializer',
+      );
+      return;
+    }
+
+    notificationsCubit.receiveOpenedAlert(alert);
+    _openNotificationAlert(appRouter, alert);
   }
 
   Future<void> _yieldToUi() => Future<void>.delayed(Duration.zero);

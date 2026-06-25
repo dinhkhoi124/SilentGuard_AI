@@ -14,6 +14,7 @@ import 'package:mobile/features/household_invite/presentation/cubit/invite_manag
 import 'package:mobile/features/household_invite/presentation/cubit/pending_invites_cubit.dart';
 import 'package:mobile/core/services/fcm_service.dart';
 import 'package:mobile/core/services/local_notification_service.dart';
+import 'package:mobile/core/services/monitoring_suppress_service.dart';
 import 'package:mobile/core/services/onboarding_service.dart';
 import 'package:mobile/core/theme/theme_controller.dart';
 import 'package:mobile/features/auth/data/datasources/firebase_auth_datasource.dart';
@@ -53,6 +54,7 @@ import 'package:mobile/features/home/data/repositories/event_feedback_repository
 import 'package:mobile/features/home/domain/repositories/event_feedback_repository.dart';
 import 'package:mobile/features/home/domain/usecases/submit_event_feedback.dart';
 import 'package:mobile/features/home/presentation/cubit/event_feedback_cubit.dart';
+import 'package:mobile/features/home/presentation/cubit/suppress_cubit.dart';
 import 'package:mobile/features/notifications/data/datasources/notification_local_data_source.dart';
 import 'package:mobile/features/notifications/presentation/cubit/notifications_cubit.dart';
 import 'package:mobile/features/session/data/datasources/session_remote_datasource.dart';
@@ -83,6 +85,9 @@ Future<void> init() async {
     )
     ..registerLazySingleton(() => ApiClient(client: sl()))
     ..registerLazySingleton(SharedPreferencesAsync.new)
+    ..registerLazySingleton(
+      () => MonitoringSuppressService(sharedPreferences: sl()),
+    )
     ..registerLazySingleton(() => OnboardingService(sl()))
     ..registerLazySingleton(() => PhoneDialerService())
     ..registerLazySingleton<HouseholdInviteRemoteDataSource>(
@@ -116,6 +121,7 @@ Future<void> init() async {
         apiClient: sl(),
         firebaseAuth: sl(),
         localNotificationService: sl(),
+        monitoringSuppressService: sl(),
         messaging: sl(),
       ),
     )
@@ -126,6 +132,7 @@ Future<void> init() async {
         authRepository: sl(),
         sessionRepository: sl(),
         fcmService: sl(),
+        monitoringSuppressService: sl(),
       ),
     )
     ..registerFactory(
@@ -141,6 +148,7 @@ Future<void> init() async {
     ..registerFactory(
       () => VideoUploadBloc(uploadVideoUseCase: sl(), sessionRepository: sl()),
     )
+    ..registerFactory(() => SuppressCubit(sl()))
     ..registerFactory(
       () =>
           DevicePairingBloc(deviceRepository: sl(), imouStreamRepository: sl()),

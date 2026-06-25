@@ -15,12 +15,14 @@ import 'package:mobile/features/home/presentation/bloc/home_event.dart';
 import 'package:mobile/features/home/presentation/bloc/home_state.dart';
 import 'package:mobile/features/home/presentation/cubit/camera_event_history_cubit.dart';
 import 'package:mobile/features/home/presentation/cubit/camera_event_history_state.dart';
+import 'package:mobile/features/home/presentation/cubit/suppress_cubit.dart';
 import 'package:mobile/features/home/presentation/mappers/camera_event_adapter.dart';
 import 'package:mobile/features/home/presentation/widgets/camera_action_buttons.dart';
 import 'package:mobile/features/home/presentation/widgets/camera_event_history_header.dart';
 import 'package:mobile/features/home/presentation/widgets/camera_event_tile.dart';
 import 'package:mobile/features/home/presentation/widgets/camera_latest_event_card.dart';
 import 'package:mobile/features/home/presentation/widgets/camera_safety_status.dart';
+import 'package:mobile/core/widgets/app_empty_state.dart';
 import 'package:mobile/features/home/presentation/widgets/camera_top_bar.dart';
 import 'package:mobile/features/home/presentation/widgets/camera_video_player.dart';
 import 'package:mobile/injection_container.dart';
@@ -44,8 +46,13 @@ class CameraDetailPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider<CameraEventHistoryCubit>(
-      create: (_) => sl<CameraEventHistoryCubit>()..loadForCamera(device),
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider<CameraEventHistoryCubit>(
+          create: (_) => sl<CameraEventHistoryCubit>()..loadForCamera(device),
+        ),
+        BlocProvider<SuppressCubit>(create: (_) => sl<SuppressCubit>()),
+      ],
       child: _CameraDetailBody(
         device: device,
         onThumbnailCaptured: onThumbnailCaptured,
@@ -75,6 +82,7 @@ class _CameraDetailBodyState extends State<_CameraDetailBody> {
   @override
   void initState() {
     super.initState();
+    context.read<SuppressCubit>().loadState(widget.device.id);
     _streamUrl = _normalizedUrl(widget.device.rtspUrl);
     _isStreamLoading = _streamUrl == null;
     _updateTime();
@@ -100,40 +108,53 @@ class _CameraDetailBodyState extends State<_CameraDetailBody> {
 
   @override
   Widget build(BuildContext context) {
-    return BlocListener<HomeBloc, HomeState>(
-      listenWhen: (_, state) =>
-          state is CameraStreamUrlLoading ||
-          state is CameraStreamUrlLoaded ||
-          state is CameraStreamUrlFailure,
-      listener: (context, state) {
-        if (state is CameraStreamUrlLoading &&
-            state.cameraId == widget.device.id) {
-          setState(() {
-            _isStreamLoading =
-                _streamUrl == null || _showLoadingForNextStreamRequest;
-            _streamErrorMessage = null;
-          });
-          return;
-        }
-        if (state is CameraStreamUrlLoaded &&
-            state.cameraId == widget.device.id) {
-          setState(() {
-            _streamUrl = state.streamUrl;
-            _isStreamLoading = false;
-            _showLoadingForNextStreamRequest = false;
-            _streamErrorMessage = null;
-          });
-          return;
-        }
-        if (state is CameraStreamUrlFailure &&
-            state.cameraId == widget.device.id) {
-          setState(() {
-            _isStreamLoading = false;
-            _showLoadingForNextStreamRequest = false;
-            _streamErrorMessage = state.message;
-          });
-        }
-      },
+    return MultiBlocListener(
+      listeners: [
+        BlocListener<HomeBloc, HomeState>(
+          listenWhen: (_, state) =>
+              state is CameraStreamUrlLoading ||
+              state is CameraStreamUrlLoaded ||
+              state is CameraStreamUrlFailure,
+          listener: (context, state) {
+            if (state is CameraStreamUrlLoading &&
+                state.cameraId == widget.device.id) {
+              setState(() {
+                _isStreamLoading =
+                    _streamUrl == null || _showLoadingForNextStreamRequest;
+                _streamErrorMessage = null;
+              });
+              return;
+            }
+            if (state is CameraStreamUrlLoaded &&
+                state.cameraId == widget.device.id) {
+              setState(() {
+                _streamUrl = state.streamUrl;
+                _isStreamLoading = false;
+                _showLoadingForNextStreamRequest = false;
+                _streamErrorMessage = null;
+              });
+              return;
+            }
+            if (state is CameraStreamUrlFailure &&
+                state.cameraId == widget.device.id) {
+              setState(() {
+                _isStreamLoading = false;
+                _showLoadingForNextStreamRequest = false;
+                _streamErrorMessage = state.message;
+              });
+            }
+          },
+        ),
+        BlocListener<SuppressCubit, SuppressState>(
+          listenWhen: (_, state) => state is SuppressFailure,
+          listener: (context, state) {
+            final failure = state as SuppressFailure;
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(SnackBar(content: Text(failure.message)));
+          },
+        ),
+      ],
       child: Scaffold(
         backgroundColor: AppColors.background,
         body: SafeArea(
@@ -205,7 +226,11 @@ class _CameraDetailBodyState extends State<_CameraDetailBody> {
                     ),
               ),
               const SliverToBoxAdapter(child: SizedBox(height: 10)),
-              const SliverToBoxAdapter(child: CameraActionButtons()),
+              SliverToBoxAdapter(
+                child: BlocBuilder<SuppressCubit, SuppressState>(
+                  builder: (context, state) => _buildActionButtons(state),
+                ),
+              ),
               const SliverToBoxAdapter(child: SizedBox(height: 16)),
               const SliverToBoxAdapter(child: CameraEventHistoryHeader()),
               // Event history list — driven by CameraEventHistoryCubit
@@ -263,6 +288,54 @@ class _CameraDetailBodyState extends State<_CameraDetailBody> {
       CameraStreamUrlRequested(
         cameraId: widget.device.id,
         serialNumber: serialNumber,
+      ),
+    );
+  }
+
+  Widget _buildActionButtons(SuppressState state) {
+    return switch (state) {
+      SuppressActive(:final suppressedUntil) => CameraActionButtons(
+        monitoringIcon: Icons.play_circle_fill_rounded,
+        monitoringLabel:
+            'Tiếp tục\n${_formatRemainingDuration(suppressedUntil)}',
+        monitoringActive: true,
+        onMonitoringTap: () =>
+            context.read<SuppressCubit>().resumeMonitoring(widget.device.id),
+      ),
+      SuppressLoading() || SuppressInitial() => const CameraActionButtons(
+        monitoringIcon: Icons.pause_circle_outline_rounded,
+        monitoringLabel: 'Đang xử lý',
+        monitoringLoading: true,
+      ),
+      SuppressFailure() => CameraActionButtons(
+        monitoringIcon: Icons.refresh_rounded,
+        monitoringLabel: 'Thử lại\nthông báo',
+        onMonitoringTap: () =>
+            context.read<SuppressCubit>().loadState(widget.device.id),
+      ),
+      SuppressInactive() => CameraActionButtons(
+        monitoringIcon: Icons.pause_circle_outline_rounded,
+        monitoringLabel: 'Tạm dừng\ngiám sát',
+        onMonitoringTap: _showSuppressDurationSheet,
+      ),
+    };
+  }
+
+  Future<void> _showSuppressDurationSheet() async {
+    final suppressCubit = context.read<SuppressCubit>();
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      barrierColor: AppColors.darkText.withValues(alpha: 0.22),
+      builder: (sheetContext) => BlocProvider(
+        create: (_) => _PauseDurationCubit(),
+        child: _PauseDurationSheet(
+          onConfirm: (minutes) async {
+            await suppressCubit.pauseMonitoring(widget.device.id, minutes);
+            if (sheetContext.mounted) Navigator.of(sheetContext).pop();
+          },
+        ),
       ),
     );
   }
@@ -446,11 +519,12 @@ class _HistoryEmptyBody extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-      child: Text(
-        message,
-        style: Theme.of(
-          context,
-        ).textTheme.bodyMedium?.copyWith(color: AppColors.mutedText),
+      child: AppEmptyState(
+        icon: Icons.event_available_outlined,
+        title: 'Chưa có sự kiện',
+        message:
+            'Camera này chưa ghi nhận cảnh báo nào. Đây là một tín hiệu tốt.',
+        compact: true,
       ),
     );
   }
@@ -504,55 +578,13 @@ class _NoCameraEventsPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(18),
-          child: Row(
-            children: [
-              DecoratedBox(
-                decoration: BoxDecoration(
-                  color: AppColors.lightBlue,
-                  borderRadius: BorderRadius.all(Radius.circular(14)),
-                ),
-                child: SizedBox.square(
-                  dimension: 42,
-                  child: Icon(
-                    Icons.event_available_outlined,
-                    color: AppColors.primary,
-                  ),
-                ),
-              ),
-              SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Chưa có sự kiện',
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        color: AppColors.darkText,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Sự kiện mới từ camera sẽ xuất hiện tại đây.',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: AppColors.mutedText,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
+    return const Padding(
+      padding: EdgeInsets.symmetric(horizontal: 16),
+      child: AppEmptyState(
+        icon: Icons.event_available_outlined,
+        title: 'Chưa có sự kiện',
+        message: 'Sự kiện mới từ camera sẽ xuất hiện tại đây.',
+        compact: true,
       ),
     );
   }
@@ -567,4 +599,315 @@ String _formatTime(DateTime time) {
 String? _normalizedUrl(String? url) {
   final trimmed = url?.trim() ?? '';
   return trimmed.isEmpty ? null : trimmed;
+}
+
+String _formatRemainingDuration(DateTime suppressedUntil) {
+  final remaining = suppressedUntil.difference(DateTime.now().toUtc());
+  final totalSeconds = remaining.inSeconds.clamp(0, 99 * 60 + 59);
+  final minutes = totalSeconds ~/ 60;
+  final seconds = totalSeconds % 60;
+  return '${minutes.toString().padLeft(2, '0')}:'
+      '${seconds.toString().padLeft(2, '0')}';
+}
+
+class _PauseDurationState {
+  const _PauseDurationState({
+    this.selection = 15,
+    this.customMinutes,
+    this.errorMessage,
+  });
+
+  static const customSelection = -1;
+
+  final int selection;
+  final int? customMinutes;
+  final String? errorMessage;
+
+  int? get selectedMinutes {
+    if (selection == customSelection) return customMinutes;
+    return selection;
+  }
+
+  _PauseDurationState copyWith({
+    int? selection,
+    int? customMinutes,
+    bool clearCustomMinutes = false,
+    String? errorMessage,
+    bool clearError = false,
+  }) {
+    return _PauseDurationState(
+      selection: selection ?? this.selection,
+      customMinutes: clearCustomMinutes
+          ? null
+          : customMinutes ?? this.customMinutes,
+      errorMessage: clearError ? null : errorMessage ?? this.errorMessage,
+    );
+  }
+}
+
+class _PauseDurationCubit extends Cubit<_PauseDurationState> {
+  _PauseDurationCubit() : super(const _PauseDurationState());
+
+  void selectPreset(int minutes) {
+    emit(
+      state.copyWith(
+        selection: minutes,
+        clearCustomMinutes: true,
+        clearError: true,
+      ),
+    );
+  }
+
+  void selectCustom(int minutes) {
+    emit(
+      state.copyWith(
+        selection: _PauseDurationState.customSelection,
+        customMinutes: minutes,
+        clearError: true,
+      ),
+    );
+  }
+
+  bool validate() {
+    final minutes = state.selectedMinutes;
+    if (minutes == null || minutes < 5) {
+      emit(
+        state.copyWith(
+          errorMessage: 'Thời lượng tùy chỉnh tối thiểu là 5 phút.',
+        ),
+      );
+      return false;
+    }
+    return true;
+  }
+}
+
+class _PauseDurationSheet extends StatelessWidget {
+  const _PauseDurationSheet({required this.onConfirm});
+
+  final Future<void> Function(int minutes) onConfirm;
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(20, 10, 20, bottomInset + 22),
+      child: SingleChildScrollView(
+        child: BlocBuilder<_PauseDurationCubit, _PauseDurationState>(
+          builder: (context, state) {
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const _SheetHandle(),
+                const SizedBox(height: 22),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const _PauseSheetIcon(),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Tạm dừng thông báo',
+                            style: Theme.of(context).textTheme.titleLarge
+                                ?.copyWith(
+                                  color: AppColors.darkText,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                          ),
+                          const SizedBox(height: 5),
+                          Text(
+                            'Chỉ áp dụng trên thiết bị này. Camera vẫn ghi hình và phát hiện sự kiện.',
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(
+                                  color: AppColors.mutedText,
+                                  height: 1.4,
+                                ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceSoft,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: RadioGroup<int>(
+                    groupValue: state.selection,
+                    onChanged: (value) {
+                      if (value == null) return;
+                      if (value == _PauseDurationState.customSelection) {
+                        _pickCustomDuration(context);
+                        return;
+                      }
+                      context.read<_PauseDurationCubit>().selectPreset(value);
+                    },
+                    child: Column(
+                      children: [
+                        const _DurationOption(value: 15, label: '15 phút'),
+                        const _DurationDivider(),
+                        const _DurationOption(value: 30, label: '30 phút'),
+                        const _DurationDivider(),
+                        const _DurationOption(value: 60, label: '1 giờ'),
+                        const _DurationDivider(),
+                        _DurationOption(
+                          value: _PauseDurationState.customSelection,
+                          label: 'Tùy chỉnh',
+                          detail: state.customMinutes == null
+                              ? 'Chọn giờ và phút'
+                              : _formatCustomMinutes(state.customMinutes!),
+                          trailing: const Icon(
+                            Icons.schedule_rounded,
+                            color: AppColors.primary,
+                            size: 20,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                AnimatedSize(
+                  duration: const Duration(milliseconds: 220),
+                  curve: Curves.easeOutCubic,
+                  child: state.errorMessage == null
+                      ? const SizedBox(height: 18)
+                      : Padding(
+                          padding: const EdgeInsets.only(top: 10),
+                          child: Text(
+                            state.errorMessage!,
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(
+                                  color: AppColors.destructive,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                          ),
+                        ),
+                ),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: () async {
+                      final cubit = context.read<_PauseDurationCubit>();
+                      if (!cubit.validate()) return;
+                      await onConfirm(cubit.state.selectedMinutes!);
+                    },
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      minimumSize: const Size.fromHeight(52),
+                    ),
+                    child: const Text('Xác nhận'),
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickCustomDuration(BuildContext context) async {
+    final cubit = context.read<_PauseDurationCubit>();
+    final currentMinutes = cubit.state.customMinutes ?? 30;
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay(
+        hour: currentMinutes ~/ 60,
+        minute: currentMinutes % 60,
+      ),
+      helpText: 'Chọn thời lượng tạm dừng',
+      hourLabelText: 'Giờ',
+      minuteLabelText: 'Phút',
+      cancelText: 'Hủy',
+      confirmText: 'Chọn',
+    );
+    if (picked == null || !context.mounted) return;
+    cubit.selectCustom(picked.hour * 60 + picked.minute);
+  }
+}
+
+class _PauseSheetIcon extends StatelessWidget {
+  const _PauseSheetIcon();
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: AppColors.lightBlue,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.12)),
+      ),
+      child: const SizedBox.square(
+        dimension: 48,
+        child: Icon(
+          Icons.notifications_paused_outlined,
+          color: AppColors.primary,
+          size: 24,
+        ),
+      ),
+    );
+  }
+}
+
+class _DurationOption extends StatelessWidget {
+  const _DurationOption({
+    required this.value,
+    required this.label,
+    this.detail,
+    this.trailing,
+  });
+
+  final int value;
+  final String label;
+  final String? detail;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    return RadioListTile<int>(
+      value: value,
+      activeColor: AppColors.primary,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+      title: Text(
+        label,
+        style: const TextStyle(
+          color: AppColors.darkText,
+          fontSize: 14,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+      subtitle: detail == null
+          ? null
+          : Text(
+              detail!,
+              style: const TextStyle(color: AppColors.mutedText, fontSize: 12),
+            ),
+      secondary: trailing,
+    );
+  }
+}
+
+class _DurationDivider extends StatelessWidget {
+  const _DurationDivider();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Divider(height: 1, indent: 52, color: AppColors.border);
+  }
+}
+
+String _formatCustomMinutes(int minutes) {
+  final hours = minutes ~/ 60;
+  final remainingMinutes = minutes % 60;
+  if (hours == 0) return '$remainingMinutes phút';
+  if (remainingMinutes == 0) return '$hours giờ';
+  return '$hours giờ $remainingMinutes phút';
 }

@@ -6,6 +6,7 @@ import 'dart:developer' as developer;
 import 'package:flutter/widgets.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:mobile/core/services/fcm_service.dart';
+import 'package:mobile/core/services/monitoring_suppress_service.dart';
 import 'package:mobile/features/auth/domain/entities/app_user.dart';
 import 'package:mobile/features/auth/domain/failures/auth_failure.dart'
     as auth_failures;
@@ -19,9 +20,11 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     required AuthRepository authRepository,
     required SessionRepository sessionRepository,
     required FcmService fcmService,
+    required MonitoringSuppressService monitoringSuppressService,
   }) : _authRepository = authRepository,
        _sessionRepository = sessionRepository,
        _fcmService = fcmService,
+       _monitoringSuppressService = monitoringSuppressService,
        super(const AuthInitial()) {
     on<AuthSignUpRequested>(_onSignUpRequested);
     on<AuthSignInRequested>(_onSignInRequested);
@@ -32,6 +35,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   final AuthRepository _authRepository;
   final SessionRepository _sessionRepository;
   final FcmService _fcmService;
+  final MonitoringSuppressService _monitoringSuppressService;
 
   Future<void> _onSignUpRequested(
     AuthSignUpRequested event,
@@ -149,10 +153,12 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   ) async {
     emit(const AuthLoading());
     final result = await _authRepository.signOut();
-    result.fold(
-      (failure) => emit(AuthFailure(failure.message)),
-      (_) => emit(const AuthSignedOut()),
-    );
+    await result.fold((failure) async => emit(AuthFailure(failure.message)), (
+      _,
+    ) async {
+      await _monitoringSuppressService.clearAll();
+      emit(const AuthSignedOut());
+    });
   }
 
   Future<void> _provisionAndEmitSuccess(

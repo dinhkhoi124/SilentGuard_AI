@@ -5,6 +5,7 @@ import 'package:mobile/features/reports/domain/entities/event_history_item.dart'
 import 'package:mobile/features/reports/presentation/cubit/event_history_cubit.dart';
 import 'package:mobile/features/reports/presentation/cubit/event_history_state.dart';
 import 'package:mobile/features/reports/presentation/mappers/event_history_display_mapper.dart';
+import 'package:mobile/core/widgets/app_empty_state.dart';
 import 'package:mobile/features/reports/presentation/widgets/recent_event_tile.dart';
 import 'package:mobile/features/reports/presentation/widgets/report_section_header.dart';
 
@@ -113,18 +114,12 @@ class _EmptyBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 20),
-      child: Center(
-        child: Text(
-          'Chưa có sự kiện nào.',
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: isDark
-                ? Theme.of(context).colorScheme.onSurfaceVariant
-                : AppColors.mutedText,
-          ),
-        ),
-      ),
+    return const AppEmptyState(
+      icon: Icons.history_outlined,
+      title: 'Chưa có sự kiện gần đây',
+      message:
+          'Khi hệ thống ghi nhận cảnh báo, các sự kiện mới nhất sẽ xuất hiện tại đây.',
+      compact: true,
     );
   }
 }

@@ -14,6 +14,9 @@ class EventHistoryCubit extends Cubit<EventHistoryState> {
   final GetEventHistory _getEventHistory;
   final SessionRepository _sessionRepository;
 
+  String? _fromDate;
+  String? _toDate;
+
   /// Loads the first page on screen entry.
   /// Reads [household_id] from the cached session — no extra network call.
   Future<void> loadInitial() async {
@@ -44,9 +47,24 @@ class EventHistoryCubit extends Cubit<EventHistoryState> {
     await _fetch(householdId);
   }
 
+  /// Filters history by date range and reloads
+  Future<void> filterByDate(String fromDate, String toDate) async {
+    _fromDate = fromDate;
+    _toDate = toDate;
+    final householdId = _sessionRepository.currentHouseholdId;
+    if (householdId == null || householdId.isEmpty) return;
+
+    emit(const EventHistoryLoading());
+    await _fetch(householdId);
+  }
+
   Future<void> _fetch(String householdId) async {
     final result = await _getEventHistory(
-      GetEventHistoryParams(householdId: householdId),
+      GetEventHistoryParams(
+        householdId: householdId,
+        fromDate: _fromDate,
+        toDate: _toDate,
+      ),
     );
 
     if (isClosed) return;

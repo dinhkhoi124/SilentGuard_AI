@@ -10,7 +10,7 @@ import 'package:mobile/features/reports/presentation/widgets/recent_events_secti
 import 'package:mobile/features/reports/presentation/widgets/report_metric_grid.dart';
 import 'package:mobile/features/reports/presentation/widgets/report_summary_card.dart';
 import 'package:mobile/features/reports/presentation/widgets/reports_header.dart';
-import 'package:mobile/features/reports/presentation/widgets/safety_trend_chart.dart';
+import 'package:mobile/features/reports/presentation/widgets/weekly_trend_chart_card.dart';
 import 'package:mobile/injection_container.dart';
 
 /// Reports tab — top-level composition only.
@@ -93,12 +93,7 @@ class _ReportsPageBody extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 32),
-                SafetyTrendChart(
-                  onFilterTap: () => _showComingSoonSnackBar(
-                    context,
-                    'Bộ lọc thời gian sẽ được kết nối sau.',
-                  ),
-                ),
+                const WeeklyTrendChartCard(),
                 const SizedBox(height: 32),
                 const AiDailySummaryCard(),
                 const SizedBox(height: 32),

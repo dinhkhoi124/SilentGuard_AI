@@ -277,11 +277,12 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
       },
       (streamUrl) {
         final trimmedUrl = streamUrl.trim();
-        if (trimmedUrl.isEmpty) {
+        if (!_isPlayableHlsUrl(trimmedUrl)) {
           emit(
             CameraStreamUrlFailure(
               cameraId: event.cameraId,
-              message: 'Imou Cloud chưa trả về đường dẫn phát trực tiếp.',
+              message:
+                  'Không tìm thấy luồng trực tiếp tương thích từ Imou Cloud. Vui lòng thử lại sau.',
             ),
           );
           return;
@@ -294,6 +295,14 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
         );
       },
     );
+  }
+
+  bool _isPlayableHlsUrl(String url) {
+    final uri = Uri.tryParse(url);
+    if (uri == null || uri.host.isEmpty || uri.port == 8890) return false;
+    final scheme = uri.scheme.toLowerCase();
+    return (scheme == 'http' || scheme == 'https') &&
+        uri.path.toLowerCase().endsWith('.m3u8');
   }
 
   /// Chuyển đổi trạng thái bật/tắt (toggle) của các phụ kiện đi kèm camera

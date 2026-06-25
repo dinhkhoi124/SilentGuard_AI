@@ -66,6 +66,13 @@ class NotificationsCubit extends Cubit<NotificationsState> {
     emit(state.copyWith(notifications: updated));
   }
 
+  void removeByInviteRequestId(String inviteRequestId) {
+    final updated = state.notifications
+        .where((n) => n.inviteRequestId != inviteRequestId)
+        .toList(growable: false);
+    emit(state.copyWith(notifications: updated));
+  }
+
   Future<void> markAllRead() async {
     if (!state.hasUnread) return;
     final updated = state.notifications

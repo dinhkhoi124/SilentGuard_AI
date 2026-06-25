@@ -21,7 +21,7 @@ class InviteRequest extends Equatable {
 
   factory InviteRequest.fromJson(Map<String, dynamic> json) {
     return InviteRequest(
-      inviteRequestId: json['invite_request_id']?.toString() ?? '',
+      inviteRequestId: json['id']?.toString() ?? '',
       householdId: json['household_id']?.toString() ?? '',
       householdName: json['household_name']?.toString() ?? '',
       inviterName: json['inviter_name']?.toString() ?? '',

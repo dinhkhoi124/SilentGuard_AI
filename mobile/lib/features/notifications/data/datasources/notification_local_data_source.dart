@@ -23,6 +23,16 @@ class NotificationLocalDataSource {
     await _preferences.setString(storageKey, encodeNotifications(trimmed));
   }
 
+  Future<void> removeNotificationByInviteRequestId(
+    String inviteRequestId,
+  ) async {
+    final all = await loadNotifications();
+    final filtered = all
+        .where((n) => n.inviteRequestId != inviteRequestId)
+        .toList();
+    await saveNotifications(filtered);
+  }
+
   static List<NotificationAlert> decodeNotifications(String? raw) {
     if (raw == null || raw.trim().isEmpty) return const [];
 

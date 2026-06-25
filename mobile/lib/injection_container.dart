@@ -174,7 +174,7 @@ Future<void> init() async {
     )
     ..registerFactory(() => EmergencyContactsCubit(sl()))
     ..registerFactory(() => InviteManagementCubit(sl()))
-    ..registerFactory(() => PendingInvitesCubit(sl()))
+    ..registerFactory(() => PendingInvitesCubit(sl(), sl(), sl(), sl(), sl()))
     ..registerLazySingleton<DeviceRemoteDataSource>(
       () =>
           DeviceRemoteDataSourceImpl(apiClient: sl(), sessionRepository: sl()),

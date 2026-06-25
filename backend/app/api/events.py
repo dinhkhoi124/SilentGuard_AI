@@ -28,7 +28,7 @@ async def notify_ai_server(video_url: str, upload_token: str, backend_detect_url
     
     try:
         async with httpx.AsyncClient() as client:
-            response = await client.post(url, json=payload, timeout=10.0)
+            response = await client.post(url, json=payload, timeout=60.0)
             print(f"[Backend] AI Server response: {response.status_code} - {response.text}")
     except Exception as e:
         print(f"[Backend] Failed to trigger AI Server: {e}")
@@ -187,7 +187,7 @@ async def get_upload_status(upload_token: str):
 
         if upload.get("status") == "processed" and upload.get("event_id"):
             event_res = supabase.table("events")\
-                .select("event_id, severity, confidence, duration_sec, room, llm_message, timestamp, status")\
+                .select("event_id, event_type, severity, confidence, duration_sec, room, llm_message, timestamp, status")\
                 .eq("id", upload.get("event_id"))\
                 .execute()
 

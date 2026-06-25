@@ -30,112 +30,123 @@ class CameraVideoPlayer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        child: AspectRatio(
-          aspectRatio: 16 / 9,
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              CameraLivePreview(
-                rtspUrl: rtspUrl,
-                onFrameCaptured: onFrameCaptured,
-                isLoading: isLoading,
-                errorMessage: errorMessage,
-                onRetry: onRetry,
-              ),
-              Positioned(
-                top: 10,
-                left: 10,
-                child: Row(
-                  children: [
-                    _OverlayPill(
-                      color: Colors.white,
-                      children: const [
-                        _StatusDot(),
-                        SizedBox(width: 5),
-                        Text(
-                          'TRỰC TIẾP',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.darkText,
-                          ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth - 32; // horizontal padding 16 * 2
+        final height = width * 9 / 16;
+
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: SizedBox(
+              width: width,
+              height: height,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  CameraLivePreview(
+                    rtspUrl: rtspUrl,
+                    onFrameCaptured: onFrameCaptured,
+                    isLoading: isLoading,
+                    errorMessage: errorMessage,
+                    onRetry: onRetry,
+                  ),
+                  Positioned(
+                    top: 10,
+                    left: 10,
+                    child: Row(
+                      children: [
+                        const _OverlayPill(
+                          color: Colors.white,
+                          children: [
+                            _StatusDot(),
+                            SizedBox(width: 5),
+                            Text(
+                              'TRỰC TIẾP',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.darkText,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(width: 8),
+                        const _RoundOverlayButton(
+                          icon: Icons.volume_up_outlined,
+                          backgroundColor: Colors.white,
+                          iconColor: AppColors.darkText,
                         ),
                       ],
                     ),
-                    const SizedBox(width: 8),
-                    const _RoundOverlayButton(
-                      icon: Icons.volume_up_outlined,
-                      backgroundColor: Colors.white,
-                      iconColor: AppColors.darkText,
-                    ),
-                  ],
-                ),
-              ),
-              const Positioned(
-                top: 10,
-                right: 10,
-                child: Row(
-                  children: [
-                    _OverlayPill(
-                      color: Colors.black54,
+                  ),
+                  const Positioned(
+                    top: 10,
+                    right: 10,
+                    child: Row(
                       children: [
-                        Icon(
-                          Icons.people_outline,
-                          size: 14,
+                        _OverlayPill(
+                          color: Colors.black54,
+                          children: [
+                            Icon(
+                              Icons.people_outline,
+                              size: 14,
+                              color: Colors.white,
+                            ),
+                            SizedBox(width: 5),
+                            Text(
+                              '1 người',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
+                        ),
+                        SizedBox(width: 8),
+                        _RoundOverlayButton(
+                          icon: Icons.fullscreen,
+                          backgroundColor: Colors.black54,
+                          iconColor: Colors.white,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Positioned(
+                    bottom: 10,
+                    left: 10,
+                    child: _VideoLabel(
+                      child: Text(
+                        'HD',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
                           color: Colors.white,
                         ),
-                        SizedBox(width: 5),
-                        Text(
-                          '1 người',
-                          style: TextStyle(fontSize: 11, color: Colors.white),
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    bottom: 10,
+                    right: 10,
+                    child: _VideoLabel(
+                      child: Text(
+                        currentTime,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: Colors.white,
+                          fontFamily: 'monospace',
                         ),
-                      ],
-                    ),
-                    SizedBox(width: 8),
-                    _RoundOverlayButton(
-                      icon: Icons.fullscreen,
-                      backgroundColor: Colors.black54,
-                      iconColor: Colors.white,
-                    ),
-                  ],
-                ),
-              ),
-              const Positioned(
-                bottom: 10,
-                left: 10,
-                child: _VideoLabel(
-                  child: Text(
-                    'HD',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
+                      ),
                     ),
                   ),
-                ),
+                ],
               ),
-              Positioned(
-                bottom: 10,
-                right: 10,
-                child: _VideoLabel(
-                  child: Text(
-                    currentTime,
-                    style: const TextStyle(
-                      fontSize: 11,
-                      color: Colors.white,
-                      fontFamily: 'monospace',
-                    ),
-                  ),
-                ),
-              ),
-            ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }
@@ -180,6 +191,12 @@ class _CameraLivePreviewState extends State<CameraLivePreview> {
   @override
   void initState() {
     super.initState();
+    debugPrint(
+      '[VideoPlayer] player init with url: ${_redactedStreamUrl(widget.rtspUrl)}',
+    );
+    debugPrint(
+      '[VideoPlayer] init timestamp: ${DateTime.now().toIso8601String()}',
+    );
     MediaKit.ensureInitialized();
     _initController();
   }
@@ -189,6 +206,11 @@ class _CameraLivePreviewState extends State<CameraLivePreview> {
     super.didUpdateWidget(oldWidget);
 
     if (oldWidget.rtspUrl != widget.rtspUrl) {
+      debugPrint(
+        '[VideoPlayer] URL changed from: '
+        '${_redactedStreamUrl(oldWidget.rtspUrl)} to: '
+        '${_redactedStreamUrl(widget.rtspUrl)}',
+      );
       final streamUrl = widget.rtspUrl?.trim();
       if (streamUrl == null || streamUrl.isEmpty) {
         unawaited(_player?.stop());
@@ -203,10 +225,16 @@ class _CameraLivePreviewState extends State<CameraLivePreview> {
           _isOpening = true;
           _errorMessage = null;
         });
+        debugPrint(
+          '[VideoPlayer] open() called at: ${DateTime.now().toIso8601String()}',
+        );
         unawaited(
           _player!
               .open(Media(streamUrl), play: true)
-              .catchError((Object _) {
+              .catchError((Object error) {
+                debugPrint(
+                  '[VideoPlayer] playback error: $error at ${DateTime.now().toIso8601String()}',
+                );
                 debugPrint('[media_kit] stream open failed');
                 if (mounted) {
                   setState(() {
@@ -265,7 +293,9 @@ class _CameraLivePreviewState extends State<CameraLivePreview> {
   }
 
   Future<void> _ensureNativeMediaKitRegistered() async {
-    if (!Platform.isAndroid || _nativeMediaKitRegistered) return;
+    if ((!Platform.isAndroid && !Platform.isIOS) || _nativeMediaKitRegistered) {
+      return;
+    }
     await _mediaKitChannel.invokeMethod<void>('registerMediaKit');
     _nativeMediaKitRegistered = true;
   }
@@ -306,8 +336,14 @@ class _CameraLivePreviewState extends State<CameraLivePreview> {
 
       try {
         if (_rejectUnsupportedStream(streamUrl)) return;
+        debugPrint(
+          '[VideoPlayer] open() called at: ${DateTime.now().toIso8601String()}',
+        );
         await player.open(Media(streamUrl), play: true);
-      } catch (_) {
+      } catch (error) {
+        debugPrint(
+          '[VideoPlayer] playback error: $error at ${DateTime.now().toIso8601String()}',
+        );
         debugPrint('[media_kit] stream open failed');
         if (mounted) {
           setState(
@@ -334,6 +370,9 @@ class _CameraLivePreviewState extends State<CameraLivePreview> {
   void _listenToPlayerLogs(Player player) {
     _playerSubscriptions.addAll([
       player.stream.error.listen((error) {
+        debugPrint(
+          '[VideoPlayer] playback error: $error at ${DateTime.now().toIso8601String()}',
+        );
         debugPrint('[media_kit] stream playback error');
         developer.log('Stream playback failed.', name: 'CameraLivePreview');
         if (!mounted || !identical(_player, player)) return;
@@ -413,27 +452,33 @@ class _CameraLivePreviewState extends State<CameraLivePreview> {
   Widget build(BuildContext context) {
     final videoController = _videoController;
 
-    // Video widget not yet created — show loading
-    if (videoController == null) {
+    // Error from parent (stream URL fetch failed, etc.)
+    if (widget.errorMessage != null && widget.errorMessage!.trim().isNotEmpty) {
+      return _VideoErrorView(
+        message: widget.errorMessage!,
+        onRetry: _retryStream,
+      );
+    }
+
+    // Internal player error
+    if (_errorMessage != null) {
+      return _VideoErrorView(message: _errorMessage!, onRetry: _retryStream);
+    }
+
+    // Video widget not yet created or loading
+    if (videoController == null || widget.isLoading || _isOpening) {
       return const _VideoLoadingView();
     }
 
-    // Video() stays mounted always once controller exists.
-    // Loading and error states overlay on top — never replace Video().
+    // Video is ready
     return Stack(
       fit: StackFit.expand,
       children: [
-        media_kit_video.Video(controller: videoController, fit: BoxFit.cover),
-        // Error from parent (stream URL fetch failed, etc.)
-        if (widget.errorMessage != null &&
-            widget.errorMessage!.trim().isNotEmpty)
-          _VideoErrorView(message: widget.errorMessage!, onRetry: _retryStream)
-        // Internal player error
-        else if (_errorMessage != null)
-          _VideoErrorView(message: _errorMessage!, onRetry: _retryStream)
-        // Loading overlay — semi-transparent so surface stays alive
-        else if (widget.isLoading || _isOpening)
-          const _VideoLoadingView(),
+        media_kit_video.Video(
+          controller: videoController,
+          fit: BoxFit.cover,
+          controls: media_kit_video.NoVideoControls,
+        ),
       ],
     );
   }
@@ -456,14 +501,44 @@ class _CameraLivePreviewState extends State<CameraLivePreview> {
   }
 }
 
+String _redactedStreamUrl(String? url) {
+  final uri = Uri.tryParse(url ?? '');
+  if (uri == null || uri.host.isEmpty) return 'unavailable';
+  final port = uri.hasPort ? ':${uri.port}' : '';
+  return '${uri.scheme}://${uri.host}$port';
+}
+
 class _VideoLoadingView extends StatelessWidget {
   const _VideoLoadingView();
 
   @override
   Widget build(BuildContext context) {
-    return const ColoredBox(
-      color: Colors.black,
-      child: Center(child: CircularProgressIndicator(color: AppColors.primary)),
+    return ColoredBox(
+      color: Colors.black87,
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: const [
+            SizedBox(
+              width: 32,
+              height: 32,
+              child: CircularProgressIndicator(
+                color: AppColors.primary,
+                strokeWidth: 3,
+              ),
+            ),
+            SizedBox(height: 16),
+            Text(
+              'Đang kết nối camera...',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -477,7 +552,7 @@ class _VideoErrorView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ColoredBox(
-      color: Colors.black,
+      color: Colors.black87,
       child: Center(
         child: Padding(
           padding: const EdgeInsets.all(18),
@@ -487,21 +562,36 @@ class _VideoErrorView extends StatelessWidget {
               const Icon(
                 Icons.videocam_off_outlined,
                 color: Colors.white70,
-                size: 30,
+                size: 36,
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 12),
               Text(
                 message,
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   color: Colors.white,
-                  fontSize: 13,
-                  height: 1.35,
-                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                  height: 1.4,
+                  fontWeight: FontWeight.w500,
                 ),
               ),
-              const SizedBox(height: 12),
-              FilledButton(onPressed: onRetry, child: const Text('Tải lại')),
+              const SizedBox(height: 16),
+              FilledButton.icon(
+                onPressed: onRetry,
+                icon: const Icon(Icons.refresh_rounded, size: 18),
+                label: const Text('Thử lại'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 10,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                ),
+              ),
             ],
           ),
         ),

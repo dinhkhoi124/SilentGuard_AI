@@ -1,9 +1,23 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel
 from app.core.security import get_current_user
 from app.core.supabase_client import supabase
 from app.models.schemas import FCMTokenUpdateRequest, SwitchHouseholdRequest
 
+def normalize_phone(phone: str) -> str:
+    """
+    Normalize Vietnamese phone number to E.164 format.
+    0xxxxxxxxx → +84xxxxxxxxx
+    """
+    phone = phone.strip().replace(" ", "").replace("-", "")
+    if phone.startswith("0"):
+        return "+84" + phone[1:]
+    if phone.startswith("84") and not phone.startswith("+"):
+        return "+" + phone
+    return phone
+
 router = APIRouter(prefix="/api/users", tags=["Users"])
+
 
 @router.post("/login", status_code=status.HTTP_200_OK)
 async def login_user(user: dict = Depends(get_current_user)):
@@ -92,4 +106,37 @@ async def switch_household(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={"error": {"code": "DATABASE_ERROR", "message": f"Failed to switch household: {str(e)}"}}
         )
+
+class UpdatePhoneRequest(BaseModel):
+    phone: str
+
+@router.patch("/me/phone", status_code=status.HTTP_200_OK)
+async def update_phone(
+    req: UpdatePhoneRequest,
+    user: dict = Depends(get_current_user)
+):
+    """
+    PATCH /api/users/me/phone
+    Updates the user's phone number, normalizing Vietnamese format to E.164.
+    """
+    user_id = user.get("id")
+    normalized = normalize_phone(req.phone)
+
+    # Basic E.164 validation after normalization
+    import re
+    if not re.match(r"^\+\d{10,15}$", normalized):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"error": {"code": "INVALID_PHONE", "message": "Số điện thoại không hợp lệ. Vui lòng nhập đúng định dạng (vd: 0347838309)"}}
+        )
+
+    try:
+        supabase.table("users").update({"phone": normalized}).eq("id", user_id).execute()
+        return {"status": "ok", "phone": normalized}
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={"error": {"code": "DATABASE_ERROR", "message": str(e)}}
+        )
+
 

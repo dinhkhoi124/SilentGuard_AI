@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mobile/core/theme/theme_controller.dart';
+import 'package:mobile/core/utils/app_colors.dart';
+import 'package:mobile/features/account/presentation/widgets/account_page_header.dart';
 import 'package:mobile/injection_container.dart';
 
 class AppAppearancePage extends StatelessWidget {
@@ -12,16 +14,14 @@ class AppAppearancePage extends StatelessWidget {
 
     return AnimatedBuilder(
       animation: themeController,
-      builder: (context, _) {
-        final colorScheme = Theme.of(context).colorScheme;
-
+      builder: (context, state) {
         return Scaffold(
-          backgroundColor: colorScheme.surface,
+          backgroundColor: Theme.of(context).scaffoldBackgroundColor,
           body: SafeArea(
             child: Column(
               children: [
-                _AppearanceHeader(onBack: () => context.pop()),
-                const SizedBox(height: 22),
+                const AccountPageHeader(title: 'Giao diện ứng dụng'),
+                const SizedBox(height: 12),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 24),
                   child: Column(
@@ -119,47 +119,6 @@ class AppAppearancePage extends StatelessWidget {
   }
 }
 
-class _AppearanceHeader extends StatelessWidget {
-  const _AppearanceHeader({required this.onBack});
-
-  final VoidCallback onBack;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return SizedBox(
-      height: 56,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Padding(
-              padding: const EdgeInsets.only(left: 8),
-              child: IconButton(
-                onPressed: onBack,
-                icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
-                color: colorScheme.onSurface,
-                tooltip: 'Quay lại',
-              ),
-            ),
-          ),
-          Text(
-            'Giao diện ứng dụng',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: colorScheme.onSurface,
-              fontSize: 21,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _SettingRow extends StatelessWidget {
   const _SettingRow({
     required this.label,
@@ -173,36 +132,39 @@ class _SettingRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final titleColor = isDark
+        ? theme.colorScheme.onSurface
+        : AppColors.darkText;
 
     return GestureDetector(
       onTap: onTap,
-      child: SizedBox(
-        height: 42,
+      child: Container(
+        height: 56,
+        color: Colors.transparent,
         child: Row(
           children: [
             Expanded(
               child: Text(
                 label,
-                style: TextStyle(
-                  color: colorScheme.onSurface,
-                  fontSize: 17,
-                  fontWeight: FontWeight.w700,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  color: titleColor,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ),
             Text(
               value,
-              style: TextStyle(
-                color: colorScheme.onSurfaceVariant,
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
+              style: theme.textTheme.titleMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w500,
               ),
             ),
             const SizedBox(width: 10),
             Icon(
               Icons.chevron_right_rounded,
-              color: colorScheme.onSurfaceVariant,
+              color: theme.colorScheme.onSurfaceVariant,
               size: 24,
             ),
           ],

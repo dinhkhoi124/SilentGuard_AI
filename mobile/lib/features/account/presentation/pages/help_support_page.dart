@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:mobile/features/account/presentation/widgets/help_support/help_support_header.dart';
+import 'package:mobile/features/account/presentation/widgets/account_page_header.dart';
 import 'package:mobile/features/account/presentation/widgets/help_support/help_support_menu_item.dart';
 
 const _items = [
@@ -38,7 +38,8 @@ class HelpSupportPage extends StatelessWidget {
       body: SafeArea(
         child: Column(
           children: [
-            const HelpSupportHeader(),
+            const AccountPageHeader(title: 'Trợ giúp và hỗ trợ'),
+            const SizedBox(height: 12),
             Expanded(
               child: ListView.builder(
                 padding: const EdgeInsets.only(bottom: 20),

@@ -43,6 +43,14 @@ class _AccountPageState extends State<AccountPage> {
     Navigator.of(context, rootNavigator: true).pop();
   }
 
+  void _showComingSoonSnackBar(BuildContext context) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        const SnackBar(content: Text('Tính năng này sẽ sớm phát triển.')),
+      );
+  }
+
   @override
   Widget build(BuildContext context) {
     final authRepository = sl<AuthRepository>();
@@ -91,41 +99,48 @@ class _AccountPageState extends State<AccountPage> {
                     const SizedBox(height: 28),
                     const _SectionLabel('Cài đặt chung'),
                     const SizedBox(height: 6),
-                    const _AccountMenuTile(
+                    _AccountMenuTile(
                       icon: Iconsax.home,
                       title: 'Quản lý nhà',
+                      onTap: () => _showComingSoonSnackBar(context),
                     ),
-                    const _AccountMenuTile(
+                    _AccountMenuTile(
                       icon: Iconsax.microphone,
                       title: 'Trợ lý giọng nói',
+                      onTap: () => _showComingSoonSnackBar(context),
                     ),
-                    const _AccountMenuTile(
+                    _AccountMenuTile(
                       icon: Iconsax.notification,
                       title: 'Thông báo',
+                      onTap: () => context.push('/notification-settings'),
                     ),
-                    const _AccountMenuTile(
+                    _AccountMenuTile(
                       icon: Iconsax.shield_tick,
                       title: 'Tài khoản & bảo mật',
+                      onTap: () => _showComingSoonSnackBar(context),
                     ),
-                    const _AccountMenuTile(
+                    _AccountMenuTile(
                       icon: Iconsax.link,
                       title: 'Tài khoản liên kết',
+                      onTap: () => _showComingSoonSnackBar(context),
                     ),
                     _AccountMenuTile(
                       icon: Iconsax.eye,
                       title: 'Giao diện ứng dụng',
                       onTap: () => context.push('/app-appearance'),
                     ),
-                    const _AccountMenuTile(
+                    _AccountMenuTile(
                       icon: Iconsax.setting_2,
                       title: 'Cài đặt bổ sung',
+                      onTap: () => _showComingSoonSnackBar(context),
                     ),
                     const SizedBox(height: 22),
                     const _SectionLabel('Hỗ trợ'),
                     const SizedBox(height: 6),
-                    const _AccountMenuTile(
+                    _AccountMenuTile(
                       icon: Iconsax.chart_2,
                       title: 'Dữ liệu & phân tích',
+                      onTap: () => _showComingSoonSnackBar(context),
                     ),
                     _AccountMenuTile(
                       icon: Iconsax.document_text,

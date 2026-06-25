@@ -6,6 +6,7 @@ import 'package:mobile/core/utils/app_colors.dart';
 import 'package:mobile/features/automation/domain/entities/emergency_contact.dart';
 import 'package:mobile/features/automation/presentation/cubit/emergency_contacts_cubit.dart';
 import 'package:mobile/features/automation/presentation/cubit/emergency_contacts_state.dart';
+import 'package:mobile/core/widgets/app_empty_state.dart';
 import 'package:mobile/features/automation/presentation/widgets/emergency_contact_form_sheet.dart';
 import 'package:mobile/injection_container.dart';
 
@@ -82,51 +83,11 @@ class _EmergencyContactsView extends StatelessWidget {
               if (contacts.isEmpty)
                 SliverFillRemaining(
                   hasScrollBody: false,
-                  child: Center(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 32),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(24),
-                            decoration: BoxDecoration(
-                              color: isDark
-                                  ? theme.colorScheme.surfaceContainerHighest
-                                  : const Color(0xFFF0F4F8),
-                              shape: BoxShape.circle,
-                            ),
-                            child: Icon(
-                              Icons.contact_phone_outlined,
-                              size: 48,
-                              color: isDark
-                                  ? theme.colorScheme.primary
-                                  : AppColors.primary,
-                            ),
-                          ),
-                          const SizedBox(height: 24),
-                          Text(
-                            'Chưa có liên hệ nào',
-                            style: theme.textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: isDark
-                                  ? theme.colorScheme.onSurface
-                                  : AppColors.darkText,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Thêm số điện thoại người thân để gọi nhanh khi có cảnh báo.',
-                            textAlign: TextAlign.center,
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: isDark
-                                  ? theme.colorScheme.onSurfaceVariant
-                                  : AppColors.mutedText,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                  child: const AppEmptyState(
+                    icon: Icons.contact_phone_outlined,
+                    title: 'Chưa có liên hệ khẩn cấp',
+                    message:
+                        'Thêm người thân để họ có thể nhận cảnh báo và hỗ trợ khi cần.',
                   ),
                 )
               else

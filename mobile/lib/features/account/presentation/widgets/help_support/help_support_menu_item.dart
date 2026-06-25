@@ -34,8 +34,7 @@ class HelpSupportMenuItem extends StatelessWidget {
                 label,
                 style: theme.textTheme.titleMedium?.copyWith(
                   color: textColor,
-                  fontWeight: FontWeight.w500,
-                  letterSpacing: -0.3,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ),

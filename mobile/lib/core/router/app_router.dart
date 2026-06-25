@@ -14,6 +14,7 @@ import 'package:mobile/core/utils/app_colors.dart';
 import 'package:mobile/features/account/presentation/pages/app_appearance_page.dart';
 import 'package:mobile/features/account/presentation/pages/faq_page.dart';
 import 'package:mobile/features/account/presentation/pages/help_support_page.dart';
+import 'package:mobile/features/account/presentation/pages/notification_settings_page.dart';
 import 'package:mobile/features/account/presentation/pages/privacy_policy_page.dart';
 import 'package:mobile/features/devices/presentation/bloc/device_pairing_bloc.dart';
 import 'package:mobile/features/devices/presentation/bloc/device_pairing_event.dart';
@@ -117,6 +118,10 @@ class AppRouter {
       GoRoute(
         path: '/app-appearance',
         builder: (context, state) => const AppAppearancePage(),
+      ),
+      GoRoute(
+        path: '/notification-settings',
+        builder: (context, state) => const NotificationSettingsPage(),
       ),
       GoRoute(
         path: '/help-support',

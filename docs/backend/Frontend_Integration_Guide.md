@@ -93,6 +93,23 @@ Authorization: Bearer <FIREBASE_ID_TOKEN>
 
 ---
 
+### 3.2a Xóa tài khoản (GDPR Compliance) (`DELETE /api/users/me`)
+Xóa vĩnh viễn tài khoản người dùng và tất cả dữ liệu cá nhân liên quan. Cần thiết để đáp ứng chính sách xét duyệt của Apple App Store và Google Play.
+
+- **Headers**:
+```http
+Authorization: Bearer <FIREBASE_ID_TOKEN>
+```
+- **Response 200 OK**:
+```json
+{
+  "status": "ok",
+  "message": "Tài khoản đã được xóa thành công"
+}
+```
+
+---
+
 ### 3.3 Đăng ký FCM token nhận Push Notification (`POST /api/users/device-token`)
 Gọi mỗi khi ứng dụng khởi chạy hoặc khi token FCM thay đổi (rotate) để đảm bảo nhận được thông báo khẩn cấp.
 
@@ -875,3 +892,4 @@ Khi API gặp lỗi xử lý, Backend sẽ trả về định dạng JSON chuẩ
 ### 5.2 Xử lý leo thang đối với sự kiện HIGH (Nguy hiểm)
 1. **Thông báo đẩy (Push Notification)**: Gửi cảnh báo tức thì tới người liên hệ chính (Primary Contact).
 2. **Leo thang sau 3 phút**: Nếu sau 3 phút kể từ khi phát hiện sự kiện mà người liên hệ chính chưa xác nhận, hệ thống sẽ thực hiện cuộc gọi VoIP (Twilio) tới người liên hệ phụ tiếp theo (contacts[1]) để cảnh báo.
+

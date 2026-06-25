@@ -1,6 +1,7 @@
 # SilentGuard AI — Backend Design Document (MVP V1)
 
 > Stack: **FastAPI (Python) + Supabase (Postgres + Storage)**, xác thực qua **Firebase Auth** (verify token), push qua **Firebase Cloud Messaging (FCM)**, LLM qua **Claude API**.
+> **Performance**: Toàn bộ các tương tác I/O ngoại vi (FCM, LLM, Supabase Storage) đều được chuyển sang ThreadPool (Non-blocking I/O) để đảm bảo 100% không đóng băng Event Loop.
 
 ---
 
@@ -485,6 +486,19 @@ Verify Firebase Token của người dùng, thực hiện JIT Provisioning (kh�
   ```json
   {
     "updated": true
+  }
+  ```
+
+#### 4.6.4 `DELETE /api/users/me`
+Xóa vĩnh viễn tài khoản (Tuân thủ GDPR / Apple App Store).
+
+- **Headers**:
+  - `Authorization: Bearer <idToken>` (Bắt buộc)
+- **Response 200 OK**:
+  ```json
+  {
+    "status": "ok",
+    "message": "Tài khoản đã được xóa thành công"
   }
   ```
 

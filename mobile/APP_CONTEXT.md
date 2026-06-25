@@ -150,16 +150,18 @@ Thanh phan chinh:
 
 - `core/services/fcm_service.dart`
 - `core/services/local_notification_service.dart`
+- `core/services/monitoring_suppress_service.dart`
 - `features/notifications/data/datasources/notification_local_data_source.dart`
 - `features/notifications/presentation/cubit/notifications_cubit.dart`
 - `features/notifications/presentation/pages/notifications_page.dart`
+- `features/notifications/presentation/widgets/notification_segmented_tab_bar.dart`
 
 Flow hien tai:
 
-- Foreground FCM: persist + hien local notification/in-app handling
-- Background FCM: `firebaseMessagingBackgroundHandler` persist message qua `NotificationLocalDataSource.saveBackgroundMessage(...)`
-- Open from terminated: `AppInitializer` doc initial alert va navigate
-- Open from local notification: parse payload, persist, navigate
+- Foreground FCM: kiem tra suppress locally truoc. Neu khong bi suppress: ghi nhan tin nhan + hien thi local notification qua `LocalNotificationService`.
+- Background FCM: `firebaseMessagingBackgroundHandler` luu tru tin nhan bang `NotificationLocalDataSource.saveBackgroundMessage(...)`.
+- Open from terminated: `AppInitializer` kiem tra suppress, doc tin nhan va dieu huong.
+- Open from local notification: dieu huong den camera detail hoac trang chu.
 
 Local persistence:
 
@@ -172,6 +174,9 @@ Navigation tu notification:
 - neu khong -> `go('/home')`
 
 Ngoai FCM, startup con inject pending household invites vao notification list de user thay loi moi.
+
+Tich hop Suppression:
+- `FcmService` tich hop `MonitoringSuppressService` de loc bo cac canh bao `fall_alert` tu camera dang trong thoi gian tam dung giam sat (suppressed).
 
 ## 7. Navigation va app shell
 
@@ -191,6 +196,7 @@ Route hien co:
 - `/faq`
 - `/privacy-policy`
 - `/notifications`
+- `/notification-settings`
 - `/camera/:id`
 
 Luu y:
@@ -216,7 +222,9 @@ Thanh phan chinh:
 - `HomeBloc`
 - `HomePage`
 - `CameraDetailPage`
-- widgets cho weather, camera grid, room filter, camera card
+- `SuppressCubit`
+- `MonitoringSuppressService`
+- widgets cho safety_weather_card, camera grid, room filter, camera card, camera_action_buttons
 
 `HomeBloc` quan ly it nhat cac viec sau:
 
@@ -228,6 +236,11 @@ Thanh phan chinh:
 - stream URL loading cho camera detail
 - backend warm-up state
 - unauthorized state
+
+`SuppressCubit` & `MonitoringSuppressService`:
+- Quan ly viec tam dung giam sat/gui canh bao tu camera theo thoi gian duoc chon (30 phut, 2 gio, 12 gio, 24 gio).
+- Luu tru thoi gian tam dung vao `SharedPreferencesAsync`.
+- Cap nhat bo dem nguoc realtime va cap nhat trang thai UI cua nut bam trong `CameraDetailPage`.
 
 ### 8.2 `features/devices`
 
@@ -253,6 +266,9 @@ Bao cao va lich su su kien:
 - `ReportsPage`
 - `EventHistoryCubit`
 - `EventHistoryRemoteDataSource`
+- `WeeklyEventTrendAggregator`
+- `WeeklyTrendChartCard`
+- `AnimatedWeeklyBarChart`
 - mapper de bien event history thanh display model
 
 API dang dung:
@@ -268,6 +284,11 @@ Query params hien co:
 - `room`
 - `from_date`
 - `to_date`
+
+Bieu do xu huong tuan (Weekly Trend Chart):
+- Lay du lieu that tu backend thong qua `EventHistoryCubit` voi bo loc thoi gian 7 ngay gan nhat.
+- Su dung `WeeklyEventTrendAggregator` de nhom cac su kien theo tung thu trong tuan va theo muc do nghiem trong (severity).
+- Hien thi bieu do cot dong `AnimatedWeeklyBarChart` phan chia theo mau sac cua muc do su co.
 
 ### 8.4 `features/automation`
 
@@ -323,6 +344,8 @@ Hien co:
 - `HelpSupportPage`
 - `FaqPage`
 - `PrivacyPolicyPage`
+- `NotificationSettingsPage`
+- `AccountPageHeader` (Header thong nhat cho cac trang con thuoc Account)
 
 Asset markdown:
 
@@ -399,10 +422,12 @@ Camera detail hien tai phu thuoc vao:
 - `AuthNotifier`
 - `LocalNotificationService`
 - `FcmService`
+- `MonitoringSuppressService`
 - `NotificationsCubit`
 - `AuthBloc`
 - `HomeBloc`
 - `VideoUploadBloc`
+- `SuppressCubit`
 - `DevicePairingBloc`
 - `EmergencyContactsCubit`
 - `InviteManagementCubit`
@@ -448,11 +473,17 @@ Tu code hien tai co the thay app dang goi nhom API sau:
 Gan day app da co nhieu dieu chinh de nang cao trai nghiem nguoi dung va tinh dong nhat (premium UI):
 
 - **Empty States**: Su dung `AppEmptyState` voi minh hoa va animation thay vi text trong rong.
-- **Home Tab**: Weather card duoc nang cap thanh "Safety + Weather Hybrid Card" tap trung vao an toan gia dinh, ket hop gradient va typography hien dai.
-- **Reports**: Chon khoang thoi gian qua Bottom Sheet co chon loc thay vi Dropdown menu de toi uu mobile UX.
-- **Video Upload**: Bo sung Intro Bottom Sheet de giai thich muc dich truoc khi mo gallery chon file.
-- **Account Tab**: Dong nhat header (`AccountPageHeader`) va padding cho cac trang con (Thong bao, Giao dien, Tro giup). Cac tinh nang chua hoan thien se hien thong bao "Coming soon".
-- **Camera Detail**: Khung video duoc fix cung ty le 16:9 de tranh loi layout chiem toan man hinh tren iPhone, kem loading/error states ro rang.
+- **Home Tab**: Weather card duoc nang cap thanh "Safety + Weather Hybrid Card" (file `safety_weather_card.dart`) tap trung vao an toan gia dinh, ket hop gradient va typography hien dai. Bo tri 2 cot phan tren (Safety ben trai, Weather capsule ben phai) va hang metric duoc boc trong widget `Wrap` de tranh tran nut (overflow clipping) tren cac thiet bi man hinh nho.
+- **Reports (Bieu do & Su kien)**: 
+  - Chon khoang thoi gian qua Bottom Sheet co chon loc thay vi Dropdown menu de toi uu mobile UX.
+  - Bieu do xu huong tuan duoc thay the bang bieu do cot dong (`AnimatedWeeklyBarChart`) tich hop truc tiep du lieu su kien tu thuc te, phan tact severity theo cac tong mau thong nhat.
+  - Fix loi layout bi co rut khi xay ra loi tai su kien o phan bottom screen bang cach set layout full-width va dung component `AppEmptyState` dong bo.
+- **Video Upload**: Bo sung Intro Bottom Sheet (`video_upload_intro_sheet.dart`) de giai thich chi tiet ve tinh nang gui video phan tich AI truoc khi mo thu vien.
+- **Account Tab**: Dong nhat header (`AccountPageHeader`) va padding cho cac trang con (Thong bao, Giao dien, Tro giup). Cac tinh nang chua hoan thien se hien thong bao "Coming soon". Them trang `/notification-settings` cho phep nguoi dung tuy chinh thiet lap canh bao.
+- **Camera Detail**: 
+  - Khung video duoc fix cung ty le 16:9 de tranh loi layout chiem toan man hinh tren iPhone, giup noi dung phia duoi cuon (scrollable) binh thuong, kem loading/error states ro rang.
+  - Su kien gan day duoc lam moi card layout: loai bo mock image thumbnail do thuc te backend khong cung cap anh thumbnail, hien thi thong tin thuc te tu backend gom Duration, Confidence, Room, Status va Severity Badge thong nhat. Xoa bo cac so lieu test cung (`999s` / `95%` confidence) do day la mock data.
+  - Cho phep tam dung thong bao canh bao cua camera bang cach cham vao nut "Tam dung giam sat" voi lua chon khoang thoi gian giam sat (30m, 2h, 12h, 24h) cung hieu ung countdown chu ky giay tuyet dep.
 
 ## 13. Diem can luu y khi tiep tuc sua code
 
@@ -494,6 +525,8 @@ Neu sua reports:
 - `lib/features/reports/presentation/pages/reports_page.dart`
 - `lib/features/reports/presentation/cubit/event_history_cubit.dart`
 - `lib/features/reports/data/datasources/event_history_remote_datasource.dart`
+- `lib/features/reports/presentation/widgets/weekly_trend_chart_card.dart`
+- `lib/features/reports/presentation/widgets/animated_weekly_bar_chart.dart`
 
 Neu sua account/legal:
 

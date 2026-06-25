@@ -443,7 +443,18 @@ Tu code hien tai co the thay app dang goi nhom API sau:
 - Open-Meteo cho weather
 - Imou OpenAPI cho stream/device integration
 
-## 12. Diem can luu y khi tiep tuc sua code
+## 12. Giao dien (UI/UX) va Design System
+
+Gan day app da co nhieu dieu chinh de nang cao trai nghiem nguoi dung va tinh dong nhat (premium UI):
+
+- **Empty States**: Su dung `AppEmptyState` voi minh hoa va animation thay vi text trong rong.
+- **Home Tab**: Weather card duoc nang cap thanh "Safety + Weather Hybrid Card" tap trung vao an toan gia dinh, ket hop gradient va typography hien dai.
+- **Reports**: Chon khoang thoi gian qua Bottom Sheet co chon loc thay vi Dropdown menu de toi uu mobile UX.
+- **Video Upload**: Bo sung Intro Bottom Sheet de giai thich muc dich truoc khi mo gallery chon file.
+- **Account Tab**: Dong nhat header (`AccountPageHeader`) va padding cho cac trang con (Thong bao, Giao dien, Tro giup). Cac tinh nang chua hoan thien se hien thong bao "Coming soon".
+- **Camera Detail**: Khung video duoc fix cung ty le 16:9 de tranh loi layout chiem toan man hinh tren iPhone, kem loading/error states ro rang.
+
+## 13. Diem can luu y khi tiep tuc sua code
 
 - Branding dang lech giua `WatchNest`, `SilentGuard`, va `SlientGuard`
 - Nhieu chuoi tieng Viet trong source dang bi loi encoding
@@ -454,7 +465,7 @@ Tu code hien tai co the thay app dang goi nhom API sau:
 - Notification list khong chi den tu FCM; startup con bom them pending household invites
 - Mot so UI trong Automation/Account la placeholder hoac chua noi backend that
 
-## 13. File nen doc dau tien theo tung loai task
+## 14. File nen doc dau tien theo tung loai task
 
 Neu sua startup/auth:
 
@@ -490,6 +501,6 @@ Neu sua account/legal:
 - `faq.md`
 - `privacy-policy.md`
 
-## 14. Tom tat 1 cau
+## 15. Tom tat 1 cau
 
 App mobile hien la mot Flutter app cho giam sat an toan gia dinh, dung Firebase auth + Railway backend + FCM/local notifications + Imou/media streaming, trong do `HomePage` la app shell 4 tab va startup flow da duoc tach de first frame len nhanh hon.

@@ -10,6 +10,8 @@ import 'package:mobile/features/notifications/presentation/cubit/notifications_s
 import 'package:mobile/features/session/domain/repositories/session_repository.dart';
 import 'package:mobile/features/household_invite/presentation/cubit/pending_invites_cubit.dart';
 import 'package:mobile/features/household_invite/presentation/cubit/pending_invites_state.dart';
+import 'package:mobile/core/widgets/app_empty_state.dart';
+import 'package:mobile/features/notifications/presentation/widgets/notification_segmented_tab_bar.dart';
 import 'package:mobile/injection_container.dart' as di;
 
 class NotificationsPage extends StatefulWidget {
@@ -79,13 +81,15 @@ class _NotificationsPageState extends State<NotificationsPage>
                     ? () {
                         if (_tabController.index == 0) {
                           for (final n in alertNotifications) {
-                            if (!n.isRead)
+                            if (!n.isRead) {
                               context.read<NotificationsCubit>().markRead(n.id);
+                            }
                           }
                         } else if (_tabController.index == 1) {
                           for (final n in inviteNotifications) {
-                            if (!n.isRead)
+                            if (!n.isRead) {
                               context.read<NotificationsCubit>().markRead(n.id);
+                            }
                           }
                         }
                       }
@@ -93,24 +97,10 @@ class _NotificationsPageState extends State<NotificationsPage>
                 child: const Text('Đánh dấu đã đọc'),
               ),
             ],
-            bottom: TabBar(
+            bottom: NotificationSegmentedTabBar(
               controller: _tabController,
-              tabs: [
-                Tab(
-                  child: Badge(
-                    isLabelVisible: unreadAlerts > 0,
-                    label: Text(unreadAlerts.toString()),
-                    child: const Text('Cảnh báo ngã'),
-                  ),
-                ),
-                Tab(
-                  child: Badge(
-                    isLabelVisible: unreadInvites > 0,
-                    label: Text(unreadInvites.toString()),
-                    child: const Text('Lời mời'),
-                  ),
-                ),
-              ],
+              unreadAlerts: unreadAlerts,
+              unreadInvites: unreadInvites,
             ),
           ),
           body: SafeArea(
@@ -135,10 +125,10 @@ class _NotificationsPageState extends State<NotificationsPage>
     if (notifications.isEmpty) {
       return _EmptyNotifications(
         icon: isInvite ? Iconsax.people : Iconsax.notification,
-        title: isInvite ? 'Chưa có lời mời' : 'Chưa có thông báo',
+        title: isInvite ? 'Không có lời mời nào' : 'Chưa có cảnh báo té ngã',
         subtitle: isInvite
-            ? 'Lời mời tham gia gia đình sẽ xuất hiện tại đây.'
-            : 'Các cảnh báo từ hệ thống sẽ xuất hiện tại đây.',
+            ? 'Các lời mời tham gia gia đình sẽ xuất hiện tại đây.'
+            : 'Khi hệ thống phát hiện sự cố, cảnh báo sẽ được hiển thị tại đây.',
       );
     }
 
@@ -391,42 +381,7 @@ class _EmptyNotifications extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 76,
-              height: 76,
-              decoration: BoxDecoration(
-                color: AppColors.lightBlue,
-                borderRadius: BorderRadius.circular(28),
-              ),
-              child: Icon(icon, color: AppColors.primary, size: 32),
-            ),
-            const SizedBox(height: 20),
-            Text(
-              title,
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                color: AppColors.darkText,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              subtitle,
-              textAlign: TextAlign.center,
-              style: Theme.of(
-                context,
-              ).textTheme.bodyMedium?.copyWith(color: AppColors.mutedText),
-            ),
-          ],
-        ),
-      ),
-    );
+    return AppEmptyState(icon: icon, title: title, message: subtitle);
   }
 }
 

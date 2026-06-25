@@ -72,8 +72,8 @@ class NotificationLocalDataSource {
       final alert = NotificationAlert.fromPayload(
         Map<String, dynamic>.from(message.data),
         messageId: message.messageId,
-        title: message.notification?.title,
-        body: message.notification?.body,
+        title: message.notification?.title ?? message.data['title']?.toString(),
+        body: message.notification?.body ?? message.data['body']?.toString(),
         receivedAt: message.sentTime,
       );
       await preferences.setString(

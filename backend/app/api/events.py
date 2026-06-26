@@ -305,11 +305,14 @@ async def trigger_ai(
     Triggers the AI server after a client successfully uploads a video directly to Supabase.
     """
     try:
-        res = supabase.table("video_uploads").select("*").eq("upload_token", req.upload_token).execute()
+        token = req.upload_token.strip()
+        print(f"[trigger-ai] Received request with upload_token: '{token}'")
+        res = supabase.table("video_uploads").select("*").eq("upload_token", token).execute()
+        print(f"[trigger-ai] Query result data: {res.data}")
         if not res.data:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail={"error": {"code": "NOT_FOUND", "message": "Upload token không tồn tại"}}
+                detail={"error": {"code": "NOT_FOUND", "message": f"Upload token không tồn tại. Nhận được: '{req.upload_token}'"}}
             )
         upload_record = res.data[0]
         if upload_record.get("status") != "pending":

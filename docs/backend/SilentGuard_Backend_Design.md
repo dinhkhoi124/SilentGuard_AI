@@ -804,6 +804,7 @@ Response:
 ### 4.12g `POST /api/households/invite-requests/{invite_id}/respond` — Trả lời lời mời gia đình
 
 Quyền: Người dùng được mời (invitee).
+**Logic (Smart Switch & Cleanup)**: Khi người dùng đồng ý (`action: accepted`), Backend sẽ tự động kiểm tra nhà mặc định hiện tại của họ. Nếu nhà mặc định là "nhà rỗng" (0 camera, 0 thành viên khác), Backend sẽ tự động cập nhật `active_household_id` sang nhà mới này và xóa bỏ dữ liệu nhà rỗng đi để làm sạch DB.
 
 Header: `Authorization: Bearer <token>`
 

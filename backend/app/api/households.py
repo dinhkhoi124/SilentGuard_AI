@@ -285,6 +285,30 @@ async def respond_invite(
                 detail={"error": {"code": "DATABASE_ERROR", "message": "Lỗi hệ thống nội bộ, vui lòng thử lại sau"}}
             )
 
+        # --- NEW LOGIC: Smart Switch and Cleanup ---
+        try:
+            # 1. Lấy thông tin active_household_id hiện tại
+            u_res = supabase.table("users").select("active_household_id").eq("id", user_id).execute()
+            if u_res.data:
+                active_id = u_res.data[0].get("active_household_id")
+                if active_id and active_id != household_id:
+                    # 2. Kiểm tra xem nhà cũ có phải là "nhà ma" không (0 camera, 0 thành viên khác)
+                    cam_res = supabase.table("cameras").select("id").eq("household_id", active_id).is_("deleted_at", "null").limit(1).execute()
+                    mem_res = supabase.table("household_members").select("user_id").eq("household_id", active_id).neq("user_id", user_id).limit(1).execute()
+                    
+                    if (not cam_res.data or len(cam_res.data) == 0) and (not mem_res.data or len(mem_res.data) == 0):
+                        # Là nhà ma -> Tự động chuyển qua nhà mới và dọn dẹp nhà ma
+                        supabase.table("users").update({"active_household_id": household_id}).eq("id", user_id).execute()
+                        supabase.table("household_members").delete().eq("household_id", active_id).execute()
+                        supabase.table("households").delete().eq("id", active_id).execute()
+                elif not active_id:
+                    # Nếu chưa có nhà nào active thì gán luôn nhà mới
+                    supabase.table("users").update({"active_household_id": household_id}).eq("id", user_id).execute()
+        except Exception as e:
+            print(f"Error in smart switch and cleanup: {e}")
+            # Lỗi ở bước dọn dẹp không được làm hỏng luồng chính
+        # --- END NEW LOGIC ---
+
     # Update invite status
     supabase.table("household_invite_requests").update({
         "status": req.action,

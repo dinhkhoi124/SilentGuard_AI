@@ -3,17 +3,14 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile/core/services/monitoring_suppress_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
-import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
 
 void main() {
-  late SharedPreferencesAsync preferences;
+  late SharedPreferences preferences;
   late MonitoringSuppressService service;
 
-  setUp(() {
-    SharedPreferencesAsyncPlatform.instance =
-        InMemorySharedPreferencesAsync.empty();
-    preferences = SharedPreferencesAsync();
+  setUp(() async {
+    SharedPreferences.setMockInitialValues({});
+    preferences = await SharedPreferences.getInstance();
     service = MonitoringSuppressService(sharedPreferences: preferences);
   });
 
@@ -39,7 +36,7 @@ void main() {
     );
 
     expect(await service.getSuppressedUntil('camera-a'), isNull);
-    expect(await preferences.containsKey(key), isFalse);
+    expect(preferences.containsKey(key), isFalse);
   });
 
   test('pruneExpired removes malformed and expired values', () async {
@@ -61,9 +58,9 @@ void main() {
 
     await service.pruneExpired();
 
-    expect(await preferences.containsKey(expiredKey), isFalse);
-    expect(await preferences.containsKey(malformedKey), isFalse);
-    expect(await preferences.containsKey(activeKey), isTrue);
+    expect(preferences.containsKey(expiredKey), isFalse);
+    expect(preferences.containsKey(malformedKey), isFalse);
+    expect(preferences.containsKey(activeKey), isTrue);
   });
 
   test('clearAll removes only monitoring suppression entries', () async {
@@ -73,7 +70,7 @@ void main() {
 
     await service.clearAll();
 
-    expect(await preferences.containsKey(cameraKey), isFalse);
-    expect(await preferences.getString('unrelated_preference'), 'keep-me');
+    expect(preferences.containsKey(cameraKey), isFalse);
+    expect(preferences.getString('unrelated_preference'), 'keep-me');
   });
 }

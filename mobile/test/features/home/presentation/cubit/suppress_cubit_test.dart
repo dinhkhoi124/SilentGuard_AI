@@ -4,17 +4,15 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile/core/services/monitoring_suppress_service.dart';
 import 'package:mobile/features/home/presentation/cubit/suppress_cubit.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
-import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
 
 void main() {
   late SuppressCubit cubit;
 
-  setUp(() {
-    SharedPreferencesAsyncPlatform.instance =
-        InMemorySharedPreferencesAsync.empty();
+  setUp(() async {
+    SharedPreferences.setMockInitialValues({});
+    final prefs = await SharedPreferences.getInstance();
     cubit = SuppressCubit(
-      MonitoringSuppressService(sharedPreferences: SharedPreferencesAsync()),
+      MonitoringSuppressService(sharedPreferences: prefs),
     );
   });
 

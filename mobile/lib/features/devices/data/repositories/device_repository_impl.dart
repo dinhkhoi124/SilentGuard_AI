@@ -7,8 +7,6 @@ import 'package:http/http.dart' as http;
 import 'package:mobile/core/network/api_client.dart';
 import 'package:mobile/features/devices/data/datasources/device_permission_data_source.dart';
 import 'package:mobile/features/devices/data/datasources/device_remote_data_source.dart';
-import 'package:mobile/features/devices/data/datasources/gallery_image_data_source.dart';
-import 'package:mobile/features/devices/data/datasources/qr_code_data_source.dart';
 import 'package:mobile/features/devices/domain/entities/paired_device.dart';
 import 'package:mobile/features/devices/domain/entities/resolved_device.dart';
 import 'package:mobile/features/devices/domain/repositories/device_repository.dart';
@@ -16,17 +14,11 @@ import 'package:mobile/features/devices/domain/repositories/device_repository.da
 class DeviceRepositoryImpl implements DeviceRepository {
   const DeviceRepositoryImpl({
     required DeviceRemoteDataSource remoteDataSource,
-    required QrCodeDataSource qrCodeDataSource,
-    required GalleryImageDataSource galleryImageDataSource,
     required DevicePermissionDataSource permissionDataSource,
   }) : _remoteDataSource = remoteDataSource,
-       _qrCodeDataSource = qrCodeDataSource,
-       _galleryImageDataSource = galleryImageDataSource,
        _permissionDataSource = permissionDataSource;
 
   final DeviceRemoteDataSource _remoteDataSource;
-  final QrCodeDataSource _qrCodeDataSource;
-  final GalleryImageDataSource _galleryImageDataSource;
   final DevicePermissionDataSource _permissionDataSource;
 
   @override
@@ -35,42 +27,11 @@ class DeviceRepositoryImpl implements DeviceRepository {
   }
 
   @override
-  Future<Either<String, bool>> requestPhotoLibraryPermission() {
-    return _guard(_permissionDataSource.requestPhotoLibrary);
-  }
-
-  @override
-  Future<Either<String, void>> openAppSettings() {
-    return _guard(_permissionDataSource.openSettings);
-  }
-
-  @override
-  Future<Either<String, String?>> pickQrImagePath() {
-    return _guard(_galleryImageDataSource.pickQrImagePath);
-  }
-
-  @override
-  Future<Either<String, String>> decodeQrImageFile(String path) {
-    return _guard(() => _qrCodeDataSource.decodeImageFile(path));
-  }
-
-  @override
-  Future<Either<String, ResolvedDevice>> resolveDeviceQr(String qrRaw) {
-    return _guard(() => _remoteDataSource.resolveDeviceQr(qrRaw));
-  }
-
-  @override
   Future<Either<String, PairedDevice>> savePairedDevice({
     required ResolvedDevice resolvedDevice,
-    required String ipAddress,
-    required String rtspUrl,
   }) {
     return _guard(
-      () => _remoteDataSource.savePairedDevice(
-        resolvedDevice: resolvedDevice,
-        ipAddress: ipAddress,
-        rtspUrl: rtspUrl,
-      ),
+      () => _remoteDataSource.savePairedDevice(resolvedDevice: resolvedDevice),
     );
   }
 
@@ -90,9 +51,6 @@ class DeviceRepositoryImpl implements DeviceRepository {
     } on ApiException catch (error, stackTrace) {
       _logFailure(error, stackTrace);
       return Left(_messageForApiException(error));
-    } on QrCodeException catch (error, stackTrace) {
-      _logFailure(error, stackTrace);
-      return Left(error.message);
     } on TimeoutException catch (error, stackTrace) {
       _logFailure(error, stackTrace);
       return const Left(

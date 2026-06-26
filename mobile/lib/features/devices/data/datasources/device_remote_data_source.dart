@@ -1,21 +1,20 @@
+import 'dart:convert';
 import 'dart:developer' as developer;
+
+import 'package:flutter/foundation.dart';
 import 'package:mobile/core/network/api_client.dart';
 import 'package:mobile/features/devices/data/models/device_models.dart';
 import 'package:mobile/features/devices/domain/entities/paired_device.dart';
 import 'package:mobile/features/devices/domain/entities/resolved_device.dart';
-import 'package:mobile/features/devices/domain/utils/qr_parser.dart';
 import 'package:mobile/features/session/domain/repositories/session_repository.dart';
-import 'package:flutter/foundation.dart';
-import 'dart:convert';
 
 abstract interface class DeviceRemoteDataSource {
-  Future<ResolvedDevice> resolveDeviceQr(String qrRaw);
   Future<List<PairedDevice>> getPairedDevices();
+
   Future<PairedDevice> savePairedDevice({
     required ResolvedDevice resolvedDevice,
-    required String ipAddress,
-    required String rtspUrl,
   });
+
   Future<void> deletePairedDevice(String deviceId);
 }
 
@@ -28,31 +27,6 @@ class DeviceRemoteDataSourceImpl implements DeviceRemoteDataSource {
 
   final ApiClient _apiClient;
   final SessionRepository _sessionRepository;
-
-  @override
-  Future<ResolvedDevice> resolveDeviceQr(String qrRaw) async {
-    final trimmedQr = qrRaw.trim();
-    if (trimmedQr.isEmpty) {
-      throw const ApiException(
-        'Mã QR không hợp lệ.',
-        kind: ApiExceptionKind.badRequest,
-      );
-    }
-
-    final serialNumber = parseSerialNumber(trimmedQr);
-    if (serialNumber == null) {
-      throw const ApiException(
-        'Không đọc được mã serial từ QR. Vui lòng thử lại.',
-        kind: ApiExceptionKind.badRequest,
-      );
-    }
-
-    return ResolvedDevice(
-      deviceId: serialNumber,
-      displayName: 'Camera $serialNumber',
-      serialNumber: serialNumber,
-    );
-  }
 
   @override
   Future<List<PairedDevice>> getPairedDevices() async {
@@ -72,8 +46,6 @@ class DeviceRemoteDataSourceImpl implements DeviceRemoteDataSource {
   @override
   Future<PairedDevice> savePairedDevice({
     required ResolvedDevice resolvedDevice,
-    required String ipAddress,
-    required String rtspUrl,
   }) async {
     final householdId = _currentHouseholdId();
     try {
@@ -88,8 +60,8 @@ class DeviceRemoteDataSourceImpl implements DeviceRemoteDataSource {
       return PairedDeviceModel.fromJson({
         ..._payload(response),
         'household_id': householdId,
-        'ip_address': ipAddress,
-        'rtsp_url': rtspUrl,
+        'ip_address': 'imou-cloud',
+        'rtsp_url': '',
         'status': 'unknown',
         'serial_number': resolvedDevice.serialNumber,
       }).toEntity();

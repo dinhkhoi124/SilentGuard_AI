@@ -25,7 +25,6 @@ const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
 const DEMO_EMAIL = "demo@silentguard.ai";
 const DEMO_PASSWORD = "Demo@2026";
-const DEMO_HOUSEHOLD_ID = "d5494e06-b7ac-43f8-810a-22102079aade";
 
 async function getDemoToken() {
   const auth = getAuth(app);
@@ -121,6 +120,18 @@ function DemoPage() {
 
       setStatus("uploading");
       
+      // Step 0: Lấy ID hộ gia đình (nhà) thực tế của tài khoản Demo
+      const meRes = await fetch("https://c2-app-128-production.up.railway.app/api/households/me", {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      if (!meRes.ok) {
+        throw new Error("Tài khoản chưa được khởi tạo Hộ gia đình hợp lệ.");
+      }
+      const meData = await meRes.json();
+      const actualHouseholdId = meData.household_id;
+
       // Step 1: Xin link upload trực tiếp
       const reqUploadRes = await fetch("https://c2-app-128-production.up.railway.app/api/events/request-upload-url", {
         method: "POST",
@@ -129,7 +140,7 @@ function DemoPage() {
           Authorization: `Bearer ${token}`
         },
         body: JSON.stringify({
-          household_id: DEMO_HOUSEHOLD_ID,
+          household_id: actualHouseholdId,
           filename: `${Date.now()}_${file.name}`,
           content_type: file.type || "video/mp4"
         }),

@@ -86,12 +86,22 @@ async def upload_video(
         # Read file content
         file_bytes = await file.read()
         
+<<<<<<< Updated upstream
         # Upload to Supabase Storage 'clips' bucket
         await asyncio.to_thread(
             supabase.storage.from_("clips").upload,
             storage_path,
             file_bytes,
             {"content-type": file.content_type}
+=======
+        import asyncio
+        # Upload to Supabase Storage 'clips' bucket asynchronously to prevent blocking the event loop
+        await asyncio.to_thread(
+            supabase.storage.from_("clips").upload,
+            path=storage_path,
+            file=file_bytes,
+            file_options={"content-type": file.content_type}
+>>>>>>> Stashed changes
         )
         
         # Create a signed URL valid for 7 days

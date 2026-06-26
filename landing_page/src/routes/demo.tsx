@@ -130,7 +130,7 @@ function DemoPage() {
         },
         body: JSON.stringify({
           household_id: DEMO_HOUSEHOLD_ID,
-          filename: file.name,
+          filename: `${Date.now()}_${file.name}`,
           content_type: file.type || "video/mp4"
         }),
       });

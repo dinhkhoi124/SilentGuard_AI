@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowLeft, Volume2, VolumeX } from "lucide-react";
 import { useState, useRef, useEffect, lazy, Suspense } from "react";
 import { ClientOnly } from "@/components/ClientOnly";
+import { AnimatePresence, motion } from "framer-motion";
 import logoAsset from "@/assets/logo.png";
 
 const Flipbook = lazy(() => import("@/components/Flipbook").then((m) => ({ default: m.Flipbook })));
@@ -21,6 +22,7 @@ export const Route = createFileRoute("/brochure")({
 
 function BrochurePage() {
   const [isPlaying, setIsPlaying] = useState(false);
+  const [showHint, setShowHint] = useState(true);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
@@ -156,10 +158,27 @@ function BrochurePage() {
       </nav>
 
       {/* Vùng hiển thị toàn màn hình cho sách lật */}
-      <div className="flex-1 flex flex-col relative py-6 sm:py-12 px-2 sm:px-8 overflow-hidden z-10">
+      <div className="flex-1 flex flex-col relative py-6 sm:py-12 px-2 sm:px-8 overflow-hidden z-10" onClick={() => setShowHint(false)}>
         <ClientOnly fallback={<div className="flex-1 flex items-center justify-center animate-pulse text-ink-soft">Đang tải tài liệu...</div>}>
           <Suspense fallback={<div className="flex-1 flex items-center justify-center animate-pulse text-ink-soft">Đang khởi tạo sách...</div>}>
             <Flipbook pdfUrl="/brochure.pdf" />
+            
+            {/* Helper Text */}
+            <AnimatePresence>
+              {showHint && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  className="absolute bottom-[10%] sm:bottom-12 left-1/2 -translate-x-1/2 z-30 pointer-events-none"
+                >
+                  <div className="animate-bounce flex items-center gap-2 bg-white/70 backdrop-blur-xl px-5 py-2.5 rounded-full shadow-soft border border-white/50 text-brand font-medium text-sm tracking-wide">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-mouse-pointer-click size-4 shrink-0"><path d="M14 4.1 12 6"/><path d="m5.1 8-2.9-.8"/><path d="m6 12-2.8 3"/><path d="M7.2 2.2 8 5.1"/><path d="M9.037 9.69a.498.498 0 0 1 .653-.653l11 4.5a.5.5 0 0 1-.074.949l-4.349 1.041a1 1 0 0 0-.74.739l-1.04 4.35a.5.5 0 0 1-.95.074z"/></svg>
+                    <span>Kéo lật góc trang sách để đọc thêm thông tin</span>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </Suspense>
         </ClientOnly>
       </div>

@@ -294,7 +294,7 @@ function Introduction() {
             Tài liệu giới thiệu giải pháp
           </h2>
           <p className="mx-auto mt-4 max-w-[50ch] text-pretty text-ink-soft">
-            Tìm hiểu chi tiết về cơ chế hoạt động, các tính năng cốt lõi và chính sách bảo mật của SilentGuard qua cuốn brochure tương tác.
+            Tìm hiểu chi tiết về cơ chế hoạt động, các tính năng cốt lõi và chính sách bảo mật của SilentGuard qua cuốn sách tương tác.
           </p>
           <div className="mt-8">
             <Link

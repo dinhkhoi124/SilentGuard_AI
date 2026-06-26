@@ -11,10 +11,10 @@ class NotificationLocalDataSource {
   static const storageKey = 'app_notifications';
   static const maxItems = 100;
 
-  final SharedPreferencesAsync _preferences;
+  final SharedPreferences _preferences;
 
   Future<List<NotificationAlert>> loadNotifications() async {
-    final raw = await _preferences.getString(storageKey);
+    final raw = _preferences.getString(storageKey);
     return decodeNotifications(raw);
   }
 
@@ -75,10 +75,8 @@ class NotificationLocalDataSource {
 
   static Future<void> saveBackgroundMessage(RemoteMessage message) async {
     try {
-      final preferences = SharedPreferencesAsync();
-      final current = decodeNotifications(
-        await preferences.getString(storageKey),
-      );
+      final preferences = await SharedPreferences.getInstance();
+      final current = decodeNotifications(preferences.getString(storageKey));
       final alert = NotificationAlert.fromPayload(
         Map<String, dynamic>.from(message.data),
         messageId: message.messageId,

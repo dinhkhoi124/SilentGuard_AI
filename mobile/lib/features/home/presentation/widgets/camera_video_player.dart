@@ -10,29 +10,86 @@ import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart' as media_kit_video;
 import 'package:mobile/core/utils/app_colors.dart';
 
-class CameraVideoPlayer extends StatelessWidget {
+class CameraVideoPlayerController extends ChangeNotifier {
+  CameraVideoPlayerController({
+    required String currentTime,
+    bool isLoading = false,
+    String? errorMessage,
+  }) : _currentTime = currentTime,
+       _isLoading = isLoading,
+       _errorMessage = errorMessage;
+
+  String _currentTime;
+  bool _isLoading;
+  String? _errorMessage;
+
+  String get currentTime => _currentTime;
+  bool get isLoading => _isLoading;
+  String? get errorMessage => _errorMessage;
+
+  void update({
+    String? currentTime,
+    bool? isLoading,
+    String? errorMessage,
+    bool clearError = false,
+  }) {
+    var changed = false;
+    if (currentTime != null && currentTime != _currentTime) {
+      _currentTime = currentTime;
+      changed = true;
+    }
+    if (isLoading != null && isLoading != _isLoading) {
+      _isLoading = isLoading;
+      changed = true;
+    }
+    final nextError = clearError ? null : errorMessage ?? _errorMessage;
+    if (nextError != _errorMessage) {
+      _errorMessage = nextError;
+      changed = true;
+    }
+    if (changed) notifyListeners();
+  }
+}
+
+class CameraVideoPlayer extends StatefulWidget {
   const CameraVideoPlayer({
     super.key,
-    required this.currentTime,
+    required this.controller,
     this.rtspUrl,
     this.onFrameCaptured,
-    this.isLoading = false,
-    this.errorMessage,
     this.onRetry,
+    this.onPlaybackError,
   });
 
-  final String currentTime;
+  final CameraVideoPlayerController controller;
   final String? rtspUrl;
   final ValueChanged<Uint8List>? onFrameCaptured;
-  final bool isLoading;
-  final String? errorMessage;
   final VoidCallback? onRetry;
+  final ValueChanged<String>? onPlaybackError;
+
+  @override
+  State<CameraVideoPlayer> createState() => CameraVideoPlayerState();
+}
+
+class CameraVideoPlayerState extends State<CameraVideoPlayer> {
+  final _previewKey = GlobalKey<CameraLivePreviewState>();
+
+  void updateUrl(String newUrl) {
+    _previewKey.currentState?.updateUrl(newUrl);
+  }
+
+  void updateDisplayState({bool? isLoading, String? errorMessage}) {
+    _previewKey.currentState?.updateDisplayState(
+      isLoading: isLoading,
+      errorMessage: errorMessage,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final width = constraints.maxWidth - 32; // horizontal padding 16 * 2
+        final width = constraints.maxWidth - 32;
         final height = width * 9 / 16;
 
         return Padding(
@@ -46,11 +103,13 @@ class CameraVideoPlayer extends StatelessWidget {
                 fit: StackFit.expand,
                 children: [
                   CameraLivePreview(
-                    rtspUrl: rtspUrl,
-                    onFrameCaptured: onFrameCaptured,
-                    isLoading: isLoading,
-                    errorMessage: errorMessage,
-                    onRetry: onRetry,
+                    key: _previewKey,
+                    rtspUrl: widget.rtspUrl,
+                    onFrameCaptured: widget.onFrameCaptured,
+                    isLoading: widget.controller.isLoading,
+                    errorMessage: widget.controller.errorMessage,
+                    onRetry: widget.onRetry,
+                    onPlaybackError: widget.onPlaybackError,
                   ),
                   Positioned(
                     top: 10,
@@ -130,15 +189,20 @@ class CameraVideoPlayer extends StatelessWidget {
                   Positioned(
                     bottom: 10,
                     right: 10,
-                    child: _VideoLabel(
-                      child: Text(
-                        currentTime,
-                        style: const TextStyle(
-                          fontSize: 11,
-                          color: Colors.white,
-                          fontFamily: 'monospace',
-                        ),
-                      ),
+                    child: AnimatedBuilder(
+                      animation: widget.controller,
+                      builder: (context, _) {
+                        return _VideoLabel(
+                          child: Text(
+                            widget.controller.currentTime,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: Colors.white,
+                              fontFamily: 'monospace',
+                            ),
+                          ),
+                        );
+                      },
                     ),
                   ),
                 ],
@@ -159,6 +223,7 @@ class CameraLivePreview extends StatefulWidget {
     this.isLoading = false,
     this.errorMessage,
     this.onRetry,
+    this.onPlaybackError,
   });
 
   final String? rtspUrl;
@@ -166,12 +231,13 @@ class CameraLivePreview extends StatefulWidget {
   final bool isLoading;
   final String? errorMessage;
   final VoidCallback? onRetry;
+  final ValueChanged<String>? onPlaybackError;
 
   @override
-  State<CameraLivePreview> createState() => _CameraLivePreviewState();
+  State<CameraLivePreview> createState() => CameraLivePreviewState();
 }
 
-class _CameraLivePreviewState extends State<CameraLivePreview> {
+class CameraLivePreviewState extends State<CameraLivePreview> {
   static const _mediaKitChannel = MethodChannel('SlientGuard/media_kit');
   static const _playerConfiguration = PlayerConfiguration(
     bufferSize: 32 * 1024 * 1024,
@@ -179,111 +245,131 @@ class _CameraLivePreviewState extends State<CameraLivePreview> {
   );
   static const _unsupportedStreamMessage =
       'Camera đang trực tuyến nhưng luồng trực tiếp hiện chưa hỗ trợ trên Android. Vui lòng thử lại sau hoặc kiểm tra cấu hình camera.';
+  static const _streamOpenFailedMessage =
+      'Không thể phát trực tiếp camera. Vui lòng thử tải lại.';
+  static const _noStreamUrlMessage =
+      'Chưa có đường dẫn phát trực tiếp cho camera này.';
   static bool _nativeMediaKitRegistered = false;
 
   Player? _player;
   media_kit_video.VideoController? _videoController;
+  Future<void>? _playerInitialization;
   final List<StreamSubscription<Object?>> _playerSubscriptions = [];
   bool _isOpening = false;
+  bool _hasOpenedUrl = false;
+  late bool _externalIsLoading;
+  String? _externalErrorMessage;
   String? _errorMessage;
+  String? _currentUrl;
+  String? _pendingUrl;
+  bool _surfaceReady = false;
+  bool _surfaceReadyScheduled = false;
   Timer? _blackScreenTimer;
+  Timer? _surfaceOpenTimer;
 
   @override
   void initState() {
     super.initState();
+    _currentUrl = widget.rtspUrl?.trim();
+    _externalIsLoading = widget.isLoading;
+    _externalErrorMessage = widget.errorMessage;
     debugPrint(
-      '[VideoPlayer] player init with url: ${_redactedStreamUrl(widget.rtspUrl)}',
+      '[VideoPlayer] initState() at: ${DateTime.now().toIso8601String()}, '
+      'url: ${_redactedStreamUrl(widget.rtspUrl)}',
     );
-    debugPrint(
-      '[VideoPlayer] init timestamp: ${DateTime.now().toIso8601String()}',
-    );
-    MediaKit.ensureInitialized();
-    _initController();
+    final initialUrl = _currentUrl;
+    if (initialUrl == null || initialUrl.isEmpty) {
+      if (!widget.isLoading) _errorMessage = _noStreamUrlMessage;
+    } else {
+      updateUrl(initialUrl);
+    }
+  }
+
+  void updateUrl(String newUrl) {
+    final normalizedUrl = newUrl.trim();
+    if (normalizedUrl.isEmpty || normalizedUrl == 'unavailable') return;
+    if (normalizedUrl == _currentUrl && !_isOpening && _hasOpenedUrl) return;
+    final changedUrl = normalizedUrl != _currentUrl;
+    _currentUrl = normalizedUrl;
+    if (changedUrl) _hasOpenedUrl = false;
+    if (_rejectUnsupportedStream(normalizedUrl)) return;
+    _pendingUrl = normalizedUrl;
+    unawaited(_preparePlayerAndOpen(normalizedUrl));
+  }
+
+  void updateDisplayState({bool? isLoading, String? errorMessage}) {
+    var changed = false;
+    if (isLoading != null && isLoading != _externalIsLoading) {
+      _externalIsLoading = isLoading;
+      changed = true;
+    }
+    if (errorMessage != _externalErrorMessage) {
+      _externalErrorMessage = errorMessage;
+      changed = true;
+    }
+    if (changed && mounted) setState(() {});
   }
 
   @override
   void didUpdateWidget(covariant CameraLivePreview oldWidget) {
     super.didUpdateWidget(oldWidget);
-
-    if (oldWidget.rtspUrl != widget.rtspUrl) {
-      debugPrint(
-        '[VideoPlayer] URL changed from: '
-        '${_redactedStreamUrl(oldWidget.rtspUrl)} to: '
-        '${_redactedStreamUrl(widget.rtspUrl)}',
-      );
-      final streamUrl = widget.rtspUrl?.trim();
-      if (streamUrl == null || streamUrl.isEmpty) {
-        unawaited(_player?.stop());
+    if (oldWidget.rtspUrl == widget.rtspUrl) return;
+    debugPrint(
+      '[VideoPlayer] URL changed from: '
+      '${_redactedStreamUrl(oldWidget.rtspUrl)} to: '
+      '${_redactedStreamUrl(widget.rtspUrl)}',
+    );
+    final nextUrl = widget.rtspUrl?.trim();
+    if (nextUrl == null || nextUrl.isEmpty) {
+      _currentUrl = null;
+      _pendingUrl = null;
+      _hasOpenedUrl = false;
+      final player = _player;
+      if (player != null) unawaited(player.stop());
+      if (mounted && _errorMessage != _noStreamUrlMessage) {
         setState(() {
           _isOpening = false;
-          _errorMessage = 'Chưa có đường dẫn phát trực tiếp cho camera này.';
+          _errorMessage = _noStreamUrlMessage;
         });
-      } else if (_player != null) {
-        if (_rejectUnsupportedStream(streamUrl)) return;
-        if (_isOpening) return;
-        setState(() {
-          _isOpening = true;
-          _errorMessage = null;
-        });
-        debugPrint(
-          '[VideoPlayer] open() called at: ${DateTime.now().toIso8601String()}',
-        );
-        unawaited(
-          _player!
-              .open(Media(streamUrl), play: true)
-              .catchError((Object error) {
-                debugPrint(
-                  '[VideoPlayer] playback error: $error at ${DateTime.now().toIso8601String()}',
-                );
-                debugPrint('[media_kit] stream open failed');
-                if (mounted) {
-                  setState(() {
-                    _errorMessage =
-                        'Không thể phát trực tiếp camera. Vui lòng thử tải lại.';
-                  });
-                }
-              })
-              .whenComplete(() {
-                if (mounted && widget.rtspUrl?.trim() == streamUrl) {
-                  setState(() => _isOpening = false);
-                }
-              }),
-        );
-      } else {
-        _initController();
       }
+      return;
     }
+    updateUrl(nextUrl);
   }
 
   @override
   void dispose() {
-    unawaited(_disposeControllers(captureFrame: true, notify: false));
+    debugPrint(
+      '[VideoPlayer] dispose() called at: ${DateTime.now().toIso8601String()}',
+    );
+    unawaited(_disposePlayer(captureFrame: true));
     super.dispose();
   }
 
-  void _initController() {
-    final streamUrl = widget.rtspUrl?.trim();
-    if (streamUrl == null || streamUrl.isEmpty) {
-      setState(() {
-        _isOpening = false;
-        _errorMessage = 'Chưa có đường dẫn phát trực tiếp cho camera này.';
+  void _scheduleOpenAfterSurfaceReady() {
+    if (_surfaceReady) return;
+    if (_surfaceReadyScheduled) return;
+    _surfaceReadyScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _surfaceOpenTimer?.cancel();
+      _surfaceOpenTimer = Timer(const Duration(milliseconds: 500), () {
+        if (!mounted) return;
+        _surfaceReady = true;
+        _surfaceReadyScheduled = false;
+        final pendingUrl = _pendingUrl;
+        if (pendingUrl == null || pendingUrl.isEmpty) return;
+        if (_currentUrl != pendingUrl) return;
+        unawaited(_openMedia(pendingUrl));
       });
-      return;
-    }
-    _validateAndOpen(streamUrl);
-  }
-
-  void _validateAndOpen(String url) {
-    if (_rejectUnsupportedStream(url)) return;
-    unawaited(_openStreamWhenReady(url));
+    });
   }
 
   bool _rejectUnsupportedStream(String url) {
     final scheme = Uri.tryParse(url)?.scheme.toLowerCase();
     if (scheme != 'rtmp' && scheme != 'rtmps') return false;
-
     debugPrint('[media_kit] rejected unsupported stream format: $scheme');
-    if (mounted) {
+    if (mounted && _errorMessage != _unsupportedStreamMessage) {
       setState(() {
         _isOpening = false;
         _errorMessage = _unsupportedStreamMessage;
@@ -293,78 +379,116 @@ class _CameraLivePreviewState extends State<CameraLivePreview> {
   }
 
   Future<void> _ensureNativeMediaKitRegistered() async {
-    if ((!Platform.isAndroid && !Platform.isIOS) || _nativeMediaKitRegistered) {
+    if (!Platform.isAndroid || _nativeMediaKitRegistered) {
       return;
     }
     await _mediaKitChannel.invokeMethod<void>('registerMediaKit');
     _nativeMediaKitRegistered = true;
   }
 
-  Future<void> _openStreamWhenReady(String streamUrl) async {
+  Future<void> _ensurePlayerInitialized() {
+    if (_player != null && _videoController != null) return Future.value();
+    final pendingInitialization = _playerInitialization;
+    if (pendingInitialization != null) return pendingInitialization;
+
+    final initialization = _initializePlayer();
+    _playerInitialization = initialization;
+    return initialization;
+  }
+
+  Future<void> _initializePlayer() async {
+    try {
+      await _ensureNativeMediaKitRegistered();
+      if (!mounted) return;
+
+      MediaKit.ensureInitialized();
+      if (!mounted) return;
+
+      final player = Player(configuration: _playerConfiguration);
+      final videoController = media_kit_video.VideoController(player);
+      _player = player;
+      _videoController = videoController;
+      debugPrint(
+        '[VideoPlayer] VideoController created at: ${DateTime.now().toIso8601String()}',
+      );
+      _listenToPlayerLogs(player);
+      if (mounted) setState(() {});
+    } catch (error, stackTrace) {
+      _playerInitialization = null;
+      developer.log(
+        'MediaKit player initialization failed.',
+        name: 'CameraLivePreview',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      if (mounted && _errorMessage != _streamOpenFailedMessage) {
+        setState(() => _errorMessage = _streamOpenFailedMessage);
+      }
+    }
+  }
+
+  Future<void> _preparePlayerAndOpen(String streamUrl) async {
+    await _ensurePlayerInitialized();
+    if (!mounted || _currentUrl != streamUrl) return;
+    if (_player == null || _videoController == null) {
+      if (_errorMessage != _streamOpenFailedMessage) {
+        setState(() => _errorMessage = _streamOpenFailedMessage);
+      }
+      return;
+    }
+    if (_surfaceReady) {
+      await _openMedia(streamUrl);
+      return;
+    }
+    _scheduleOpenAfterSurfaceReady();
+  }
+
+  Future<void> _openMedia(String streamUrl) async {
     if (_isOpening) return;
     _isOpening = true;
-
-    await WidgetsBinding.instance.endOfFrame;
-    if (!mounted || widget.rtspUrl?.trim() != streamUrl) {
-      _isOpening = false;
-      return;
+    if (mounted) {
+      setState(() {
+        _errorMessage = null;
+      });
     }
 
-    await _ensureNativeMediaKitRegistered();
-    final player = Player(configuration: _playerConfiguration);
-    final videoController = media_kit_video.VideoController(player);
-
-    if (!mounted || widget.rtspUrl?.trim() != streamUrl) {
-      unawaited(player.dispose());
-      _isOpening = false;
-      return;
-    }
-
-    _player = player;
-    _videoController = videoController;
-    _listenToPlayerLogs(player);
-    setState(() {
-      _errorMessage = null;
-    });
-
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      await player.stop();
-      if (!mounted || !identical(_player, player)) {
-        _isOpening = false;
+    try {
+      await _ensurePlayerInitialized();
+      final player = _player;
+      if (!mounted || _currentUrl != streamUrl) return;
+      if (player == null) {
+        if (_errorMessage != _streamOpenFailedMessage) {
+          setState(() => _errorMessage = _streamOpenFailedMessage);
+        }
         return;
       }
-
-      try {
-        if (_rejectUnsupportedStream(streamUrl)) return;
-        debugPrint(
-          '[VideoPlayer] open() called at: ${DateTime.now().toIso8601String()}',
-        );
-        await player.open(Media(streamUrl), play: true);
-      } catch (error) {
-        debugPrint(
-          '[VideoPlayer] playback error: $error at ${DateTime.now().toIso8601String()}',
-        );
-        debugPrint('[media_kit] stream open failed');
-        if (mounted) {
-          setState(
-            () => _errorMessage =
-                'Không thể phát trực tiếp camera. Vui lòng thử tải lại.',
-          );
-        }
-      } finally {
-        if (mounted) setState(() => _isOpening = false);
+      await player.stop();
+      await _applyHlsLiveOptions(streamUrl, player);
+      debugPrint(
+        '[VideoPlayer] open() called with URL: ${_redactedStreamUrl(streamUrl)}',
+      );
+      if (!mounted || _currentUrl != streamUrl) return;
+      await player.open(_mediaForStream(streamUrl), play: true);
+      await player.play();
+      _hasOpenedUrl = true;
+      _startBlackScreenTimer();
+    } catch (error) {
+      debugPrint(
+        '[VideoPlayer] playback error: $error at ${DateTime.now().toIso8601String()}',
+      );
+      if (_isNonFatalLiveHlsSeekWarning(error)) {
+        debugPrint('[media_kit] ignored non-fatal HLS live seek warning');
+        return;
       }
-
-      _blackScreenTimer?.cancel();
-      _blackScreenTimer = Timer(const Duration(seconds: 8), () {
-        if (mounted && (_player?.state.width ?? 0) == 0) {
-          setState(() {
-            _errorMessage =
-                'Không thể phát trực tiếp camera. Vui lòng thử tải lại.';
-          });
-        }
-      });
-    });
+      debugPrint('[media_kit] stream open failed');
+      widget.onPlaybackError?.call(error.toString());
+      if (mounted && _errorMessage != _streamOpenFailedMessage) {
+        setState(() => _errorMessage = _streamOpenFailedMessage);
+      }
+    } finally {
+      _isOpening = false;
+      if (mounted) setState(() {});
+    }
   }
 
   void _listenToPlayerLogs(Player player) {
@@ -373,13 +497,17 @@ class _CameraLivePreviewState extends State<CameraLivePreview> {
         debugPrint(
           '[VideoPlayer] playback error: $error at ${DateTime.now().toIso8601String()}',
         );
+        if (_isNonFatalLiveHlsSeekWarning(error)) {
+          debugPrint('[media_kit] ignored non-fatal HLS live seek warning');
+          return;
+        }
         debugPrint('[media_kit] stream playback error');
         developer.log('Stream playback failed.', name: 'CameraLivePreview');
-        if (!mounted || !identical(_player, player)) return;
+        widget.onPlaybackError?.call(error.toString());
+        if (!mounted || _errorMessage == _streamOpenFailedMessage) return;
         setState(() {
           _isOpening = false;
-          _errorMessage =
-              'Không thể phát trực tiếp camera. Vui lòng thử tải lại.';
+          _errorMessage = _streamOpenFailedMessage;
         });
       }),
       player.stream.width.listen((width) {
@@ -392,48 +520,84 @@ class _CameraLivePreviewState extends State<CameraLivePreview> {
     ]);
   }
 
-  Future<void> _disposeControllers({
-    required bool captureFrame,
-    required bool notify,
-  }) async {
-    final player = _player;
-    final videoController = _videoController;
+  Future<void> _applyHlsLiveOptions(String streamUrl, Player player) async {
+    if (!_isHlsStream(streamUrl)) return;
+    final options = <String, String>{
+      'force-seekable': 'yes',
+      'cache': 'no',
+      'live-caching': '800',
+    };
+    for (final option in options.entries) {
+      try {
+        await (player.platform as dynamic).setProperty(
+          option.key,
+          option.value,
+        );
+      } catch (error) {
+        debugPrint('[media_kit] ${option.key} option failed: $error');
+      }
+    }
+  }
+
+  Media _mediaForStream(String streamUrl) {
+    if (!_isHlsStream(streamUrl)) return Media(streamUrl);
+    return Media(streamUrl, extras: const {'force-seekable': 'yes'});
+  }
+
+  bool _isHlsStream(String streamUrl) {
+    final uri = Uri.tryParse(streamUrl);
+    if (uri == null) return false;
+    return uri.path.toLowerCase().contains('.m3u8');
+  }
+
+  bool _isNonFatalLiveHlsSeekWarning(Object error) {
+    final message = error.toString().toLowerCase();
+    return message.contains('cannot seek') ||
+        message.contains('force-seekable');
+  }
+
+  void _startBlackScreenTimer() {
+    _blackScreenTimer?.cancel();
+    _blackScreenTimer = Timer(const Duration(seconds: 8), () {
+      final player = _player;
+      if (!mounted || (player?.state.width ?? 0) > 0) return;
+      if (_errorMessage == _streamOpenFailedMessage) return;
+      widget.onPlaybackError?.call(_streamOpenFailedMessage);
+      setState(() => _errorMessage = _streamOpenFailedMessage);
+    });
+  }
+
+  Future<void> _disposePlayer({required bool captureFrame}) async {
     final subscriptions = List<StreamSubscription<Object?>>.of(
       _playerSubscriptions,
     );
     _playerSubscriptions.clear();
-    _player = null;
-    _videoController = null;
-    if (notify && mounted) {
-      setState(() {});
-    }
-
     for (final subscription in subscriptions) {
       unawaited(subscription.cancel());
     }
-
     _blackScreenTimer?.cancel();
-
+    _surfaceOpenTimer?.cancel();
+    final player = _player;
+    final videoController = _videoController;
+    _player = null;
+    _videoController = null;
     if (player == null) return;
-
     if (captureFrame) await _captureLastFrame(player);
-
     try {
+      debugPrint('[VideoPlayer] player.stop() called');
       await player.stop();
+      debugPrint('[VideoPlayer] player.dispose() called');
       await player.dispose();
     } catch (_) {}
-
-    // Ensure controller is disposed after player as requested
-    // ignore: undefined_method
     try {
-      (videoController as dynamic)?.dispose();
+      debugPrint('[VideoPlayer] controller.dispose() called');
+      (videoController as dynamic).dispose();
     } catch (_) {}
   }
 
   Future<void> _captureLastFrame(Player player) async {
     final onFrameCaptured = widget.onFrameCaptured;
     if (onFrameCaptured == null) return;
-
     try {
       final bytes = await player.screenshot(format: 'image/png');
       if (bytes == null || bytes.isEmpty) return;
@@ -450,27 +614,25 @@ class _CameraLivePreviewState extends State<CameraLivePreview> {
 
   @override
   Widget build(BuildContext context) {
-    final videoController = _videoController;
-
-    // Error from parent (stream URL fetch failed, etc.)
-    if (widget.errorMessage != null && widget.errorMessage!.trim().isNotEmpty) {
+    final externalErrorMessage = _externalErrorMessage;
+    if (externalErrorMessage != null &&
+        externalErrorMessage.trim().isNotEmpty) {
       return _VideoErrorView(
-        message: widget.errorMessage!,
+        message: externalErrorMessage,
         onRetry: _retryStream,
       );
     }
-
-    // Internal player error
     if (_errorMessage != null) {
       return _VideoErrorView(message: _errorMessage!, onRetry: _retryStream);
     }
-
-    // Video widget not yet created or loading
-    if (videoController == null || widget.isLoading || _isOpening) {
+    final videoController = _videoController;
+    if (videoController == null) {
       return const _VideoLoadingView();
     }
-
-    // Video is ready
+    debugPrint(
+      '[VideoPlayer] Video widget built, wid will be assigned by platform',
+    );
+    _scheduleOpenAfterSurfaceReady();
     return Stack(
       fit: StackFit.expand,
       children: [
@@ -479,23 +641,21 @@ class _CameraLivePreviewState extends State<CameraLivePreview> {
           fit: BoxFit.cover,
           controls: media_kit_video.NoVideoControls,
         ),
+        if (_externalIsLoading || _isOpening) const _VideoLoadingView(),
       ],
     );
   }
 
   Future<void> _retryStream() async {
-    await _disposeControllers(captureFrame: false, notify: false);
-
-    final player = Player(configuration: _playerConfiguration);
-    _player = player;
-    _videoController = media_kit_video.VideoController(player);
-    _listenToPlayerLogs(player);
-
-    if (mounted) {
+    final currentUrl = _currentUrl;
+    if (mounted && _errorMessage != null) {
       setState(() {
         _errorMessage = null;
         _isOpening = false;
       });
+    }
+    if (currentUrl != null && currentUrl.isNotEmpty) {
+      updateUrl(currentUrl);
     }
     widget.onRetry?.call();
   }
@@ -505,7 +665,7 @@ String _redactedStreamUrl(String? url) {
   final uri = Uri.tryParse(url ?? '');
   if (uri == null || uri.host.isEmpty) return 'unavailable';
   final port = uri.hasPort ? ':${uri.port}' : '';
-  return '${uri.scheme}://${uri.host}$port';
+  return '${uri.scheme}://${uri.host}$port${uri.path}';
 }
 
 class _VideoLoadingView extends StatelessWidget {
@@ -513,12 +673,12 @@ class _VideoLoadingView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ColoredBox(
+    return const ColoredBox(
       color: Colors.black87,
       child: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
-          children: const [
+          children: [
             SizedBox(
               width: 32,
               height: 32,
@@ -602,17 +762,21 @@ class _VideoErrorView extends StatelessWidget {
 
 class _OverlayPill extends StatelessWidget {
   const _OverlayPill({required this.color, required this.children});
+
   final Color color;
   final List<Widget> children;
+
   @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-    decoration: BoxDecoration(
-      color: color,
-      borderRadius: BorderRadius.circular(20),
-    ),
-    child: Row(mainAxisSize: MainAxisSize.min, children: children),
-  );
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(mainAxisSize: MainAxisSize.min, children: children),
+    );
+  }
 }
 
 class _RoundOverlayButton extends StatelessWidget {
@@ -621,41 +785,52 @@ class _RoundOverlayButton extends StatelessWidget {
     required this.backgroundColor,
     required this.iconColor,
   });
+
   final IconData icon;
   final Color backgroundColor;
   final Color iconColor;
+
   @override
-  Widget build(BuildContext context) => Container(
-    width: 32,
-    height: 32,
-    decoration: BoxDecoration(color: backgroundColor, shape: BoxShape.circle),
-    child: Icon(icon, size: 16, color: iconColor),
-  );
+  Widget build(BuildContext context) {
+    return Container(
+      width: 32,
+      height: 32,
+      decoration: BoxDecoration(color: backgroundColor, shape: BoxShape.circle),
+      child: Icon(icon, size: 16, color: iconColor),
+    );
+  }
 }
 
 class _StatusDot extends StatelessWidget {
   const _StatusDot();
+
   @override
-  Widget build(BuildContext context) => Container(
-    width: 8,
-    height: 8,
-    decoration: const BoxDecoration(
-      color: AppColors.safe,
-      shape: BoxShape.circle,
-    ),
-  );
+  Widget build(BuildContext context) {
+    return Container(
+      width: 8,
+      height: 8,
+      decoration: const BoxDecoration(
+        color: AppColors.safe,
+        shape: BoxShape.circle,
+      ),
+    );
+  }
 }
 
 class _VideoLabel extends StatelessWidget {
   const _VideoLabel({required this.child});
+
   final Widget child;
+
   @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-    decoration: BoxDecoration(
-      color: Colors.black54,
-      borderRadius: BorderRadius.circular(6),
-    ),
-    child: child,
-  );
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: Colors.black54,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: child,
+    );
+  }
 }

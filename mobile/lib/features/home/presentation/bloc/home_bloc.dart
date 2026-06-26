@@ -1,7 +1,8 @@
 import 'dart:async';
-import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:mobile/features/devices/data/models/imou_models.dart';
 import 'package:mobile/features/devices/domain/repositories/imou_stream_repository.dart';
 import 'package:mobile/features/home/domain/entities/camera_device.dart';
 import 'package:mobile/features/home/domain/usecases/delete_camera_device.dart';
@@ -30,7 +31,10 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     on<HomeDeviceDeleted>(_onDeviceDeleted);
     on<HomeDevicePaired>(_onDevicePaired);
     on<CameraThumbnailCaptured>(_onCameraThumbnailCaptured);
+    on<ResetCameraStreamUrlEvent>(_onResetCameraStreamUrl);
     on<CameraStreamUrlRequested>(_onCameraStreamUrlRequested);
+    on<CameraDetailClosed>(_onCameraDetailClosed);
+    on<CameraStreamPlaybackFailed>(_onCameraStreamPlaybackFailed);
     on<HomeAccessoryToggled>(_onAccessoryToggled);
     on<NotificationTapped>((event, emit) {});
   }
@@ -41,6 +45,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
   final ImouStreamRepository imouStreamRepository;
   final SessionRepository sessionRepository;
 
+  String? lastKnownStreamUrl;
   List<CameraDevice> _activeDevices = [];
   int _loadGeneration = 0;
   Timer? _backendRetryTimer;
@@ -249,10 +254,21 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
   }
 
   /// Yêu cầu lấy URL luồng phát trực tiếp (live stream) từ dịch vụ Imou
+  void _onResetCameraStreamUrl(
+    ResetCameraStreamUrlEvent event,
+    Emitter<HomeState> emit,
+  ) {
+    emit(const CameraStreamUrlInitial());
+  }
+
   Future<void> _onCameraStreamUrlRequested(
     CameraStreamUrlRequested event,
     Emitter<HomeState> emit,
   ) async {
+    debugPrint(
+      '[HomeBloc] state reset to initial? ${state is HomeInitial} '
+      'currentState: ${state.runtimeType}',
+    );
     final serialNumber = event.serialNumber.trim();
     if (serialNumber.isEmpty) {
       emit(
@@ -265,44 +281,87 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     }
 
     emit(CameraStreamUrlLoading(event.cameraId));
-    final result = await imouStreamRepository.getStreamUrl(serialNumber);
-    result.fold(
-      (failure) {
+    try {
+      final streamUrl = await imouStreamRepository.getStreamUrl(serialNumber);
+      final trimmedUrl = streamUrl.trim();
+      if (!_isPlayableCloudUrl(trimmedUrl)) {
         emit(
           CameraStreamUrlFailure(
             cameraId: event.cameraId,
-            message: failure.message,
+            message:
+                'Không tìm thấy luồng trực tiếp tương thích từ Imou Cloud. Vui lòng thử lại sau.',
           ),
         );
-      },
-      (streamUrl) {
-        final trimmedUrl = streamUrl.trim();
-        if (!_isPlayableHlsUrl(trimmedUrl)) {
-          emit(
-            CameraStreamUrlFailure(
-              cameraId: event.cameraId,
-              message:
-                  'Không tìm thấy luồng trực tiếp tương thích từ Imou Cloud. Vui lòng thử lại sau.',
-            ),
-          );
-          return;
-        }
-        emit(
-          CameraStreamUrlLoaded(
-            cameraId: event.cameraId,
-            streamUrl: trimmedUrl,
-          ),
-        );
-      },
+        return;
+      }
+      lastKnownStreamUrl = trimmedUrl;
+      emit(
+        CameraStreamUrlLoaded(cameraId: event.cameraId, streamUrl: trimmedUrl),
+      );
+    } on ImouApiException catch (error) {
+      emit(
+        CameraStreamUrlFailure(
+          cameraId: event.cameraId,
+          message: _messageForImouStreamError(error),
+        ),
+      );
+    } catch (error) {
+      debugPrint('[HomeBloc] stream request failed: $error');
+      emit(
+        CameraStreamUrlFailure(
+          cameraId: event.cameraId,
+          message:
+              'Không thể lấy luồng trực tiếp từ Imou Cloud. Vui lòng thử lại sau.',
+        ),
+      );
+    }
+  }
+
+  Future<void> _onCameraDetailClosed(
+    CameraDetailClosed event,
+    Emitter<HomeState> emit,
+  ) async {
+    final serialNumber = event.serialNumber.trim();
+    if (serialNumber.isEmpty) return;
+
+    lastKnownStreamUrl = null;
+    try {
+      await imouStreamRepository.releaseStreamSession(serialNumber);
+    } catch (error) {
+      debugPrint('[HomeBloc] release stream session failed: $error');
+    }
+  }
+
+  void _onCameraStreamPlaybackFailed(
+    CameraStreamPlaybackFailed event,
+    Emitter<HomeState> emit,
+  ) {
+    debugPrint('[HomeBloc] playback failed: ${event.error}');
+    emit(
+      CameraStreamUrlFailure(
+        cameraId: event.cameraId,
+        message: 'Mất kết nối với camera. Vui lòng thử lại.',
+      ),
     );
   }
 
-  bool _isPlayableHlsUrl(String url) {
+  String _messageForImouStreamError(ImouApiException error) {
+    return switch (error.code) {
+      'DEVICE_OFFLINE' =>
+        'Camera đang offline. Vui lòng kiểm tra kết nối thiết bị.',
+      'NO_STREAM_URL' => 'Không lấy được stream. Vui lòng thử lại.',
+      _ => 'Lỗi kết nối: ${error.message}',
+    };
+  }
+
+  bool _isPlayableCloudUrl(String url) {
     final uri = Uri.tryParse(url);
     if (uri == null || uri.host.isEmpty || uri.port == 8890) return false;
     final scheme = uri.scheme.toLowerCase();
-    return (scheme == 'http' || scheme == 'https') &&
-        uri.path.toLowerCase().endsWith('.m3u8');
+    if (scheme != 'http' && scheme != 'https') return false;
+
+    final path = uri.path.toLowerCase();
+    return path.endsWith('.m3u8') || path.endsWith('.flv');
   }
 
   /// Chuyển đổi trạng thái bật/tắt (toggle) của các phụ kiện đi kèm camera

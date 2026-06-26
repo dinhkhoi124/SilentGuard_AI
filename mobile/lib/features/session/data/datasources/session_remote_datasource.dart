@@ -6,6 +6,7 @@ abstract interface class SessionRemoteDataSource {
   Future<BackendUser> login({String? inviteCode});
   Future<Household> getCurrentHousehold();
   Future<void> logout({String? idToken});
+  Future<void> switchHousehold(String householdId);
 }
 
 class SessionRemoteDataSourceImpl implements SessionRemoteDataSource {
@@ -45,6 +46,13 @@ class SessionRemoteDataSourceImpl implements SessionRemoteDataSource {
   Future<Household> getCurrentHousehold() async {
     final response = await _apiClient.getObject('/api/households/me');
     return _householdFromJson(response);
+  }
+
+  @override
+  Future<void> switchHousehold(String householdId) async {
+    await _apiClient.postObject('/api/users/switch-household', {
+      'household_id': householdId,
+    });
   }
 
   @override

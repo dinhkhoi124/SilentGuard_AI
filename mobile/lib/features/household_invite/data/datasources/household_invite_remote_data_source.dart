@@ -7,7 +7,7 @@ import 'package:mobile/features/household_invite/domain/entities/invite_request.
 abstract class HouseholdInviteRemoteDataSource {
   Future<Map<String, dynamic>> inviteByEmail(String email, String householdId);
   Future<List<InviteRequest>> getPendingInvites();
-  Future<void> respondToInvite(String inviteRequestId, String action);
+  Future<void> respondToInvite(String inviteRequestId, bool accepted);
   Future<List<HouseholdMember>> getHouseholdMembers(String householdId);
 }
 
@@ -45,10 +45,10 @@ class HouseholdInviteRemoteDataSourceImpl
   }
 
   @override
-  Future<void> respondToInvite(String inviteRequestId, String action) async {
+  Future<void> respondToInvite(String inviteRequestId, bool accepted) async {
     await _apiClient.postObject(
       '/api/households/invite-requests/$inviteRequestId/respond',
-      {'action': action},
+      {'action': accepted ? 'accepted' : 'declined'},
     );
   }
 

@@ -30,9 +30,7 @@ class NotificationSegmentedTabBar extends StatelessWidget
         decoration: BoxDecoration(
           color: Theme.of(context).brightness == Brightness.dark
               ? Theme.of(context).colorScheme.surfaceContainerHighest
-              : AppColors.mutedText.withValues(
-                  alpha: 0.15,
-                ),
+              : AppColors.mutedText.withValues(alpha: 0.15),
           borderRadius: BorderRadius.circular(10),
         ),
         child: TabBar(

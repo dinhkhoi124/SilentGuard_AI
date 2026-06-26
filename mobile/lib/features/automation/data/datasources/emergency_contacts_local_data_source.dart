@@ -13,12 +13,12 @@ class EmergencyContactsLocalDataSourceImpl
     implements EmergencyContactsLocalDataSource {
   const EmergencyContactsLocalDataSourceImpl(this._preferences);
 
-  final SharedPreferencesAsync _preferences;
+  final SharedPreferences _preferences;
   static const _key = 'local_emergency_contacts';
 
   @override
   Future<List<EmergencyContactModel>> getContacts() async {
-    final jsonString = await _preferences.getString(_key);
+    final jsonString = _preferences.getString(_key);
     if (jsonString == null || jsonString.isEmpty) {
       return [];
     }

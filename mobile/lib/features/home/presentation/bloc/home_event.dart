@@ -81,6 +81,32 @@ final class CameraStreamUrlRequested extends HomeEvent {
   List<Object?> get props => [cameraId, serialNumber];
 }
 
+final class CameraDetailClosed extends HomeEvent {
+  const CameraDetailClosed({required this.serialNumber});
+
+  final String serialNumber;
+
+  @override
+  List<Object?> get props => [serialNumber];
+}
+
+final class CameraStreamPlaybackFailed extends HomeEvent {
+  const CameraStreamPlaybackFailed({
+    required this.cameraId,
+    required this.error,
+  });
+
+  final String cameraId;
+  final String error;
+
+  @override
+  List<Object?> get props => [cameraId, error];
+}
+
+final class ResetCameraStreamUrlEvent extends HomeEvent {
+  const ResetCameraStreamUrlEvent();
+}
+
 final class HomeAccessoryToggled extends HomeEvent {
   const HomeAccessoryToggled(this.deviceId, this.accessoryIndex);
 

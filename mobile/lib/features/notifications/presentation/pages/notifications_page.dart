@@ -65,50 +65,68 @@ class _NotificationsPageState extends State<NotificationsPage>
             (_tabController.index == 0 && unreadAlerts > 0) ||
             (_tabController.index == 1 && unreadInvites > 0);
 
-        return Scaffold(
-          appBar: AppBar(
-            title: const Text('Thông báo'),
-            centerTitle: true,
-            leading: IconButton(
-              icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
-              onPressed: () => context.pop(),
-              tooltip: 'Quay lại',
-            ),
-            actions: [
-              TextButton(
-                onPressed: hasUnreadInCurrentTab
-                    ? () {
-                        if (_tabController.index == 0) {
-                          for (final n in alertNotifications) {
-                            if (!n.isRead) {
-                              context.read<NotificationsCubit>().markRead(n.id);
+        return BlocListener<PendingInvitesCubit, PendingInvitesState>(
+          listener: (context, pendingState) {
+            if (pendingState is RespondSuccess &&
+                pendingState.action == 'accepted') {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Đã tham gia hộ gia đình thành công'),
+                  backgroundColor: AppColors.safe,
+                ),
+              );
+              context.go('/home');
+            }
+          },
+          child: Scaffold(
+            appBar: AppBar(
+              title: const Text('Thông báo'),
+              centerTitle: true,
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
+                onPressed: () => context.pop(),
+                tooltip: 'Quay lại',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: hasUnreadInCurrentTab
+                      ? () {
+                          if (_tabController.index == 0) {
+                            for (final n in alertNotifications) {
+                              if (!n.isRead) {
+                                context.read<NotificationsCubit>().markRead(
+                                  n.id,
+                                );
+                              }
                             }
-                          }
-                        } else if (_tabController.index == 1) {
-                          for (final n in inviteNotifications) {
-                            if (!n.isRead) {
-                              context.read<NotificationsCubit>().markRead(n.id);
+                          } else if (_tabController.index == 1) {
+                            for (final n in inviteNotifications) {
+                              if (!n.isRead) {
+                                context.read<NotificationsCubit>().markRead(
+                                  n.id,
+                                );
+                              }
                             }
                           }
                         }
-                      }
-                    : null,
-                child: const Text('Đánh dấu đã đọc'),
-              ),
-            ],
-            bottom: NotificationSegmentedTabBar(
-              controller: _tabController,
-              unreadAlerts: unreadAlerts,
-              unreadInvites: unreadInvites,
-            ),
-          ),
-          body: SafeArea(
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                _buildNotificationList(context, alertNotifications, false),
-                _buildNotificationList(context, inviteNotifications, true),
+                      : null,
+                  child: const Text('Đánh dấu đã đọc'),
+                ),
               ],
+              bottom: NotificationSegmentedTabBar(
+                controller: _tabController,
+                unreadAlerts: unreadAlerts,
+                unreadInvites: unreadInvites,
+              ),
+            ),
+            body: SafeArea(
+              child: TabBarView(
+                controller: _tabController,
+                children: [
+                  _buildNotificationList(context, alertNotifications, false),
+                  _buildNotificationList(context, inviteNotifications, true),
+                ],
+              ),
             ),
           ),
         );
@@ -526,7 +544,7 @@ class _InviteNotificationCard extends StatelessWidget {
                                         .read<PendingInvitesCubit>()
                                         .respondToInvite(
                                           notification.inviteRequestId ?? '',
-                                          'declined',
+                                          false,
                                         );
                                   },
                             style: OutlinedButton.styleFrom(
@@ -557,7 +575,7 @@ class _InviteNotificationCard extends StatelessWidget {
                                         .read<PendingInvitesCubit>()
                                         .respondToInvite(
                                           notification.inviteRequestId ?? '',
-                                          'accepted',
+                                          true,
                                         );
                                   },
                             style: FilledButton.styleFrom(

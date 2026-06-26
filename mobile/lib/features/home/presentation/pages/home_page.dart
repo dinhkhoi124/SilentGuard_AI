@@ -238,6 +238,7 @@ class _HomeTab extends StatelessWidget {
             message: message,
           ), // FIX: show session-expired UI only for auth failures.
           HomeError(:final message) => _ErrorView(message: message),
+          CameraStreamUrlInitial() ||
           CameraStreamUrlLoading() ||
           CameraStreamUrlLoaded() ||
           CameraStreamUrlFailure() => const WaveTextLoader(),

@@ -85,6 +85,10 @@ final class CameraStreamUrlLoading extends HomeState {
   List<Object?> get props => [cameraId];
 }
 
+final class CameraStreamUrlInitial extends HomeState {
+  const CameraStreamUrlInitial();
+}
+
 final class CameraStreamUrlLoaded extends HomeState {
   const CameraStreamUrlLoaded({
     required this.cameraId,

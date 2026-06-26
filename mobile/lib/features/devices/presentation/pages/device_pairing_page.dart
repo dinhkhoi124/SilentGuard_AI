@@ -4,10 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mobile/core/utils/app_colors.dart';
+import 'package:mobile/features/devices/domain/entities/paired_device.dart';
 import 'package:mobile/features/devices/presentation/bloc/device_pairing_bloc.dart';
 import 'package:mobile/features/devices/presentation/bloc/device_pairing_event.dart';
 import 'package:mobile/features/devices/presentation/bloc/device_pairing_state.dart';
-import 'package:mobile/features/devices/domain/entities/resolved_device.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 class DevicePairingPage extends StatelessWidget {
@@ -34,83 +34,19 @@ class DevicePairingPage extends StatelessWidget {
       ),
       body: SafeArea(
         top: false,
-        child: BlocConsumer<DevicePairingBloc, DevicePairingState>(
-          listenWhen: (previous, current) => current is DevicePairingSuccess,
-          listener: (context, state) {
-            if (state is DevicePairingSuccess) {
-              context.pop();
-            }
-          },
+        child: BlocBuilder<DevicePairingBloc, DevicePairingState>(
           builder: (context, state) {
             return switch (state) {
-              DevicePairingInitial() => const _ProgressView(
-                title: 'Chuẩn bị quét mã QR',
-                message: 'Đang kiểm tra quyền camera.',
-                activeStep: 0,
-              ),
+              DevicePairingInitial() => const _InitialView(),
               DevicePairingScanning() => const _ScannerView(),
-              DevicePairingResolving() => const _ProgressView(
-                title: 'Đang xác minh thiết bị',
-                message: 'SlientGuard đang gửi mã QR đến máy chủ AI.',
-                activeStep: 1,
+              DevicePairingLoading(:final serialNumber) => _LoadingView(
+                serialNumber: serialNumber,
               ),
-              DevicePairingCheckingImou(:final resolvedDevice) => _ProgressView(
-                title: 'Đang kiểm tra Imou Cloud',
-                message:
-                    'Thiết bị ${resolvedDevice.displayName} đã được xác minh bởi SlientGuard.',
-                activeStep: 2,
+              DevicePairingSuccess(:final device) => _SuccessView(
+                device: device,
               ),
-              DevicePairingObtainingStream(:final imouStatus) => _ProgressView(
-                title: 'Đang lấy luồng Imou',
-                message: imouStatus.isOnline
-                    ? 'Camera ${imouStatus.deviceName ?? imouStatus.serialNumber} đang online.'
-                    : 'Camera đang offline — vẫn tiếp tục thêm thiết bị.',
-                activeStep: 3,
-              ),
-              DevicePairingNameInput(:final resolvedDevice) => _NameInputView(
-                resolvedDevice: resolvedDevice,
-              ),
-              DevicePairingPersisting(:final resolvedDevice) => _ProgressView(
-                title: 'Đang lưu thiết bị',
-                message:
-                    'Đang lưu ${resolvedDevice.displayName} vào máy chủ AI.',
-                activeStep: 4,
-              ),
-              DevicePairingPermissionDenied(:final message) => _MessageView(
-                icon: Icons.gpp_bad_outlined,
-                title: 'Thiếu quyền truy cập',
+              DevicePairingError(:final message) => _ErrorView(
                 message: message,
-                primaryLabel: 'Thử lại',
-                onPrimary: () => context.read<DevicePairingBloc>().add(
-                  const DevicePairingRetryRequested(),
-                ),
-                secondaryLabel: 'Mở cài đặt',
-                onSecondary: () => context.read<DevicePairingBloc>().add(
-                  const DevicePairingOpenSettingsRequested(),
-                ),
-                tertiaryLabel: 'Chọn ảnh QR',
-                onTertiary: () => context.read<DevicePairingBloc>().add(
-                  const DevicePairingGalleryQrRequested(),
-                ),
-              ),
-              DevicePairingSuccess(:final device, :final warningMessage) =>
-                _ProgressView(
-                  title: 'Hoàn tất',
-                  message: warningMessage ?? 'Đã thêm ${device.name}.',
-                  activeStep: 5,
-                ),
-              DevicePairingError(:final message) => _MessageView(
-                icon: Icons.warning_amber_rounded,
-                title: 'Không thể thêm thiết bị',
-                message: message,
-                primaryLabel: 'Thử lại',
-                onPrimary: () => context.read<DevicePairingBloc>().add(
-                  const DevicePairingRetryRequested(),
-                ),
-                secondaryLabel: 'Chọn ảnh QR',
-                onSecondary: () => context.read<DevicePairingBloc>().add(
-                  const DevicePairingGalleryQrRequested(),
-                ),
               ),
             };
           },
@@ -120,86 +56,94 @@ class DevicePairingPage extends StatelessWidget {
   }
 }
 
-class _NameInputView extends StatefulWidget {
-  const _NameInputView({required this.resolvedDevice});
-
-  final ResolvedDevice resolvedDevice;
-
-  @override
-  State<_NameInputView> createState() => _NameInputViewState();
-}
-
-class _NameInputViewState extends State<_NameInputView> {
-  late final TextEditingController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = TextEditingController(
-      text: widget.resolvedDevice.displayName,
-    );
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
+class _InitialView extends StatelessWidget {
+  const _InitialView();
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 34, 20, 28),
-      children: [
-        const Icon(
-          Icons.camera_alt_outlined,
-          size: 48,
-          color: AppColors.primary,
-        ),
-        const SizedBox(height: 22),
-        const Text(
-          'Đặt tên camera',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            color: AppColors.darkText,
-            fontSize: 22,
-            fontWeight: FontWeight.w700,
+    return const _MessageLayout(
+      icon: Icons.qr_code_scanner_rounded,
+      title: 'Quét QR camera',
+      message: 'Đang chuẩn bị camera để đọc mã serial trên thiết bị.',
+      child: Padding(
+        padding: EdgeInsets.only(top: 20),
+        child: Center(
+          child: CircularProgressIndicator(
+            strokeWidth: 2.5,
+            color: AppColors.primary,
           ),
         ),
-        const SizedBox(height: 8),
-        Text(
-          'Serial: ${widget.resolvedDevice.serialNumber}',
-          textAlign: TextAlign.center,
-          style: const TextStyle(
-            color: AppColors.mutedText,
-            fontSize: 14,
-            height: 1.45,
+      ),
+    );
+  }
+}
+
+class _LoadingView extends StatelessWidget {
+  const _LoadingView({required this.serialNumber});
+
+  final String serialNumber;
+
+  @override
+  Widget build(BuildContext context) {
+    return _MessageLayout(
+      icon: Icons.cloud_upload_outlined,
+      title: 'Đang đăng ký camera',
+      message: 'Serial: $serialNumber',
+      child: const Padding(
+        padding: EdgeInsets.only(top: 20),
+        child: Center(
+          child: CircularProgressIndicator(
+            strokeWidth: 2.5,
+            color: AppColors.primary,
           ),
         ),
-        const SizedBox(height: 28),
-        TextField(
-          controller: _controller,
-          decoration: InputDecoration(
-            labelText: 'Tên thiết bị',
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+      ),
+    );
+  }
+}
+
+class _SuccessView extends StatelessWidget {
+  const _SuccessView({required this.device});
+
+  final PairedDevice device;
+
+  @override
+  Widget build(BuildContext context) {
+    return _MessageLayout(
+      icon: Icons.check_circle_outline_rounded,
+      title: 'Đã thêm camera',
+      message: device.name,
+      child: Padding(
+        padding: const EdgeInsets.only(top: 24),
+        child: FilledButton(
+          onPressed: () => context.pop(true),
+          child: const Text('Xong'),
+        ),
+      ),
+    );
+  }
+}
+
+class _ErrorView extends StatelessWidget {
+  const _ErrorView({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return _MessageLayout(
+      icon: Icons.warning_amber_rounded,
+      title: 'Không thể thêm thiết bị',
+      message: message,
+      child: Padding(
+        padding: const EdgeInsets.only(top: 24),
+        child: FilledButton(
+          onPressed: () => context.read<DevicePairingBloc>().add(
+            const DevicePairingRetryRequested(),
           ),
+          child: const Text('Thử lại'),
         ),
-        const SizedBox(height: 24),
-        FilledButton(
-          onPressed: () {
-            final name = _controller.text.trim();
-            if (name.isEmpty) return;
-            context.read<DevicePairingBloc>().add(
-              DevicePairingNameSubmitted(
-                name,
-                widget.resolvedDevice,
-                widget.resolvedDevice.serialNumber,
-              ),
-            );
-          },
-          child: const Text('Tiếp tục'),
-        ),
-      ],
+      ),
     );
   }
 }
@@ -272,197 +216,40 @@ class _ScannerViewState extends State<_ScannerView> {
         ),
         const SizedBox(height: 8),
         const Text(
-          'Nếu đang chạy bằng trình giả lập, hãy chọn ảnh QR từ thư viện.',
+          'Ứng dụng sẽ lấy serial từ QR và đăng ký camera với máy chủ SilentGuard.',
           style: TextStyle(
             color: AppColors.mutedText,
             fontSize: 14,
             height: 1.45,
           ),
         ),
-        const SizedBox(height: 20),
-        OutlinedButton.icon(
-          onPressed: () => context.read<DevicePairingBloc>().add(
-            const DevicePairingGalleryQrRequested(),
-          ),
-          icon: const Icon(Icons.photo_library_outlined, size: 18),
-          label: const Text('Chọn ảnh QR'),
-          style: OutlinedButton.styleFrom(
-            foregroundColor: AppColors.primary,
-            side: const BorderSide(color: AppColors.border),
-            padding: const EdgeInsets.symmetric(vertical: 15),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(18),
-            ),
-          ),
-        ),
       ],
     );
   }
 }
 
-class _ProgressView extends StatelessWidget {
-  const _ProgressView({
-    required this.title,
-    required this.message,
-    required this.activeStep,
-  });
-
-  final String title;
-  final String message;
-  final int activeStep;
-
-  static const _steps = [
-    'Quyền truy cập',
-    'Xác minh QR',
-    'Kiểm tra Imou',
-    'Lấy luồng',
-    'Lưu thiết bị',
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 34, 20, 28),
-      children: [
-        const _StatusIcon(
-          icon: Icons.qr_code_scanner_rounded,
-          color: AppColors.primary,
-        ),
-        const SizedBox(height: 22),
-        Text(
-          title,
-          style: const TextStyle(
-            color: AppColors.darkText,
-            fontSize: 22,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          message,
-          style: const TextStyle(
-            color: AppColors.mutedText,
-            fontSize: 14,
-            height: 1.45,
-          ),
-        ),
-        const SizedBox(height: 28),
-        DecoratedBox(
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: AppColors.border),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(18),
-            child: Column(
-              children: [
-                for (var index = 0; index < _steps.length; index++)
-                  _StepRow(
-                    label: _steps[index],
-                    isComplete: index < activeStep,
-                    isActive: index == activeStep,
-                  ),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _StepRow extends StatelessWidget {
-  const _StepRow({
-    required this.label,
-    required this.isComplete,
-    required this.isActive,
-  });
-
-  final String label;
-  final bool isComplete;
-  final bool isActive;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = isComplete || isActive ? AppColors.primary : AppColors.border;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 9),
-      child: Row(
-        children: [
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 220),
-            width: 24,
-            height: 24,
-            decoration: BoxDecoration(
-              color: isComplete ? AppColors.primary : Colors.transparent,
-              border: Border.all(color: color, width: 1.5),
-              shape: BoxShape.circle,
-            ),
-            child: isComplete
-                ? const Icon(Icons.check, color: Colors.white, size: 15)
-                : isActive
-                ? const Padding(
-                    padding: EdgeInsets.all(5),
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: AppColors.primary,
-                    ),
-                  )
-                : null,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              label,
-              style: TextStyle(
-                color: isActive ? AppColors.darkText : AppColors.mutedText,
-                fontSize: 14,
-                fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _MessageView extends StatelessWidget {
-  const _MessageView({
+class _MessageLayout extends StatelessWidget {
+  const _MessageLayout({
     required this.icon,
     required this.title,
     required this.message,
-    required this.primaryLabel,
-    required this.onPrimary,
-    this.secondaryLabel,
-    this.onSecondary,
-    this.tertiaryLabel,
-    this.onTertiary,
+    this.child,
   });
 
   final IconData icon;
   final String title;
   final String message;
-  final String primaryLabel;
-  final VoidCallback onPrimary;
-  final String? secondaryLabel;
-  final VoidCallback? onSecondary;
-  final String? tertiaryLabel;
-  final VoidCallback? onTertiary;
+  final Widget? child;
 
   @override
   Widget build(BuildContext context) {
+    final isError = icon == Icons.warning_amber_rounded;
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 48, 20, 28),
       children: [
         _StatusIcon(
           icon: icon,
-          color:
-              icon == Icons.warning_amber_rounded ||
-                  icon == Icons.gpp_bad_outlined
-              ? AppColors.destructive
-              : AppColors.primary,
+          color: isError ? AppColors.destructive : AppColors.primary,
         ),
         const SizedBox(height: 22),
         Text(
@@ -482,16 +269,7 @@ class _MessageView extends StatelessWidget {
             height: 1.45,
           ),
         ),
-        const SizedBox(height: 24),
-        FilledButton(onPressed: onPrimary, child: Text(primaryLabel)),
-        if (secondaryLabel != null && onSecondary != null) ...[
-          const SizedBox(height: 12),
-          OutlinedButton(onPressed: onSecondary, child: Text(secondaryLabel!)),
-        ],
-        if (tertiaryLabel != null && onTertiary != null) ...[
-          const SizedBox(height: 12),
-          TextButton(onPressed: onTertiary, child: Text(tertiaryLabel!)),
-        ],
+        ?child,
       ],
     );
   }

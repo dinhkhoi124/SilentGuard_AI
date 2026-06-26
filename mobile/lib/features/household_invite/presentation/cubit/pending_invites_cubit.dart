@@ -39,7 +39,8 @@ class PendingInvitesCubit extends Cubit<PendingInvitesState> {
     }
   }
 
-  Future<void> respondToInvite(String inviteRequestId, String action) async {
+  Future<void> respondToInvite(String inviteRequestId, bool accepted) async {
+    final action = accepted ? 'accepted' : 'declined';
     List<InviteRequest> currentInvites = [];
     if (state is PendingInvitesLoaded) {
       currentInvites = (state as PendingInvitesLoaded).invites;
@@ -50,7 +51,7 @@ class PendingInvitesCubit extends Cubit<PendingInvitesState> {
     emit(RespondingToInvite(inviteRequestId, currentInvites));
 
     try {
-      await _dataSource.respondToInvite(inviteRequestId, action);
+      await _dataSource.respondToInvite(inviteRequestId, accepted);
 
       // Update local list
       final updatedInvites = currentInvites
@@ -65,8 +66,16 @@ class PendingInvitesCubit extends Cubit<PendingInvitesState> {
         _notificationsCubit.removeByInviteRequestId(inviteRequestId);
 
         if (action == 'accepted') {
-          _sessionRepository.clearCachedSession();
-          await _sessionRepository.provisionSession();
+          try {
+            final invite = currentInvites.firstWhere(
+              (i) => i.inviteRequestId == inviteRequestId,
+            );
+            await _sessionRepository.switchHousehold(invite.householdId);
+          } catch (_) {
+            // fallback if invite is somehow missing
+            _sessionRepository.clearCachedSession();
+            await _sessionRepository.provisionSession();
+          }
           _homeBloc.add(const HomeStarted());
         }
       } catch (_) {

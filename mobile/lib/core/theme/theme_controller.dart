@@ -9,15 +9,28 @@ class ThemeController extends ChangeNotifier {
   static const _darkValue = 'dark';
   static const _systemValue = 'system';
 
-  final SharedPreferencesAsync _preferences;
-  ThemeMode _themeMode = ThemeMode.light;
+  final SharedPreferences _preferences;
+  ThemeMode _themeMode = ThemeMode.system;
 
   ThemeMode get themeMode => _themeMode;
 
   Future<void> load() async {
-    _themeMode = _themeModeFromValue(
-      await _preferences.getString(_themeModeKey),
-    );
+    // Không await để tách khỏi main thread startup block
+    _loadAsync();
+  }
+
+  Future<void> _loadAsync() async {
+    try {
+      final loadedMode = _themeModeFromValue(
+        _preferences.getString(_themeModeKey),
+      );
+      if (loadedMode == _themeMode) return;
+      _themeMode = loadedMode;
+      notifyListeners();
+    } catch (e) {
+      // Keystore/crypto lỗi trên một số thiết bị Android — giữ nguyên default theme
+      debugPrint('[ThemeController] Failed to load theme preference: $e');
+    }
   }
 
   Future<void> setThemeMode(ThemeMode mode) async {

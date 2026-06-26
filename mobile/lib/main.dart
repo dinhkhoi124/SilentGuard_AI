@@ -27,15 +27,17 @@ import 'package:shared_preferences/shared_preferences.dart';
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   try {
     WidgetsFlutterBinding.ensureInitialized();
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    ).timeout(const Duration(seconds: 5));
+    if (Firebase.apps.isEmpty) {
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      ).timeout(const Duration(seconds: 5));
+    }
     final type = message.data['type']?.toString();
     final cameraId = _cameraIdFromPayload(message.data);
     if (type == 'fall_alert' && cameraId != null) {
       final isSuppressed =
           await MonitoringSuppressService.isSuppressedInBackground(
-            sharedPreferences: SharedPreferencesAsync(),
+            sharedPreferences: await SharedPreferences.getInstance(),
             cameraId: cameraId,
           );
       if (isSuppressed) {
@@ -74,10 +76,12 @@ String? _cameraIdFromPayload(Map<String, dynamic> data) {
 }
 
 Future<void> main() async {
-  // Tier 1: only the Flutter binding and Firebase core are allowed to block
-  // before runApp. Everything else is delayed until Flutter can paint splash.
+  debugPrint('=== MAIN STARTED ===');
   final binding = WidgetsFlutterBinding.ensureInitialized();
-  FlutterNativeSplash.preserve(widgetsBinding: binding);
+  _logStartupSync(
+    'FlutterNativeSplash.preserve',
+    () => FlutterNativeSplash.preserve(widgetsBinding: binding),
+  );
   Stopwatch? startupStopwatch;
   if (kDebugMode) {
     startupStopwatch = Stopwatch()..start();
@@ -88,28 +92,37 @@ Future<void> main() async {
       );
     });
   }
-  await Future.wait([
-    Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform),
-  ]);
-  FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
-  await di.init();
-  await di.sl<ThemeController>().load();
 
-  final appRouter = AppRouter(di.sl());
-
+  debugPrint('[STEP] runApp start');
   runApp(
-    BootstrapApp(appRouter: appRouter, initializer: const AppInitializer()),
+    BootstrapApp(
+      initializer: AppInitializer(initializeFirebase: _initializeFirebase),
+    ),
   );
+  debugPrint('[STEP] runApp done');
+}
+
+Future<void> _initializeFirebase() async {
+  if (Firebase.apps.isEmpty) {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+  }
+  FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+}
+
+T _logStartupSync<T>(String label, T Function() action) {
+  final stopwatch = Stopwatch()..start();
+  try {
+    return action();
+  } finally {
+    debugPrint('[STARTUP] $label: ${stopwatch.elapsedMilliseconds}ms');
+  }
 }
 
 class BootstrapApp extends StatefulWidget {
-  const BootstrapApp({
-    super.key,
-    required this.appRouter,
-    required this.initializer,
-  });
+  const BootstrapApp({super.key, required this.initializer});
 
-  final AppRouter appRouter;
   final AppInitializer initializer;
 
   @override
@@ -117,6 +130,9 @@ class BootstrapApp extends StatefulWidget {
 }
 
 class _BootstrapAppState extends State<BootstrapApp> {
+  AppRouter? _appRouter;
+  Object? _initializationError;
+
   @override
   void initState() {
     super.initState();
@@ -126,19 +142,27 @@ class _BootstrapAppState extends State<BootstrapApp> {
   }
 
   Future<void> _initializePostFrame() async {
+    debugPrint('[STEP] postFrame start');
     try {
-      // Tier 2: plugin setup, local notifications, and initial FCM lookup stay
-      // post-frame. AppInitializer yields between platform-channel calls to
-      // avoid DartMessenger congestion.
-      final result = await widget.initializer.initializeAfterFirstFrame(
-        appRouter: widget.appRouter,
-      );
+      final result = await widget.initializer.initializeAfterFirstFrame();
       if (!mounted) return;
+      setState(() {
+        _appRouter = result.appRouter;
+      });
 
       WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
         widget.initializer.scheduleMessagingSetup(result);
       });
+      debugPrint('[STEP] postFrame complete');
     } catch (error, stackTrace) {
+      debugPrint('[CRASH] _initializePostFrame failed: $error\n$stackTrace');
+      if (mounted) {
+        FlutterNativeSplash.remove();
+        setState(() {
+          _initializationError = error;
+        });
+      }
       developer.log(
         'App post-frame initialization failed.',
         name: 'Bootstrap',
@@ -150,7 +174,41 @@ class _BootstrapAppState extends State<BootstrapApp> {
 
   @override
   Widget build(BuildContext context) {
-    return MyApp(appRouter: widget.appRouter);
+    debugPrint('[STEP] BootstrapApp.build called');
+    final appRouter = _appRouter;
+    if (appRouter != null) return MyApp(appRouter: appRouter);
+
+    return _BootstrapShell(error: _initializationError);
+  }
+}
+
+class _BootstrapShell extends StatelessWidget {
+  const _BootstrapShell({this.error});
+
+  final Object? error;
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'WatchNest',
+      debugShowCheckedModeBanner: false,
+      theme: AppTheme.light,
+      locale: const Locale('vi', 'VN'),
+      home: Scaffold(
+        backgroundColor: AppTheme.light.scaffoldBackgroundColor,
+        body: Center(
+          child: error == null
+              ? const CircularProgressIndicator()
+              : Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Text(
+                    'Không thể khởi động ứng dụng.\n$error',
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+        ),
+      ),
+    );
   }
 }
 

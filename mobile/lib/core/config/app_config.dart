@@ -10,7 +10,7 @@ abstract final class AppConfig {
         '804956207376-l4fp0vs97r8vjg1bcvru7ffub6bjctgn.apps.googleusercontent.com',
   );
 
-  static const String imouApiBaseUrl = String.fromEnvironment(
+  static const String imouBaseUrl = String.fromEnvironment(
     'IMOU_API_BASE_URL',
     defaultValue: 'https://openapi-sg.easy4ip.com/openapi',
   );
@@ -25,14 +25,7 @@ abstract final class AppConfig {
     defaultValue: '201c43cf082041a48e5bd69be23cf4',
   );
 
-  static const String defaultOnvifUsername = String.fromEnvironment(
-    'ONVIF_USERNAME',
-  );
 
-  static const String defaultOnvifPassword = String.fromEnvironment(
-    'ONVIF_PASSWORD',
-  );
 
   static const Duration networkTimeout = Duration(seconds: 15);
-  static const Duration onvifDiscoveryTimeout = Duration(seconds: 6);
 }

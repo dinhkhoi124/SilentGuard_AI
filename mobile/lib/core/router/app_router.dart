@@ -127,7 +127,7 @@ class AppRouter {
         path: '/help-support',
         builder: (context, state) => const HelpSupportPage(),
       ),
-      GoRoute(path: '/faq', builder: (context, state) => const FaqPage()),
+
       GoRoute(
         path: '/notifications',
         builder: (context, state) => const NotificationsPage(),

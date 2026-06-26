@@ -5,10 +5,10 @@ class OnboardingService {
 
   static const _completedKey = 'onboarding_completed';
 
-  final SharedPreferencesAsync _preferences;
+  final SharedPreferences _preferences;
 
   Future<bool> isCompleted() async {
-    return await _preferences.getBool(_completedKey) ?? false;
+    return _preferences.getBool(_completedKey) ?? false;
   }
 
   Future<void> markCompleted() {

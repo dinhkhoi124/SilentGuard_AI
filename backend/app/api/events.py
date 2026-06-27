@@ -9,6 +9,13 @@ from app.core.security import verify_device_key_dependency, get_current_user, re
 from app.core.supabase_client import supabase
 from app.models.schemas import EventDetectRequest
 from app.services.alert_engine import process_event
+from app.services.severity_engine import classify_severity
+from app.db.queries import get_thresholds, get_contacts_sorted
+from app.services.notification_service import send_push
+
+class DurationUpdateRequest(BaseModel):
+    duration_sec: int
+    status: str = "tracking" # tracking, recovered
 
 router = APIRouter(prefix="/api/events", tags=["Events"])
 
@@ -469,6 +476,82 @@ async def detect_event(
         "status": "received",
         "event_id": req.event_id
     }
+
+
+@router.put("/{event_id}/duration", status_code=status.HTTP_200_OK)
+async def update_event_duration(
+    event_id: str,
+    req: DurationUpdateRequest,
+    x_device_key: str = Header(None, alias="X-Device-Key")
+):
+    """
+    PUT /api/events/{event_id}/duration
+    Updates the duration of an ongoing event and escalates severity if needed.
+    """
+    camera = await verify_device_key_dependency(x_device_key)
+    household_id = camera.get("household_id")
+    
+    # 1. Fetch existing event
+    try:
+        res = supabase.table("events").select("*").eq("event_id", event_id).eq("household_id", household_id).execute()
+        if not res.data or len(res.data) == 0:
+            raise HTTPException(status_code=404, detail="Event not found")
+        
+        event_data = res.data[0]
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error fetching event for duration update: {e}")
+        raise HTTPException(status_code=500, detail="Database error")
+        
+    old_severity = event_data.get("severity")
+    
+    # 2. Get thresholds & reclassify
+    thresholds = await get_thresholds(household_id)
+    new_severity = classify_severity(req.duration_sec, thresholds)
+    
+    severity_order = {"LOW": 1, "MEDIUM": 2, "HIGH": 3, "CRITICAL": 4}
+    old_order = severity_order.get(old_severity, 1)
+    new_order = severity_order.get(new_severity, 1)
+    
+    update_data = {
+        "duration_sec": req.duration_sec,
+        "severity": new_severity if new_order > old_order else old_severity
+    }
+    
+    if req.status == "recovered":
+        update_data["status"] = "recovered"
+        
+    # 3. Update database
+    try:
+        supabase.table("events").update(update_data).eq("id", event_data["id"]).execute()
+    except Exception as e:
+        print(f"Error updating event duration: {e}")
+        
+    # 4. Escalate if severity increased
+    if new_order > old_order:
+        print(f"[Escalation] Event {event_id} escalated from {old_severity} to {new_severity} after {req.duration_sec}s")
+        event_data.update(update_data)
+        
+        # Gửi lại Push Notification với mức độ mới
+        contacts = await get_contacts_sorted(household_id)
+        if contacts:
+            primary = contacts[0]
+            event_data["llm_message"] = f"⚠️ CẢNH BÁO {new_severity}: Nạn nhân đã nằm trên sàn {req.duration_sec} giây!"
+            await send_push(primary.get("user_id"), event_data)
+            
+            try:
+                escalation_entry = {
+                    "event_id": event_data["id"],
+                    "contact_id": primary.get("id"),
+                    "status": "escalated"
+                }
+                supabase.table("escalation_logs").insert(escalation_entry).execute()
+            except Exception:
+                pass
+                
+    return {"status": "updated", "duration_sec": req.duration_sec, "severity": update_data["severity"]}
+
 
 @router.post("/upload_clip", status_code=status.HTTP_201_CREATED)
 async def upload_clip(

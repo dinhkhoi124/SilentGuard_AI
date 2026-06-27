@@ -17,78 +17,88 @@ class CameraLatestEventCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final appearance = _eventAppearance(latestEvent.type);
+    final levelAppearance = _eventLevelAppearance(latestEvent.level);
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: const Color(0xFFFFF0F0),
         border: Border.all(color: const Color(0xFFFFCDD2)),
         borderRadius: BorderRadius.circular(16),
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const _CircleIcon(
-            icon: Icons.accessibility_new,
-            backgroundColor: Color(0xFFFFE5E5),
-            iconColor: Color(0xFFE53935),
-            size: 44,
+          _CircleIcon(
+            icon: appearance.icon,
+            backgroundColor: appearance.backgroundColor,
+            iconColor: appearance.iconColor,
+            size: 42,
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  'Sự kiện gần nhất',
+                  'SỰ KIỆN GẦN NHẤT',
                   style: TextStyle(
-                    fontSize: 11,
+                    fontSize: 10,
                     color: Color(0xFFE53935),
-                    fontWeight: FontWeight.w600,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.5,
                   ),
                 ),
-                const SizedBox(height: 4),
-                const Wrap(
-                  spacing: 8,
-                  runSpacing: 4,
-                  crossAxisAlignment: WrapCrossAlignment.center,
+                const SizedBox(height: 6),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Nghi ngờ té ngã',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.darkText,
+                    Expanded(
+                      child: Text(
+                        latestEvent.title,
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.darkText,
+                          height: 1.2,
+                        ),
                       ),
                     ),
-                    _LevelBadge(label: 'Mức cao', color: Color(0xFFE53935)),
+                    if (levelAppearance.badge != null) ...[
+                      const SizedBox(width: 8),
+                      levelAppearance.badge!,
+                    ],
                   ],
                 ),
-                const SizedBox(height: 4),
-                const Text(
-                  '09:35 AM  •  20 giây trước',
-                  style: TextStyle(fontSize: 11, color: AppColors.mutedText),
-                ),
+                const SizedBox(height: 6),
                 Text(
-                  device.location,
+                  _buildMetadata(latestEvent, device.location),
                   style: const TextStyle(
-                    fontSize: 11,
+                    fontSize: 12,
                     color: AppColors.mutedText,
+                    height: 1.4,
                   ),
                 ),
               ],
             ),
           ),
-          const SizedBox(width: 8),
-          const Column(
-            children: [
-              _Thumbnail(width: 64, height: 48),
-              SizedBox(height: 4),
-              Icon(Icons.chevron_right, color: AppColors.mutedText, size: 20),
-            ],
-          ),
         ],
       ),
     );
+  }
+
+  String _buildMetadata(CameraEvent event, String fallbackRoom) {
+    final parts = <String>[
+      event.time,
+      event.room.isNotEmpty ? event.room : fallbackRoom,
+      if (event.durationSec != null && event.durationSec! > 0)
+        '${event.durationSec}s',
+      if (event.confidence != null)
+        '${(event.confidence! * 100).toStringAsFixed(0)}% tin cậy',
+    ];
+    return parts.join(' · ');
   }
 }
 
@@ -112,20 +122,6 @@ class _CircleIcon extends StatelessWidget {
   );
 }
 
-class _Thumbnail extends StatelessWidget {
-  const _Thumbnail({required this.width, required this.height});
-  final double width;
-  final double height;
-  @override
-  Widget build(BuildContext context) => ClipRRect(
-    borderRadius: BorderRadius.circular(8),
-    child: ColoredBox(
-      color: const Color(0xFFBDBDBD),
-      child: SizedBox(width: width, height: height),
-    ),
-  );
-}
-
 class _LevelBadge extends StatelessWidget {
   const _LevelBadge({required this.label, required this.color});
   final String label;
@@ -146,4 +142,50 @@ class _LevelBadge extends StatelessWidget {
       ),
     ),
   );
+}
+
+({Color backgroundColor, Color iconColor, IconData icon}) _eventAppearance(
+  EventType type,
+) {
+  return switch (type) {
+    EventType.fall => (
+      backgroundColor: const Color(0xFFFFE5E5),
+      iconColor: const Color(0xFFE53935),
+      icon: Icons.accessibility_new,
+    ),
+    EventType.still => (
+      backgroundColor: const Color(0xFFFFF3E0),
+      iconColor: const Color(0xFFFF9800),
+      icon: Icons.airline_seat_flat,
+    ),
+    EventType.normal => (
+      backgroundColor: const Color(0xFFE8F5E9),
+      iconColor: AppColors.safe,
+      icon: Icons.directions_run,
+    ),
+    EventType.reconnect => (
+      backgroundColor: const Color(0xFFF5F5F5),
+      iconColor: AppColors.mutedText,
+      icon: Icons.videocam_off_outlined,
+    ),
+  };
+}
+
+({Color timeColor, _LevelBadge? badge}) _eventLevelAppearance(
+  EventLevel level,
+) {
+  return switch (level) {
+    EventLevel.high => (
+      timeColor: const Color(0xFFE53935),
+      badge: const _LevelBadge(label: 'Mức cao', color: Color(0xFFE53935)),
+    ),
+    EventLevel.medium => (
+      timeColor: const Color(0xFFFF9800),
+      badge: const _LevelBadge(
+        label: 'Mức trung bình',
+        color: Color(0xFFFF9800),
+      ),
+    ),
+    _ => (timeColor: AppColors.darkText, badge: null),
+  };
 }

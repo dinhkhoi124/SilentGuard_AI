@@ -11,6 +11,12 @@ class CameraDevice extends Equatable {
     required this.isArmed,
     required this.accessories,
     required this.accessoryStates,
+    this.ipAddress,
+    this.rtspUrl,
+    this.model,
+    this.serialNumber,
+    this.productId,
+    this.room,
   });
 
   final String id;
@@ -20,8 +26,26 @@ class CameraDevice extends Equatable {
   final bool isArmed;
   final List<String> accessories;
   final List<bool> accessoryStates;
+  final String? ipAddress;
+  final String? rtspUrl;
+  final String? model;
+  final String? serialNumber;
+  final String? productId;
 
-  CameraDevice copyWith({List<bool>? accessoryStates, bool? isArmed}) {
+  /// Raw backend room key (e.g. 'bedroom', 'living_room').
+  /// Distinct from [location] which is the human-readable display string.
+  final String? room;
+
+  CameraDevice copyWith({
+    List<bool>? accessoryStates,
+    bool? isArmed,
+    String? ipAddress,
+    String? rtspUrl,
+    String? model,
+    String? serialNumber,
+    String? productId,
+    String? room,
+  }) {
     return CameraDevice(
       id: id,
       name: name,
@@ -30,6 +54,12 @@ class CameraDevice extends Equatable {
       isArmed: isArmed ?? this.isArmed,
       accessories: accessories,
       accessoryStates: accessoryStates ?? this.accessoryStates,
+      ipAddress: ipAddress ?? this.ipAddress,
+      rtspUrl: rtspUrl ?? this.rtspUrl,
+      model: model ?? this.model,
+      serialNumber: serialNumber ?? this.serialNumber,
+      productId: productId ?? this.productId,
+      room: room ?? this.room,
     );
   }
 
@@ -42,5 +72,11 @@ class CameraDevice extends Equatable {
     isArmed,
     accessories,
     accessoryStates,
+    ipAddress,
+    rtspUrl,
+    model,
+    serialNumber,
+    productId,
+    room,
   ];
 }

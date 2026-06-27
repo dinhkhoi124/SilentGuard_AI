@@ -1,0 +1,12 @@
+flutter_native_splash:
+  color: "#2B5CE6"
+  image: assets/images/SlientGuard_badge.png
+  color_dark: "#2B5CE6"
+  image_dark: assets/images/SlientGuard_badge.png
+  fullscreen: false
+
+  android_12:
+    color: "#2B5CE6"
+    image: assets/images/SlientGuard_badge.png
+    color_dark: "#2B5CE6"
+    image_dark: assets/images/SlientGuard_badge.png

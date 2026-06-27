@@ -5,7 +5,6 @@ import 'package:mobile/core/network/api_client.dart';
 import 'package:mobile/features/household_invite/data/datasources/household_invite_remote_data_source.dart';
 import 'package:mobile/features/household_invite/domain/entities/invite_exceptions.dart';
 import 'package:mobile/features/household_invite/presentation/cubit/invite_management_state.dart';
-import 'package:mobile/injection_container.dart';
 
 class InviteManagementCubit extends Cubit<InviteManagementState> {
   InviteManagementCubit(this._dataSource)

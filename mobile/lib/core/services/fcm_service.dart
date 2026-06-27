@@ -110,6 +110,10 @@ class FcmService with WidgetsBindingObserver {
     try {
       await requestNotificationPermission();
       final token = await _messaging.getToken().timeout(_messagingTimeout);
+      developer.log(
+        '[FCM_TOKEN] Current FCM Token: $token',
+        name: 'FcmService',
+      );
       await _registerTokenValue(token, source: 'current');
     } catch (error, stackTrace) {
       developer.log(

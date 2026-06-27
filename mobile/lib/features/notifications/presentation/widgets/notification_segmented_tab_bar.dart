@@ -52,23 +52,59 @@ class NotificationSegmentedTabBar extends StatelessWidget
           splashBorderRadius: BorderRadius.circular(8),
           tabs: [
             Tab(
-              child: Badge(
-                isLabelVisible: unreadAlerts > 0,
-                label: Text(unreadAlerts.toString()),
-                child: const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 4.0),
-                  child: Text('Cảnh báo'),
-                ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text('Cảnh báo'),
+                  if (unreadAlerts > 0) ...[
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: AppColors.badgeRed,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        unreadAlerts > 99 ? '99+' : unreadAlerts.toString(),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          height: 1.1,
+                          letterSpacing: 0,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
             Tab(
-              child: Badge(
-                isLabelVisible: unreadInvites > 0,
-                label: Text(unreadInvites.toString()),
-                child: const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 4.0),
-                  child: Text('Hệ thống'),
-                ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text('Hệ thống'),
+                  if (unreadInvites > 0) ...[
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: AppColors.badgeRed,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        unreadInvites > 99 ? '99+' : unreadInvites.toString(),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          height: 1.1,
+                          letterSpacing: 0,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
           ],

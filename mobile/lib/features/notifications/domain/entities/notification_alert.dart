@@ -38,12 +38,20 @@ class NotificationAlert extends Equatable {
   String get displayTitle {
     final trimmedTitle = title?.trim() ?? '';
     if (trimmedTitle.isNotEmpty) return trimmedTitle;
+    
+    if (type == 'household_invite') {
+      return 'Lời mời tham gia hộ gia đình';
+    }
     return 'Cảnh báo té ngã';
   }
 
   String get displayBody {
     final trimmedBody = body?.trim() ?? '';
     if (trimmedBody.isNotEmpty) return trimmedBody;
+
+    if (type == 'household_invite') {
+      return 'Bạn có một lời mời tham gia hộ gia đình đang chờ phản hồi.';
+    }
 
     final trimmedRoom = room?.trim() ?? '';
     if (trimmedRoom.isNotEmpty) return 'Phát hiện sự kiện tại $trimmedRoom.';

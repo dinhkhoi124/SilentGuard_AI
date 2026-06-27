@@ -38,10 +38,11 @@ class HouseholdInviteRemoteDataSourceImpl
 
   @override
   Future<List<InviteRequest>> getPendingInvites() async {
-    final response = await _apiClient.getList(
+    final response = await _apiClient.getObject(
       '/api/households/invite-requests/pending',
     );
-    return response.map((json) => InviteRequest.fromJson(json)).toList();
+    final itemsList = response['items'] as List<dynamic>? ?? [];
+    return itemsList.map((json) => InviteRequest.fromJson(json)).toList();
   }
 
   @override
@@ -54,9 +55,10 @@ class HouseholdInviteRemoteDataSourceImpl
 
   @override
   Future<List<HouseholdMember>> getHouseholdMembers(String householdId) async {
-    final response = await _apiClient.getList(
+    final response = await _apiClient.getObject(
       '/api/households/$householdId/members',
     );
-    return response.map((json) => HouseholdMember.fromJson(json)).toList();
+    final membersList = response['members'] as List<dynamic>? ?? [];
+    return membersList.map((json) => HouseholdMember.fromJson(json)).toList();
   }
 }

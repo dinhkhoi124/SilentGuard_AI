@@ -87,7 +87,7 @@ class _InviteDialogState extends State<InviteDialog> {
                     controller: _emailController,
                     keyboardType: TextInputType.emailAddress,
                     decoration: InputDecoration(
-                      hintText: 'Nhập email tài khoản SilentGuard',
+                      hintText: 'Nhập email tài khoản',
                       hintStyle: TextStyle(
                         color: AppColors.mutedText,
                         fontWeight: FontWeight.w400,

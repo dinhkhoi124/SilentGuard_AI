@@ -1,4 +1,4 @@
-# Project: Smartify Flutter App
+# Project: SlientGuard Flutter App
 ## Stack: Flutter 3.x, BLoC, GoRouter, GetIt, Clean Architecture
 ## Navigation: GoRouter only. Navigator.push/pop ONLY for dialogs/bottom sheets.
 ## State: HomeBloc owns home+device state. AuthNotifier owns auth state.

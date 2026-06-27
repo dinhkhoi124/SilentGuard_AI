@@ -30,12 +30,29 @@ class RoomFilterChips extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       clipBehavior: Clip.none,
       child: Row(
         children: rooms.map((room) {
           final selected = room == selectedRoom;
+          final backgroundColor = selected
+              ? AppColors.primary
+              : isDark
+              ? theme.colorScheme.surface
+              : AppColors.surface;
+          final borderColor = selected
+              ? AppColors.primary
+              : isDark
+              ? theme.colorScheme.outline.withValues(alpha: 0.75)
+              : AppColors.border.withValues(alpha: 0.55);
+          final textColor = selected
+              ? Colors.white
+              : isDark
+              ? theme.colorScheme.onSurface
+              : AppColors.darkText;
           return Padding(
             padding: const EdgeInsets.only(right: 9),
             child: Semantics(
@@ -50,13 +67,9 @@ class RoomFilterChips extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 17),
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    color: selected ? AppColors.primary : AppColors.surface,
+                    color: backgroundColor,
                     borderRadius: BorderRadius.circular(99),
-                    border: Border.all(
-                      color: selected
-                          ? AppColors.primary
-                          : AppColors.border.withValues(alpha: 0.55),
-                    ),
+                    border: Border.all(color: borderColor),
                     boxShadow: selected
                         ? [
                             BoxShadow(
@@ -70,7 +83,7 @@ class RoomFilterChips extends StatelessWidget {
                   child: Text(
                     roomLabels[room] ?? room,
                     style: TextStyle(
-                      color: selected ? Colors.white : AppColors.darkText,
+                      color: textColor,
                       fontSize: 13,
                       fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
                     ),

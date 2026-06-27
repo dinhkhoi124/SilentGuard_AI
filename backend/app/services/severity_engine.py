@@ -5,11 +5,11 @@ def classify_severity(duration_sec: int, thresholds: dict) -> str:
     Classify event severity based on duration_sec and thresholds.
     Ref: Section 5 Severity Engine
     """
-    if duration_sec < thresholds.get("low_max_sec", 30):
+    if duration_sec < (thresholds.get("low_max_sec") or 30):
         return "LOW"
-    elif duration_sec < thresholds.get("medium_max_sec", 120):
+    elif duration_sec < (thresholds.get("medium_max_sec") or 120):
         return "MEDIUM"
-    elif duration_sec < thresholds.get("high_max_sec", 300):
+    elif duration_sec < (thresholds.get("high_max_sec") or 300):
         return "HIGH"
     else:
         return "CRITICAL"

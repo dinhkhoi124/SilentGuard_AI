@@ -7,5 +7,5 @@ class GetWeather {
 
   final HomeRepository repository;
 
-  Future<Either<String, WeatherInfo>> call() => repository.getWeather();
+  Future<Either<String, WeatherInfo?>> call() => repository.getWeather();
 }

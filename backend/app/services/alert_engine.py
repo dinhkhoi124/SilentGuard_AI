@@ -123,10 +123,11 @@ async def process_event(event_data: dict) -> None:
         
         if phone_numbers:
             from app.services.call_service import make_calls
-            make_calls(
-                phone_numbers=phone_numbers,
-                event_id=event_data["event_id"],
-                room=event_data.get("room", "không xác định")
+            await asyncio.to_thread(
+                make_calls,
+                phone_numbers,
+                event_data["event_id"],
+                event_data.get("room", "không xác định")
             )
 
 

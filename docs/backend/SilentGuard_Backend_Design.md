@@ -1,6 +1,7 @@
 # SilentGuard AI — Backend Design Document (MVP V1)
 
 > Stack: **FastAPI (Python) + Supabase (Postgres + Storage)**, xác thực qua **Firebase Auth** (verify token), push qua **Firebase Cloud Messaging (FCM)**, LLM qua **Claude API**.
+> **Performance**: Toàn bộ các tương tác I/O ngoại vi (FCM, LLM, Supabase Storage) đều được chuyển sang ThreadPool (Non-blocking I/O) để đảm bảo 100% không đóng băng Event Loop.
 
 ---
 
@@ -193,6 +194,18 @@ CREATE TABLE household_invites (
 );
 CREATE INDEX idx_household_invites_code ON household_invites(code);
 
+CREATE TABLE household_invite_requests (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    household_id    UUID NOT NULL REFERENCES households(id) ON DELETE CASCADE,
+    invited_by      UUID NOT NULL REFERENCES users(id),
+    invitee_id      UUID NOT NULL REFERENCES users(id),
+    status          TEXT NOT NULL DEFAULT 'pending',
+    created_at      TIMESTAMPTZ DEFAULT NOW(),
+    responded_at    TIMESTAMPTZ,
+    UNIQUE(household_id, invitee_id)
+);
+CREATE INDEX idx_household_invite_requests_invitee ON household_invite_requests(invitee_id);
+
 ```
 
 ---
@@ -300,9 +313,9 @@ Xử lý:
 1. **Xác thực**:
    - Nếu có `X-Device-Key` -> Thực hiện xác thực thiết bị biên camera bình thường, lấy `camera_id` và `household_id`.
    - Nếu có `X-Upload-Token` -> Tra cứu bảng `video_uploads`. Nếu token hợp lệ và trạng thái là `'pending'`, lấy `household_id`, gán `camera_id = NULL` và `source = 'video_upload'`. Trả về `401 Unauthorized` nếu không hợp lệ.
-2. **Demo fallback**: Nếu `source == 'video_upload'`, tự động ép `severity = 'HIGH'` và `duration_sec = 999`.
+2. **Demo fallback**: Nếu `source == 'video_upload'`, tự động ép `duration_sec = 999` (nhưng giữ nguyên `severity` được phân tích từ AI).
 3. **Insert DB**: Thêm bản ghi vào bảng `events`. Nếu `source == 'video_upload'`, cập nhật trạng thái bảng `video_uploads` thành `'processed'` và liên kết `event_id`.
-4. Nếu `severity != LOW` -> gọi `AlertEngine.process(event)`. (Lưu ý: Bỏ qua bước reclassify severity dựa trên `duration_sec` trong Alert Engine đối với nguồn `video_upload`).
+4. Nếu `event_type == 'fall'` -> gọi `AlertEngine.process(event)`. (Lưu ý: Bỏ qua bước reclassify severity dựa trên `duration_sec` trong Alert Engine đối với nguồn `video_upload`).
 
 Response:
 ```json
@@ -473,6 +486,19 @@ Verify Firebase Token của người dùng, thực hiện JIT Provisioning (kh�
   ```json
   {
     "updated": true
+  }
+  ```
+
+#### 4.6.4 `DELETE /api/users/me`
+Xóa vĩnh viễn tài khoản (Tuân thủ GDPR / Apple App Store).
+
+- **Headers**:
+  - `Authorization: Bearer <idToken>` (Bắt buộc)
+- **Response 200 OK**:
+  ```json
+  {
+    "status": "ok",
+    "message": "Tài khoản đã được xóa thành công"
   }
   ```
 
@@ -727,7 +753,102 @@ Response:
 }
 ```
 
+### 4.12e `POST /api/households/invite-by-email` — Mời thành viên bằng Email
+
+Quyền: `owner` (Chủ hộ).
+
+Header: `Authorization: Bearer <token>`
+
+Body:
+```json
+{
+  "household_id": "household-uuid",
+  "email": "user@example.com"
+}
+```
+
+Response 201 Created:
+```json
+{
+  "invite_request_id": "invite-uuid",
+  "invitee_id": "user-uuid",
+  "status": "pending"
+}
+```
+
+### 4.12f `GET /api/households/invite-requests/pending` — Lấy danh sách lời mời đang chờ xử lý
+
+Quyền: Người dùng đã đăng nhập (invitee).
+
+Header: `Authorization: Bearer <token>`
+
+Response:
+```json
+{
+  "items": [
+    {
+      "id": "invite-uuid",
+      "household_id": "household-uuid",
+      "household_name": "Nha Ba Me",
+      "elderly_name": "Nguyen Van A",
+      "invited_by_name": "Chủ Hộ A",
+      "invited_by_email": "owner@example.com",
+      "status": "pending",
+      "created_at": "2026-06-24T08:00:00Z"
+    }
+  ],
+  "total": 1
+}
+```
+
+### 4.12g `POST /api/households/invite-requests/{invite_id}/respond` — Trả lời lời mời gia đình
+
+Quyền: Người dùng được mời (invitee).
+**Logic (Smart Switch & Cleanup)**: Khi người dùng đồng ý (`action: accepted`), Backend sẽ tự động kiểm tra nhà mặc định hiện tại của họ. Nếu nhà mặc định là "nhà rỗng" (0 camera, 0 thành viên khác), Backend sẽ tự động cập nhật `active_household_id` sang nhà mới này và xóa bỏ dữ liệu nhà rỗng đi để làm sạch DB.
+
+Header: `Authorization: Bearer <token>`
+
+Body:
+```json
+{
+  "action": "accepted" // Hoặc "declined"
+}
+```
+
+Response:
+```json
+{
+  "status": "accepted"
+}
+```
+
+### 4.12h `GET /api/households/{household_id}/members` — Lấy danh sách thành viên hộ gia đình
+
+Quyền: Thành viên thuộc hộ gia đình đó (`owner` hoặc `member`).
+
+Header: `Authorization: Bearer <token>`
+
+Response:
+```json
+{
+  "members": [
+    {
+      "user_id": "user-uuid",
+      "full_name": "Nguyen Van B",
+      "email": "member@example.com",
+      "phone": "0987654321",
+      "role": "member",
+      "joined_at": "2026-06-24T08:00:00Z",
+      "is_in_contacts": true,
+      "contacts_priority": 1
+    }
+  ],
+  "total": 1
+}
+```
+
 ### 4.13 `POST /api/cameras` — Đăng ký camera mới
+
 
 Quyền: `owner` (Chủ hộ).
 

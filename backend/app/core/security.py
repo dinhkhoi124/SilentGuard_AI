@@ -2,6 +2,7 @@ import json
 import os
 import hashlib
 from datetime import datetime, timezone
+import asyncio
 import firebase_admin
 from firebase_admin import auth as fb_auth, credentials
 from fastapi import Depends, HTTPException, Header, status, Request
@@ -26,7 +27,25 @@ else:
     else:
         print("Warning: Firebase service account path not found.")
 
-async def get_or_create_user(firebase_uid: str, email: str = None, name: str = None, invite_code: str = None) -> dict:
+def _normalize_phone(phone: str) -> str:
+    """
+    Normalize Vietnamese phone number to E.164 format.
+    0xxxxxxxxx → +84xxxxxxxxx
+    """
+    phone = phone.strip().replace(" ", "").replace("-", "")
+    if phone.startswith("0"):
+        return "+84" + phone[1:]
+    if phone.startswith("84") and not phone.startswith("+"):
+        return "+" + phone
+    return phone
+
+async def get_or_create_user(
+    firebase_uid: str,
+    email: str = None,
+    name: str = None,
+    phone: str = None,
+    invite_code: str = None
+) -> dict:
     """
     Find or provision a user in users table by firebase_uid.
     Ref: Section 3 Auth Flow - just-in-time provisioning
@@ -70,6 +89,7 @@ async def get_or_create_user(firebase_uid: str, email: str = None, name: str = N
             "firebase_uid": firebase_uid,
             "email": email,
             "full_name": name,
+            "phone": phone,
             "role": "family"
         }
         insert_response = supabase.table("users").insert(new_user).execute()
@@ -90,11 +110,22 @@ async def get_or_create_user(firebase_uid: str, email: str = None, name: str = N
                 "role": "member"
             }).execute()
             
-            # Mark invite as used
-            supabase.table("household_invites").update({
+            # Mark invite as used with optimistic locking
+            update_res = supabase.table("household_invites").update({
                 "used_at": datetime.now(timezone.utc).isoformat(),
                 "used_by": user_uuid
-            }).eq("id", invite_record["id"]).execute()
+            }).eq("id", invite_record["id"]).is_("used_at", "null").execute()
+            
+            if not update_res.data:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail={"error": {"code": "INVALID_INVITE_CODE", "message": "Mã mời đã được sử dụng"}}
+                )
+            
+            supabase.table("users").update({
+                "active_household_id": household_id_to_join
+            }).eq("id", user_uuid).execute()
+            user["active_household_id"] = household_id_to_join
         else:
             # Create a new household with placeholder elderly_name
             h_res = supabase.table("households").insert({
@@ -109,6 +140,11 @@ async def get_or_create_user(firebase_uid: str, email: str = None, name: str = N
                     "user_id": user_uuid,
                     "role": "owner"
                 }).execute()
+                
+                supabase.table("users").update({
+                    "active_household_id": new_h["id"]
+                }).eq("id", user_uuid).execute()
+                user["active_household_id"] = new_h["id"]
 
         return user
     except HTTPException as he:
@@ -119,10 +155,16 @@ async def get_or_create_user(firebase_uid: str, email: str = None, name: str = N
         if settings.APP_ENV == "production":
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail={"error": {"code": "DATABASE_ERROR", "message": f"Failed to get or create user: {str(e)}"}}
+                detail={"error": {"code": "DATABASE_ERROR", "message": "Lỗi hệ thống nội bộ, vui lòng thử lại sau"}}
             )
         # Development fallback
-        fallback_user = {"id": "mock-uuid-user", "firebase_uid": firebase_uid, "email": email, "full_name": name}
+        fallback_user = {
+            "id": "mock-uuid-user",
+            "firebase_uid": firebase_uid,
+            "email": email,
+            "full_name": name,
+            "phone": phone
+        }
         return fallback_user
 
 async def get_current_user(
@@ -137,13 +179,21 @@ async def get_current_user(
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Missing bearer token")
     token = authorization.split(" ", 1)[1]
     try:
-        decoded = fb_auth.verify_id_token(token)
+        decoded = await asyncio.to_thread(fb_auth.verify_id_token, token)
     except Exception as e:
         print(f"Error verifying Firebase token: {e}")
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid Firebase token")
 
     firebase_uid = decoded["uid"]
-    user = await get_or_create_user(firebase_uid, decoded.get("email"), decoded.get("name"), x_invite_code)
+    raw_phone = decoded.get("phone_number")
+    phone = _normalize_phone(raw_phone) if raw_phone else None
+    user = await get_or_create_user(
+        firebase_uid=firebase_uid,
+        email=decoded.get("email"),
+        name=decoded.get("name"),
+        phone=phone,
+        invite_code=x_invite_code
+    )
     return user
 
 def require_household_role(owner_only: bool = False):
@@ -159,19 +209,7 @@ def require_household_role(owner_only: bool = False):
         if not household_id:
             household_id = request.query_params.get("household_id")
         
-        # 2. Resolve from body if still not found
-        if not household_id:
-            try:
-                body_bytes = await request.body()
-                async def receive():
-                    return {"type": "http.request", "body": body_bytes, "more_body": False}
-                request._receive = receive
-                if body_bytes:
-                    body = json.loads(body_bytes)
-                    if isinstance(body, dict):
-                        household_id = body.get("household_id")
-            except Exception:
-                pass
+        # 2. (Removed fallback from body to prevent stream hanging)
         
         user_id = current_user.get("id")
         
@@ -216,7 +254,7 @@ def require_household_role(owner_only: bool = False):
         except Exception as e:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail={"error": {"code": "DATABASE_ERROR", "message": f"Database verification error: {str(e)}"}}
+                detail={"error": {"code": "DATABASE_ERROR", "message": "Lỗi hệ thống nội bộ, vui lòng thử lại sau"}}
             )
     return dependency
 

@@ -53,7 +53,7 @@ async def get_alerts(
         print(f"Error in get_alerts: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"error": {"code": "DATABASE_ERROR", "message": f"Failed to retrieve alerts: {str(e)}"}}
+            detail={"error": {"code": "DATABASE_ERROR", "message": "Lỗi hệ thống nội bộ, vui lòng thử lại sau"}}
         )
 
 @router.patch("/alerts/{event_id}/review", status_code=status.HTTP_200_OK)
@@ -114,7 +114,7 @@ async def review_alert(
             raise e
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"error": {"code": "DATABASE_ERROR", "message": f"Failed to review alert: {str(e)}"}}
+            detail={"error": {"code": "DATABASE_ERROR", "message": "Lỗi hệ thống nội bộ, vui lòng thử lại sau"}}
         )
 
 @router.get("/events/history")
@@ -179,7 +179,7 @@ async def get_event_history(
         print(f"Error in get_event_history: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"error": {"code": "DATABASE_ERROR", "message": f"Failed to retrieve event history: {str(e)}"}}
+            detail={"error": {"code": "DATABASE_ERROR", "message": "Lỗi hệ thống nội bộ, vui lòng thử lại sau"}}
         )
 
 @router.post("/events/{event_id}/feedback", status_code=status.HTTP_200_OK)
@@ -192,9 +192,13 @@ async def post_event_feedback(
     POST /api/events/{event_id}/feedback
     """
     try:
-        res = supabase.table("events").select("id, household_id").eq("event_id", event_id).execute()
+        res = supabase.table("events")\
+            .select("id, household_id, camera_id, cameras(serial_number)")\
+            .eq("event_id", event_id).execute()
         if not res.data:
-            res = supabase.table("events").select("id, household_id").eq("id", event_id).execute()
+            res = supabase.table("events")\
+                .select("id, household_id, camera_id, cameras(serial_number)")\
+                .eq("id", event_id).execute()
             if not res.data:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
@@ -223,10 +227,15 @@ async def post_event_feedback(
             "submitted_by": user["id"],
             "label": req.label,
             "note": req.note,
-            "camera_serial": req.camera_serial
+            "camera_serial": req.camera_serial or (
+                event_data.get("cameras") or {}
+            ).get("serial_number")
         }
         
-        insert_res = supabase.table("event_feedback").insert(feedback_data).select("id").execute()
+        insert_res = supabase.table("event_feedback").upsert(
+            feedback_data,
+            on_conflict="event_id,submitted_by"
+        ).select("id").execute()
         if not insert_res.data:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -243,7 +252,7 @@ async def post_event_feedback(
         print(f"Error in post_event_feedback: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"error": {"code": "DATABASE_ERROR", "message": str(e)}}
+            detail={"error": {"code": "DATABASE_ERROR", "message": "Lỗi hệ thống nội bộ, vui lòng thử lại sau"}}
         )
 
 @router.get("/events/{event_id}")
@@ -298,5 +307,5 @@ async def get_event_detail(
             raise e
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"error": {"code": "DATABASE_ERROR", "message": f"Failed to retrieve event details: {str(e)}"}}
+            detail={"error": {"code": "DATABASE_ERROR", "message": "Lỗi hệ thống nội bộ, vui lòng thử lại sau"}}
         )

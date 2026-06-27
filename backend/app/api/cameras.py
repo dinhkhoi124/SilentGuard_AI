@@ -29,14 +29,17 @@ class CameraUpdateRequest(BaseModel):
 async def create_camera(
     req: CameraCreateRequest,
     request: Request,
-    user: dict = Depends(get_current_user),
-    _owner: dict = Depends(require_household_role(owner_only=True))
+    user: dict = Depends(get_current_user)
 ):
     """
     POST /api/cameras
     Creates a new camera for the household. Owner-only.
     """
     plain_key = f"sg_live_{secrets.token_urlsafe(32)}"
+    
+    # Verify owner role
+    verify_owner_role(req.household_id, user["id"])
+    
     if req.serial_number:
         serial_check = supabase.table("cameras")\
             .select("id")\
@@ -80,7 +83,7 @@ async def create_camera(
         print(f"Error in create_camera: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"error": {"code": "DATABASE_ERROR", "message": f"Failed to create camera: {str(e)}"}}
+            detail={"error": {"code": "DATABASE_ERROR", "message": "Lỗi hệ thống nội bộ, vui lòng thử lại sau"}}
         )
 
 @router.get("")
@@ -95,11 +98,9 @@ async def list_cameras(
     Lists active cameras for a household. Member-only.
     """
     try:
-        res = supabase.table("cameras").select("*").eq("household_id", household_id).execute()
+        res = supabase.table("cameras").select("*").eq("household_id", household_id).is_("deleted_at", "null").execute()
         cameras_list = []
         for cam in (res.data or []):
-            if cam.get("deleted_at") is not None:
-                continue
             cameras_list.append({
                 "id": cam["id"],
                 "name": cam["name"],
@@ -115,7 +116,7 @@ async def list_cameras(
         print(f"Error in list_cameras: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"error": {"code": "DATABASE_ERROR", "message": f"Failed to retrieve cameras: {str(e)}"}}
+            detail={"error": {"code": "DATABASE_ERROR", "message": "Lỗi hệ thống nội bộ, vui lòng thử lại sau"}}
         )
 
 @router.get("/{camera_id}")
@@ -127,8 +128,8 @@ async def get_camera_detail(
     GET /api/cameras/{camera_id}
     """
     try:
-        res = supabase.table("cameras").select("*").eq("id", camera_id).execute()
-        if not res.data or res.data[0].get("deleted_at") is not None:
+        res = supabase.table("cameras").select("*").eq("id", camera_id).is_("deleted_at", "null").execute()
+        if not res.data:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail={"error": {"code": "CAMERA_NOT_FOUND", "message": "Camera not found"}}
@@ -165,7 +166,7 @@ async def get_camera_detail(
         print(f"Error in get_camera_detail: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"error": {"code": "DATABASE_ERROR", "message": str(e)}}
+            detail={"error": {"code": "DATABASE_ERROR", "message": "Lỗi hệ thống nội bộ, vui lòng thử lại sau"}}
         )
 
 @router.patch("/{camera_id}/rotate-key")
@@ -180,8 +181,8 @@ async def rotate_camera_key(
     """
     try:
         # Fetch camera to verify household
-        cam_res = supabase.table("cameras").select("*").eq("id", camera_id).execute()
-        if not cam_res.data or cam_res.data[0].get("deleted_at") is not None:
+        cam_res = supabase.table("cameras").select("*").eq("id", camera_id).is_("deleted_at", "null").execute()
+        if not cam_res.data:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Camera not found")
         camera = cam_res.data[0]
         
@@ -204,7 +205,7 @@ async def rotate_camera_key(
         print(f"Error in rotate_camera_key: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"error": {"code": "DATABASE_ERROR", "message": f"Failed to rotate key: {str(e)}"}}
+            detail={"error": {"code": "DATABASE_ERROR", "message": "Lỗi hệ thống nội bộ, vui lòng thử lại sau"}}
         )
 
 @router.delete("/{camera_id}")
@@ -219,8 +220,8 @@ async def delete_camera(
     """
     try:
         # Fetch camera
-        cam_res = supabase.table("cameras").select("*").eq("id", camera_id).execute()
-        if not cam_res.data or cam_res.data[0].get("deleted_at") is not None:
+        cam_res = supabase.table("cameras").select("*").eq("id", camera_id).is_("deleted_at", "null").execute()
+        if not cam_res.data:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Camera not found")
         camera = cam_res.data[0]
         
@@ -235,7 +236,7 @@ async def delete_camera(
         print(f"Error in delete_camera: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"error": {"code": "DATABASE_ERROR", "message": f"Failed to delete camera: {str(e)}"}}
+            detail={"error": {"code": "DATABASE_ERROR", "message": "Lỗi hệ thống nội bộ, vui lòng thử lại sau"}}
         )
 
 @router.patch("/{camera_id}")
@@ -251,8 +252,8 @@ async def update_camera_details(
     """
     try:
         # Fetch camera
-        cam_res = supabase.table("cameras").select("*").eq("id", camera_id).execute()
-        if not cam_res.data or cam_res.data[0].get("deleted_at") is not None:
+        cam_res = supabase.table("cameras").select("*").eq("id", camera_id).is_("deleted_at", "null").execute()
+        if not cam_res.data:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Camera not found")
         camera = cam_res.data[0]
         
@@ -292,7 +293,7 @@ async def update_camera_details(
         print(f"Error in update_camera_details: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"error": {"code": "DATABASE_ERROR", "message": f"Failed to update camera: {str(e)}"}}
+            detail={"error": {"code": "DATABASE_ERROR", "message": "Lỗi hệ thống nội bộ, vui lòng thử lại sau"}}
         )
 
 class CameraHeartbeatRequest(BaseModel):
@@ -329,7 +330,7 @@ async def get_upload_url(
         if settings.APP_ENV == "production":
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail={"error": {"code": "STORAGE_ERROR", "message": f"Failed to generate presigned upload URL: {str(e)}"}}
+                detail={"error": {"code": "STORAGE_ERROR", "message": "Lỗi hệ thống nội bộ, vui lòng thử lại sau"}}
             )
         # Dev fallback
         upload_url = f"https://sceygoxizfbbhqwatqhx.supabase.co/storage/v1/object/upload/sign/clips/{storage_path}?token=mock"
@@ -375,6 +376,6 @@ async def camera_heartbeat(
         print(f"Error in camera_heartbeat database update: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"error": {"code": "DATABASE_ERROR", "message": f"Failed to update camera heartbeat: {str(e)}"}}
+            detail={"error": {"code": "DATABASE_ERROR", "message": "Lỗi hệ thống nội bộ, vui lòng thử lại sau"}}
         )
 

@@ -37,28 +37,18 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Parse CORS origins
-if settings.APP_ENV == "production":
-    if settings.CORS_ORIGINS:
-        origins = [o.strip() for o in settings.CORS_ORIGINS.split(",") if o.strip()]
-    else:
-        # Default trusted domains for production
-        origins = [
-            "https://silentguard.ai",
-            "https://app.silentguard.ai"
-        ]
-else:
-    # Allow all origins in non-production environments
-    origins = ["*"]
+from fastapi.middleware.cors import CORSMiddleware
 
-# CORS middleware
+cors_origins = [o.strip() for o in settings.CORS_ORIGINS.split(",")] if settings.CORS_ORIGINS else ["*"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 # Mount API Routers
 app.include_router(events_router)

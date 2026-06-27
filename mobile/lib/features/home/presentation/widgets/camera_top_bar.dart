@@ -19,7 +19,7 @@ class CameraTopBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final connectionColor = device.isArmed
-        ? const Color(0xFF4CAF50)
+        ? AppColors.safe
         : AppColors.mutedText;
 
     return Padding(

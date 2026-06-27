@@ -5,8 +5,6 @@ abstract interface class AlertReviewRemoteDataSource {
     required String eventId,
     required String action,
     String? note,
-    String? feedbackLabel,
-    String? falsePositiveReason,
     double? clipTimestamp,
   });
 }
@@ -21,18 +19,11 @@ class AlertReviewRemoteDataSourceImpl implements AlertReviewRemoteDataSource {
     required String eventId,
     required String action,
     String? note,
-    String? feedbackLabel,
-    String? falsePositiveReason,
     double? clipTimestamp,
   }) async {
-    // TODO: when backend adds CHECK constraint for 'uncertain' action,
-    // update this mapping accordingly.
-    final mappedAction = action == 'uncertain' ? 'dismissed' : action;
     final body = <String, dynamic>{
-      'action': mappedAction,
+      'action': action,
       'note': ?note,
-      'feedback_label': ?feedbackLabel,
-      'false_positive_reason': ?falsePositiveReason,
       'clip_timestamp': ?clipTimestamp,
     };
 

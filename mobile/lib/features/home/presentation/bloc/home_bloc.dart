@@ -49,6 +49,8 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
   List<CameraDevice> _activeDevices = [];
   int _loadGeneration = 0;
   Timer? _backendRetryTimer;
+  final Map<String, int> _streamRequestGenerations = {};
+  final Set<String> _closedStreamSerials = {};
 
   /// Tải dữ liệu chính cho trang chủ bao gồm thời tiết, danh sách camera, và kiểm tra session
   Future<void> _loadHome(Emitter<HomeState> emit, {bool silent = false}) async {
@@ -280,9 +282,20 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
       return;
     }
 
+    final requestGeneration =
+        (_streamRequestGenerations[serialNumber] ?? 0) + 1;
+    _streamRequestGenerations[serialNumber] = requestGeneration;
+    _closedStreamSerials.remove(serialNumber);
+
     emit(CameraStreamUrlLoading(event.cameraId));
     try {
       final streamUrl = await imouStreamRepository.getStreamUrl(serialNumber);
+      if (_isStreamRequestStale(serialNumber, requestGeneration)) {
+        debugPrint(
+          '[HomeBloc] ignored stale stream URL for serial=${_maskSerial(serialNumber)}',
+        );
+        return;
+      }
       final trimmedUrl = streamUrl.trim();
       if (!_isPlayableCloudUrl(trimmedUrl)) {
         emit(
@@ -298,7 +311,13 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
       emit(
         CameraStreamUrlLoaded(cameraId: event.cameraId, streamUrl: trimmedUrl),
       );
+    } on LiveStartCancelledException catch (error) {
+      debugPrint('[HomeBloc] stream request cancelled: $error');
+      if (!_isStreamRequestStale(serialNumber, requestGeneration)) {
+        emit(const CameraStreamUrlInitial());
+      }
     } on ImouApiException catch (error) {
+      if (_isStreamRequestStale(serialNumber, requestGeneration)) return;
       emit(
         CameraStreamUrlFailure(
           cameraId: event.cameraId,
@@ -307,6 +326,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
       );
     } catch (error) {
       debugPrint('[HomeBloc] stream request failed: $error');
+      if (_isStreamRequestStale(serialNumber, requestGeneration)) return;
       emit(
         CameraStreamUrlFailure(
           cameraId: event.cameraId,
@@ -324,6 +344,13 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     final serialNumber = event.serialNumber.trim();
     if (serialNumber.isEmpty) return;
 
+    _closedStreamSerials.add(serialNumber);
+    _streamRequestGenerations[serialNumber] =
+        (_streamRequestGenerations[serialNumber] ?? 0) + 1;
+    debugPrint(
+      '[HomeBloc] camera detail closed, stream request generation invalidated '
+      'serial=${_maskSerial(serialNumber)}',
+    );
     lastKnownStreamUrl = null;
     try {
       await imouStreamRepository.releaseStreamSession(serialNumber);
@@ -338,9 +365,10 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
   ) {
     debugPrint('[HomeBloc] playback failed: ${event.error}');
     emit(
-      CameraStreamUrlFailure(
+      CameraPlaybackFailure(
         cameraId: event.cameraId,
-        message: 'Mất kết nối với camera. Vui lòng thử lại.',
+        message: 'Không phát được livestream sau nhiều lần thử.',
+        error: event.error,
       ),
     );
   }
@@ -356,12 +384,23 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
 
   bool _isPlayableCloudUrl(String url) {
     final uri = Uri.tryParse(url);
-    if (uri == null || uri.host.isEmpty || uri.port == 8890) return false;
+    if (uri == null || uri.host.isEmpty) return false;
     final scheme = uri.scheme.toLowerCase();
     if (scheme != 'http' && scheme != 'https') return false;
 
     final path = uri.path.toLowerCase();
     return path.endsWith('.m3u8') || path.endsWith('.flv');
+  }
+
+  bool _isStreamRequestStale(String serialNumber, int requestGeneration) {
+    return _closedStreamSerials.contains(serialNumber) ||
+        _streamRequestGenerations[serialNumber] != requestGeneration;
+  }
+
+  String _maskSerial(String serialNumber) {
+    final value = serialNumber.trim();
+    if (value.length <= 6) return '***';
+    return '${value.substring(0, 3)}***${value.substring(value.length - 3)}';
   }
 
   /// Chuyển đổi trạng thái bật/tắt (toggle) của các phụ kiện đi kèm camera

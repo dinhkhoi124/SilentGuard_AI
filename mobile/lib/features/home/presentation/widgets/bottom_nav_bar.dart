@@ -49,7 +49,7 @@ class BottomNavBar extends StatelessWidget {
                 onTap: () => onSelected(1),
               ),
               _NavItem(
-                icon: Icons.video_library_outlined,
+                icon: Iconsax.video,
                 label: 'Gửi video',
                 onTap: uploadDisabled ? null : onUploadSelected,
                 disabled: uploadDisabled,

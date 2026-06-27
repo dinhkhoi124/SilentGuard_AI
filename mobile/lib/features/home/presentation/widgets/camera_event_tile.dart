@@ -3,26 +3,25 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:mobile/core/utils/app_colors.dart';
-import 'package:mobile/features/home/domain/entities/event_feedback_label.dart';
+import 'package:mobile/features/home/domain/entities/alert_review_feedback.dart';
 import 'package:mobile/features/home/domain/entities/camera_event.dart';
-import 'package:mobile/features/home/presentation/cubit/event_feedback_cubit.dart';
-import 'package:mobile/features/home/presentation/cubit/event_feedback_state.dart';
+import 'package:mobile/features/home/presentation/cubit/alert_review_cubit.dart';
+import 'package:mobile/features/home/presentation/cubit/camera_event_history_cubit.dart';
+import 'package:mobile/features/reports/domain/entities/event_history_item.dart';
 import 'package:mobile/injection_container.dart';
 
 class CameraEventTile extends StatelessWidget {
   const CameraEventTile({
     super.key,
     required this.event,
-    this.initialReviewState,
   });
 
   final CameraEvent event;
-  final EventFeedbackState? initialReviewState;
 
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (_) => sl<EventFeedbackCubit>(param1: event.id),
+      create: (_) => sl<AlertReviewCubit>(),
       child: _CameraEventTileContent(event: event),
     );
   }
@@ -98,7 +97,16 @@ class _CameraEventTileContent extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 16),
-          BlocBuilder<EventFeedbackCubit, EventFeedbackState>(
+          BlocConsumer<AlertReviewCubit, AlertReviewState>(
+            listenWhen: (_, state) => state is ReviewSuccess,
+            listener: (context, state) {
+              if (state is ReviewSuccess) {
+                final newStatus = state.feedback.action == 'acknowledged'
+                    ? EventStatus.acknowledged
+                    : EventStatus.dismissed;
+                context.read<CameraEventHistoryCubit>().updateEventStatus(event.id, newStatus);
+              }
+            },
             builder: (context, state) {
               return _FeedbackStatusRow(event: event, state: state);
             },
@@ -125,17 +133,17 @@ class _FeedbackStatusRow extends StatelessWidget {
   const _FeedbackStatusRow({required this.event, required this.state});
 
   final CameraEvent event;
-  final EventFeedbackState state;
+  final AlertReviewState state;
 
   @override
   Widget build(BuildContext context) {
     final appearance = _feedbackAppearance(state);
 
-    final String displayLabel = state is EventFeedbackInitial
+    final String displayLabel = state is ReviewInitial
         ? event.statusLabel
         : appearance.label;
 
-    final Color displayColor = state is EventFeedbackInitial
+    final Color displayColor = state is ReviewInitial
         ? _statusColor(event.statusLabel)
         : appearance.color;
 
@@ -145,16 +153,16 @@ class _FeedbackStatusRow extends StatelessWidget {
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
         _FeedbackChip(label: displayLabel, color: displayColor),
-        if (state is EventFeedbackInitial)
+        if (state is ReviewInitial && event.statusLabel == 'Đang chờ')
           _FeedbackActionButton(
             label: 'Xác nhận kết quả',
             onPressed: () => _openReviewSheet(context),
           ),
-        if (state is EventFeedbackFailure)
+        if (state is ReviewFailure)
           _FeedbackActionButton(
             label: 'Thử lại',
             onPressed: () {
-              context.read<EventFeedbackCubit>().retry();
+              context.read<AlertReviewCubit>().retry();
             },
           ),
       ],
@@ -162,7 +170,7 @@ class _FeedbackStatusRow extends StatelessWidget {
   }
 
   Future<void> _openReviewSheet(BuildContext context) async {
-    final cubit = context.read<EventFeedbackCubit>();
+    final cubit = context.read<AlertReviewCubit>();
     final result = await showModalBottomSheet<_ReviewChoice>(
       context: context,
       isScrollControlled: true,
@@ -171,11 +179,17 @@ class _FeedbackStatusRow extends StatelessWidget {
     );
 
     if (result == null) return;
-    await cubit.submit(label: result.label, note: result.note);
+    await cubit.submit(
+      AlertReviewFeedback(
+        eventId: event.id,
+        action: result.action,
+        note: result.note,
+      ),
+    );
   }
 
   Color _statusColor(String statusLabel) {
-    if (statusLabel == 'Đang chờ') return AppColors.primary;
+    if (statusLabel == 'Đang chờ') return const Color(0xFFD97706); // Amber 600 for premium yellow
     if (statusLabel == 'Đã xử lý') return const Color(0xFF2E7D32);
     if (statusLabel == 'Báo động giả') return AppColors.mutedText;
     if (statusLabel == 'Đã chuyển tiếp') return const Color(0xFFE53935);
@@ -231,7 +245,7 @@ class _ReviewBottomSheetState extends State<_ReviewBottomSheet> {
                 subtitle: 'Xác nhận đây là cảnh báo đúng.',
                 icon: Icons.accessibility_new,
                 onTap: () => _submit(
-                  const _ReviewChoice(label: EventFeedbackLabel.correct),
+                  const _ReviewChoice(action: 'acknowledged'),
                 ),
               ),
               const SizedBox(height: 10),
@@ -241,7 +255,7 @@ class _ReviewBottomSheetState extends State<_ReviewBottomSheet> {
                 icon: Icons.close_rounded,
                 onTap: () => _submit(
                   _ReviewChoice(
-                    label: EventFeedbackLabel.incorrect,
+                    action: 'dismissed',
                     note: _falsePositiveReasonController.text.trim(),
                   ),
                 ),
@@ -266,15 +280,6 @@ class _ReviewBottomSheetState extends State<_ReviewBottomSheet> {
                   ),
                 ),
               ),
-              const SizedBox(height: 10),
-              _ReviewChoiceTile(
-                title: 'Chưa thể xác định',
-                subtitle: 'Lưu là chưa rõ để xem xét thêm.',
-                icon: Icons.help_outline_rounded,
-                onTap: () => _submit(
-                  const _ReviewChoice(label: EventFeedbackLabel.uncertain),
-                ),
-              ),
             ],
           ),
         ),
@@ -288,9 +293,9 @@ class _ReviewBottomSheetState extends State<_ReviewBottomSheet> {
 }
 
 class _ReviewChoice {
-  const _ReviewChoice({required this.label, this.note});
+  const _ReviewChoice({required this.action, this.note});
 
-  final EventFeedbackLabel label;
+  final String action;
   final String? note;
 }
 
@@ -490,31 +495,31 @@ class _LevelBadge extends StatelessWidget {
   }
 }
 
-({String label, Color color}) _feedbackAppearance(EventFeedbackState state) {
+({String label, Color color}) _feedbackAppearance(AlertReviewState state) {
   return switch (state) {
-    EventFeedbackInitial() => (
+    ReviewInitial() => (
       label: 'Chưa xác nhận',
       color: AppColors.mutedText,
     ),
-    EventFeedbackSubmitting() => (
+    ReviewSubmitting() => (
       label: 'Đang gửi phản hồi...',
       color: AppColors.mutedText,
     ),
-    EventFeedbackSuccess(:final label) => switch (label) {
-      EventFeedbackLabel.correct => (
-        label: 'Đã phản hồi: Té ngã thật',
+    ReviewSuccess(:final feedback) => switch (feedback.action) {
+      'acknowledged' => (
+        label: 'Đã xác nhận: Té ngã thật',
         color: const Color(0xFF2E7D32),
       ),
-      EventFeedbackLabel.incorrect => (
-        label: 'Đã phản hồi: Cảnh báo nhầm',
+      'dismissed' => (
+        label: 'Đã xác nhận: Báo động giả',
         color: AppColors.primary,
       ),
-      EventFeedbackLabel.uncertain => (
-        label: 'Đã phản hồi: Chưa rõ',
+      _ => (
+        label: 'Đã xác nhận',
         color: AppColors.mutedText,
       ),
     },
-    EventFeedbackFailure() => (
+    ReviewFailure() => (
       label: 'Chưa đồng bộ',
       color: const Color(0xFFF57C00),
     ),

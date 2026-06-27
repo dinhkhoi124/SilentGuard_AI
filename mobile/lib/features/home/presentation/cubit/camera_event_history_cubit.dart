@@ -1,6 +1,7 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:mobile/features/home/domain/entities/camera_device.dart';
 import 'package:mobile/features/home/presentation/cubit/camera_event_history_state.dart';
+import 'package:mobile/features/reports/domain/entities/event_history_item.dart';
 import 'package:mobile/features/reports/domain/usecases/get_event_history.dart';
 import 'package:mobile/features/session/domain/repositories/session_repository.dart';
 
@@ -49,4 +50,17 @@ class CameraEventHistoryCubit extends Cubit<CameraEventHistoryState> {
 
   /// Retries the last load for [device].
   Future<void> retry(CameraDevice device) => loadForCamera(device);
+
+  void updateEventStatus(String eventId, EventStatus newStatus) {
+    final currentState = state;
+    if (currentState is CameraEventHistoryLoaded) {
+      final updatedItems = currentState.items.map((item) {
+        if (item.eventId == eventId) {
+          return item.copyWith(status: newStatus);
+        }
+        return item;
+      }).toList();
+      emit(CameraEventHistoryLoaded(items: updatedItems));
+    }
+  }
 }

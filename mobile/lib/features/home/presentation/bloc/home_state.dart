@@ -112,6 +112,21 @@ final class CameraStreamUrlFailure extends HomeState {
   List<Object?> get props => [cameraId, message];
 }
 
+final class CameraPlaybackFailure extends HomeState {
+  const CameraPlaybackFailure({
+    required this.cameraId,
+    required this.message,
+    required this.error,
+  });
+
+  final String cameraId;
+  final String message;
+  final String error;
+
+  @override
+  List<Object?> get props => [cameraId, message, error];
+}
+
 final class HomeError extends HomeState {
   const HomeError(this.message);
 

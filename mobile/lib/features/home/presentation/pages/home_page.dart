@@ -68,7 +68,7 @@ class _HomePageState extends State<HomePage> {
           messenger.showSnackBar(
             const SnackBar(
               content: Text(
-                '✅ Video đã được gửi. AI sẽ phân tích trong nền và gửi thông báo nếu phát hiện sự cố.',
+                'Video đã được gửi. AI sẽ phân tích trong nền và gửi thông báo nếu phát hiện sự cố.',
               ),
               backgroundColor: AppColors.darkText,
             ),
@@ -76,7 +76,7 @@ class _HomePageState extends State<HomePage> {
         } else if (state is VideoUploadFailure) {
           messenger.showSnackBar(
             const SnackBar(
-              content: Text('❌ Không thể gửi video. Vui lòng thử lại.'),
+              content: Text('Không thể gửi video. Vui lòng thử lại.'),
               backgroundColor: AppColors.badgeRed,
             ),
           );
@@ -241,7 +241,8 @@ class _HomeTab extends StatelessWidget {
           CameraStreamUrlInitial() ||
           CameraStreamUrlLoading() ||
           CameraStreamUrlLoaded() ||
-          CameraStreamUrlFailure() => const WaveTextLoader(),
+          CameraStreamUrlFailure() ||
+          CameraPlaybackFailure() => const WaveTextLoader(),
           HomeLoaded() => _LoadedHome(state: state),
         };
       },
@@ -258,9 +259,15 @@ class _LoadedHome extends StatelessWidget {
   Widget build(BuildContext context) {
     return SafeArea(
       top: false,
-      child: CustomScrollView(
-        slivers: [
-          SliverPadding(
+      child: RefreshIndicator(
+        onRefresh: () async {
+          context.read<HomeBloc>().add(const HomeRetryRequested(silent: true));
+          await Future.delayed(const Duration(seconds: 1));
+        },
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
+            SliverPadding(
             padding: const EdgeInsets.fromLTRB(
               AppSpacing.pagePadding,
               6,
@@ -304,6 +311,7 @@ class _LoadedHome extends StatelessWidget {
             ),
           ),
         ],
+        ),
       ),
     );
   }

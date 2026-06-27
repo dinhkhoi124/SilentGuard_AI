@@ -20,8 +20,6 @@ class AlertReviewRepositoryImpl implements AlertReviewRepository {
         eventId: feedback.eventId,
         action: feedback.action,
         note: feedback.note,
-        feedbackLabel: feedback.feedbackLabel,
-        falsePositiveReason: feedback.falsePositiveReason,
         clipTimestamp: feedback.clipTimestamp,
       );
       return const Right(null);

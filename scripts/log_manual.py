@@ -29,11 +29,6 @@ from pathlib import Path
 
 VN_TZ = timezone(timedelta(hours=7))
 
-if hasattr(sys.stdout, "reconfigure"):
-    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-if hasattr(sys.stderr, "reconfigure"):
-    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
-
 
 def git(cmd):
     try:
@@ -110,8 +105,8 @@ def main():
     with open(log_file, "a", encoding="utf-8") as f:
         f.write(json.dumps(entry, ensure_ascii=False) + "\n")
 
-    print(f"\n[log] Logged: [{tool}] {prompt[:80]}")
-    print(f"[log] Saved to: {log_file}")
+    print(f"\n[log] ✅ Logged: [{tool}] {prompt[:80]}")
+    print(f"[log] 📁 Saved to: {log_file}")
 
 
 if __name__ == "__main__":

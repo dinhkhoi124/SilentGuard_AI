@@ -63,4 +63,28 @@ class EventHistoryItem {
   final DateTime? timestamp;
   final int? durationSec;
   final String? clipPath;
+
+  EventHistoryItem copyWith({
+    String? id,
+    String? eventId,
+    EventSeverity? severity,
+    EventStatus? status,
+    String? room,
+    double? confidence,
+    DateTime? timestamp,
+    int? durationSec,
+    String? clipPath,
+  }) {
+    return EventHistoryItem(
+      id: id ?? this.id,
+      eventId: eventId ?? this.eventId,
+      severity: severity ?? this.severity,
+      status: status ?? this.status,
+      room: room ?? this.room,
+      confidence: confidence ?? this.confidence,
+      timestamp: timestamp ?? this.timestamp,
+      durationSec: durationSec ?? this.durationSec,
+      clipPath: clipPath ?? this.clipPath,
+    );
+  }
 }

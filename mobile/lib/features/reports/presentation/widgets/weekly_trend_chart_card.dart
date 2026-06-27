@@ -120,7 +120,7 @@ class _WeeklyTrendChartCardState extends State<WeeklyTrendChartCard> {
     setState(() {
       _selectedMetricIndex = index;
       final values = currentMetrics[index].values;
-      int maxVal = -1;
+      int maxVal = 0;
       int maxIdx = DateTime.now().weekday - 1;
       for (int i = 0; i < values.length; i++) {
         if (values[i] > maxVal) {

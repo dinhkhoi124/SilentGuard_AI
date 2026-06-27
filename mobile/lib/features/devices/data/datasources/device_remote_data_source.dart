@@ -57,8 +57,16 @@ class DeviceRemoteDataSourceImpl implements DeviceRemoteDataSource {
       debugPrint('POST /api/cameras body: ${jsonEncode(requestBody)}');
 
       final response = await _apiClient.postObject('/api/cameras', requestBody);
+      
+      developer.log('=== ADD CAM RESPONSE: ${jsonEncode(response)} ===', name: 'DeviceRemoteDataSource');
+      final payloadData = _payload(response);
+      final apiKey = payloadData['api_key'] ?? response['api_key'];
+      if (apiKey != null) {
+        developer.log('=== DEVICE API KEY: $apiKey ===', name: 'DeviceRemoteDataSource');
+      }
+
       return PairedDeviceModel.fromJson({
-        ..._payload(response),
+        ...payloadData,
         'household_id': householdId,
         'ip_address': 'imou-cloud',
         'rtsp_url': '',

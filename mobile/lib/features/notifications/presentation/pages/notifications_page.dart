@@ -47,9 +47,11 @@ class _NotificationsPageState extends State<NotificationsPage>
 
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<NotificationsCubit, NotificationsState>(
-      builder: (context, state) {
-        final alertNotifications = state.notifications
+    return BlocProvider(
+      create: (_) => di.sl<PendingInvitesCubit>(),
+      child: BlocBuilder<NotificationsCubit, NotificationsState>(
+        builder: (context, state) {
+          final alertNotifications = state.notifications
             .where((n) => n.type != 'household_invite')
             .toList();
         final inviteNotifications = state.notifications
@@ -69,9 +71,10 @@ class _NotificationsPageState extends State<NotificationsPage>
           listener: (context, pendingState) {
             if (pendingState is RespondSuccess &&
                 pendingState.action == 'accepted') {
+              di.sl<SessionRepository>().provisionSession();
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
-                  content: Text('Đã tham gia hộ gia đình thành công'),
+                  content: Text('Bạn đã tham gia gia đình thành công. Camera và thông báo đã được bật.'),
                   backgroundColor: AppColors.safe,
                 ),
               );
@@ -131,6 +134,7 @@ class _NotificationsPageState extends State<NotificationsPage>
           ),
         );
       },
+      ),
     );
   }
 
@@ -162,21 +166,18 @@ class _NotificationsPageState extends State<NotificationsPage>
       itemBuilder: (context, index) {
         final item = grouped[index];
         if (item is String) {
+          final isDark = Theme.of(context).brightness == Brightness.dark;
           return Padding(
-            padding: const EdgeInsets.only(top: 8, bottom: 8),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  item,
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.primary,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                const Divider(height: 1, color: AppColors.border),
-              ],
+            padding: const EdgeInsets.only(top: 16, bottom: 8, left: 4),
+            child: Text(
+              item,
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: isDark
+                    ? Theme.of(context).colorScheme.primary
+                    : AppColors.primary,
+                letterSpacing: -0.2,
+              ),
             ),
           );
         } else if (item is NotificationAlert) {
@@ -257,13 +258,32 @@ class _NotificationCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final accent = _severityColor(notification);
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
-    return Material(
-      color: AppColors.surface,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? theme.colorScheme.surfaceContainer : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: AppColors.border.withValues(alpha: 0.5),
+        ),
+        boxShadow: [
+          if (!isDark)
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.02),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -344,6 +364,7 @@ class _NotificationCard extends StatelessWidget {
           ),
         ),
       ),
+    ),
     );
   }
 
@@ -409,25 +430,8 @@ class _InviteNotificationCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider(
-      create: (_) => di.sl<PendingInvitesCubit>(),
-      child: BlocConsumer<PendingInvitesCubit, PendingInvitesState>(
-        listener: (context, state) {
-          if (state is RespondSuccess &&
-              state.inviteRequestId == notification.inviteRequestId) {
-            if (state.action == 'accepted') {
-              di.sl<SessionRepository>().provisionSession();
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    'Bạn đã tham gia ${notification.householdName ?? 'gia đình'}. Camera và thông báo đã được bật.',
-                  ),
-                ),
-              );
-            }
-          }
-        },
-        builder: (context, state) {
+    return BlocBuilder<PendingInvitesCubit, PendingInvitesState>(
+      builder: (context, state) {
           final isResponding =
               state is RespondingToInvite &&
               state.inviteRequestId == notification.inviteRequestId;
@@ -440,11 +444,26 @@ class _InviteNotificationCard extends StatelessWidget {
           final theme = Theme.of(context);
           final isDark = theme.brightness == Brightness.dark;
 
-          return Material(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(16),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          return Container(
+            decoration: BoxDecoration(
+              color: isDark ? theme.colorScheme.surfaceContainer : Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: AppColors.border.withValues(alpha: 0.5),
+              ),
+              boxShadow: [
+                if (!isDark)
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.02),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+              ],
+            ),
+            child: Material(
+              color: Colors.transparent,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -610,9 +629,9 @@ class _InviteNotificationCard extends StatelessWidget {
                 ],
               ),
             ),
+          ),
           );
         },
-      ),
     );
   }
 }

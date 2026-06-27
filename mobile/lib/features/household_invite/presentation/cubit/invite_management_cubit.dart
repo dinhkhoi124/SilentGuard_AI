@@ -47,40 +47,4 @@ class InviteManagementCubit extends Cubit<InviteManagementState> {
     }
   }
 
-  Future<void> addToAlerts(String userId, String householdId) async {
-    final currentState = state;
-    if (currentState is InviteManagementLoaded) {
-      try {
-        await sl<ApiClient>().postObject('/api/contacts', {
-          'user_id': userId,
-          'household_id': householdId,
-        });
-        await loadMembers(householdId);
-      } catch (e) {
-        emit(
-          const InviteManagementError('Không thể thêm vào danh sách cảnh báo.'),
-        );
-        emit(currentState);
-      }
-    }
-  }
-
-  Future<void> reorderContacts(
-    String contactId,
-    int newPriority,
-    String householdId,
-  ) async {
-    final currentState = state;
-    if (currentState is InviteManagementLoaded) {
-      try {
-        await sl<ApiClient>().patch('/api/contacts/$contactId', {
-          'priority_order': newPriority,
-        });
-        await loadMembers(householdId);
-      } catch (e) {
-        emit(const InviteManagementError('Không thể đổi thứ tự ưu tiên.'));
-        emit(currentState);
-      }
-    }
-  }
 }

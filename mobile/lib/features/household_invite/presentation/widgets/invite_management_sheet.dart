@@ -72,7 +72,7 @@ class _SheetContent extends StatelessWidget {
           ),
           const SizedBox(height: 24),
           Text(
-            'Người nhận cảnh báo',
+            'Danh sách thành viên',
             style: theme.textTheme.titleLarge?.copyWith(
               fontWeight: FontWeight.w800,
               letterSpacing: -0.5,
@@ -85,7 +85,7 @@ class _SheetContent extends StatelessWidget {
               horizontal: AppSpacing.pagePadding,
             ),
             child: Text(
-              'Thành viên sẽ nhận thông báo khi phát hiện té ngã',
+              'Những người đang tham gia vào gia đình này',
               textAlign: TextAlign.center,
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: isDark
@@ -113,63 +113,22 @@ class _SheetContent extends StatelessWidget {
                 }
 
                 if (state is InviteManagementLoaded) {
-                  final inContacts =
-                      state.members.where((m) => m.isInContacts).toList()..sort(
-                        (a, b) => (a.contactsPriority ?? 999).compareTo(
-                          b.contactsPriority ?? 999,
-                        ),
-                      );
-                  final notInContacts = state.members
-                      .where((m) => !m.isInContacts)
-                      .toList();
+                  final members = state.members;
 
                   return CustomScrollView(
                     controller: scrollController,
                     slivers: [
-                      if (inContacts.isNotEmpty)
-                        SliverToBoxAdapter(
-                          child: Padding(
-                            padding: const EdgeInsets.fromLTRB(
-                              AppSpacing.pagePadding,
-                              16,
-                              AppSpacing.pagePadding,
-                              8,
-                            ),
-                            child: Text(
-                              'Danh sách ưu tiên',
-                              style: theme.textTheme.titleSmall?.copyWith(
-                                color: isDark
-                                    ? theme.colorScheme.primary
-                                    : AppColors.primary,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ),
-                      SliverReorderableList(
-                        itemCount: inContacts.length,
-                        onReorder: (oldIndex, newIndex) {
-                          if (!isOwner) {
-                            return;
-                          }
-                          if (newIndex > oldIndex) {
-                            newIndex -= 1;
-                          }
-                          final member = inContacts[oldIndex];
-                          final householdId =
-                              sl<SessionRepository>().currentHouseholdId ?? '';
-                          context.read<InviteManagementCubit>().reorderContacts(
-                            member.userId,
-                            newIndex + 1,
-                            householdId,
-                          );
-                          // A proper implementation would update the local list immediately for UI responsiveness,
-                          // but cubit re-fetches for simplicity.
-                        },
-                        itemBuilder: (context, index) {
-                          final member = inContacts[index];
+                      SliverList(
+                        delegate: SliverChildBuilderDelegate((
+                          context,
+                          index,
+                        ) {
+                          final member = members[index];
+                          final hasName = member.fullName.trim().isNotEmpty;
+                          final displayName = hasName ? member.fullName : member.email;
+                          final displayEmail = hasName ? member.email : '';
+
                           return Padding(
-                            key: ValueKey(member.userId),
                             padding: const EdgeInsets.symmetric(
                               horizontal: AppSpacing.pagePadding,
                               vertical: 6,
@@ -186,220 +145,94 @@ class _SheetContent extends StatelessWidget {
                                   ),
                                 ),
                                 boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.03),
-                                    blurRadius: 8,
-                                    offset: const Offset(0, 4),
-                                  ),
+                                  if (!isDark)
+                                    BoxShadow(
+                                      color: Colors.black.withValues(alpha: 0.02),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 2),
+                                    ),
                                 ],
                               ),
-                              child: Material(
-                                color: Colors.transparent,
-                                child: ListTile(
-                                  contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 16,
-                                    vertical: 4,
-                                  ),
-                                  leading: CircleAvatar(
-                                    backgroundColor: isDark
-                                        ? theme
-                                              .colorScheme
-                                              .surfaceContainerHighest
-                                        : const Color(0xFFF0F4F8),
-                                    child: Text(
-                                      member.fullName.isNotEmpty
-                                          ? member.fullName[0].toUpperCase()
-                                          : '?',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.w700,
-                                        color: isDark
-                                            ? theme.colorScheme.onSurface
-                                            : AppColors.darkText,
-                                      ),
-                                    ),
-                                  ),
-                                  title: Text(
-                                    member.fullName,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w700,
-                                      letterSpacing: -0.2,
-                                    ),
-                                  ),
-                                  subtitle: Text(
-                                    member.role == 'owner'
-                                        ? 'Chủ gia đình'
-                                        : 'Thành viên',
+                              child: ListTile(
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 6,
+                                ),
+                                leading: CircleAvatar(
+                                  radius: 22,
+                                  backgroundColor: isDark
+                                      ? theme.colorScheme.surfaceContainerHighest
+                                      : const Color(0xFFF1F5F9),
+                                  child: Text(
+                                    displayName[0].toUpperCase(),
                                     style: TextStyle(
-                                      color: AppColors.mutedText,
-                                      fontWeight: FontWeight.w500,
+                                      fontWeight: FontWeight.w700,
+                                      color: isDark
+                                          ? theme.colorScheme.onSurface
+                                          : const Color(0xFF0F172A),
                                     ),
-                                  ),
-                                  trailing: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 8,
-                                          vertical: 4,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: AppColors.warning.withValues(
-                                            alpha: 0.1,
-                                          ),
-                                          borderRadius: BorderRadius.circular(
-                                            8,
-                                          ),
-                                        ),
-                                        child: Row(
-                                          children: [
-                                            const Icon(
-                                              Icons.star,
-                                              color: AppColors.warning,
-                                              size: 14,
-                                            ),
-                                            const SizedBox(width: 4),
-                                            Text(
-                                              '${member.contactsPriority ?? index + 1}',
-                                              style: const TextStyle(
-                                                color: AppColors.warning,
-                                                fontWeight: FontWeight.w700,
-                                                fontSize: 12,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      if (isOwner) ...[
-                                        const SizedBox(width: 12),
-                                        const Icon(
-                                          Icons.drag_indicator,
-                                          color: AppColors.mutedText,
-                                          size: 20,
-                                        ),
-                                      ],
-                                    ],
                                   ),
                                 ),
+                                title: Row(
+                                  children: [
+                                    Flexible(
+                                      child: Text(
+                                        displayName,
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 15,
+                                          letterSpacing: -0.2,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    if (member.role == 'owner') ...[
+                                      const SizedBox(width: 8),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 6,
+                                          vertical: 2,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: theme.colorScheme.primary.withValues(alpha: 0.1),
+                                          borderRadius: BorderRadius.circular(6),
+                                        ),
+                                        child: Text(
+                                          'Chủ hộ',
+                                          style: TextStyle(
+                                            color: theme.colorScheme.primary,
+                                            fontWeight: FontWeight.w700,
+                                            fontSize: 11,
+                                            letterSpacing: 0.2,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                                subtitle: displayEmail.isNotEmpty
+                                    ? Padding(
+                                        padding: const EdgeInsets.only(top: 2),
+                                        child: Text(
+                                          displayEmail,
+                                          style: TextStyle(
+                                            color: isDark
+                                                ? theme.colorScheme.onSurfaceVariant
+                                                : const Color(0xFF64748B),
+                                            fontWeight: FontWeight.w500,
+                                            fontSize: 13,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      )
+                                    : null,
                               ),
                             ),
                           );
-                        },
+                        }, childCount: members.length),
                       ),
-                      if (isOwner && notInContacts.isNotEmpty)
-                        SliverToBoxAdapter(
-                          child: Padding(
-                            padding: const EdgeInsets.fromLTRB(
-                              AppSpacing.pagePadding,
-                              24,
-                              AppSpacing.pagePadding,
-                              8,
-                            ),
-                            child: Text(
-                              'Thành viên khác',
-                              style: theme.textTheme.titleSmall?.copyWith(
-                                color: isDark
-                                    ? theme.colorScheme.primary
-                                    : AppColors.primary,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ),
-                      if (isOwner)
-                        SliverList(
-                          delegate: SliverChildBuilderDelegate((
-                            context,
-                            index,
-                          ) {
-                            final member = notInContacts[index];
-                            return Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: AppSpacing.pagePadding,
-                                vertical: 6,
-                              ),
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color: isDark
-                                      ? theme.colorScheme.surfaceContainer
-                                      : Colors.white,
-                                  borderRadius: BorderRadius.circular(16),
-                                  border: Border.all(
-                                    color: AppColors.border.withValues(
-                                      alpha: 0.5,
-                                    ),
-                                  ),
-                                ),
-                                child: ListTile(
-                                  contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 16,
-                                    vertical: 4,
-                                  ),
-                                  leading: CircleAvatar(
-                                    backgroundColor: isDark
-                                        ? theme
-                                              .colorScheme
-                                              .surfaceContainerHighest
-                                        : const Color(0xFFF0F4F8),
-                                    child: Text(
-                                      member.fullName.isNotEmpty
-                                          ? member.fullName[0].toUpperCase()
-                                          : '?',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.w700,
-                                        color: isDark
-                                            ? theme.colorScheme.onSurface
-                                            : AppColors.darkText,
-                                      ),
-                                    ),
-                                  ),
-                                  title: Text(
-                                    member.fullName,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w700,
-                                      letterSpacing: -0.2,
-                                    ),
-                                  ),
-                                  subtitle: Text(
-                                    member.email,
-                                    style: const TextStyle(
-                                      color: AppColors.mutedText,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                  trailing: FilledButton.tonalIcon(
-                                    onPressed: () {
-                                      final householdId =
-                                          sl<SessionRepository>()
-                                              .currentHouseholdId ??
-                                          '';
-                                      context
-                                          .read<InviteManagementCubit>()
-                                          .addToAlerts(
-                                            member.userId,
-                                            householdId,
-                                          );
-                                    },
-                                    icon: const Icon(Icons.add, size: 16),
-                                    label: const Text(
-                                      'Thêm',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    style: FilledButton.styleFrom(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 12,
-                                      ),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(10),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            );
-                          }, childCount: notInContacts.length),
-                        ),
                     ],
                   );
                 }

@@ -20,49 +20,6 @@ def git(cmd):
         return ""
 
 
-def _extract_codex_prompt(data: dict) -> str:
-    prompt = (data.get("prompt") or "").strip()
-    if prompt:
-        return prompt[:1000]
-
-    transcript_path = (data.get("transcript_path") or "").strip()
-    if not transcript_path:
-        return ""
-
-    path = Path(transcript_path)
-    if not path.exists():
-        return ""
-
-    try:
-        with open(path, encoding="utf-8") as f:
-            lines = [line.strip() for line in f if line.strip()]
-    except Exception:
-        return ""
-
-    for raw_line in reversed(lines):
-        try:
-            entry = json.loads(raw_line)
-        except json.JSONDecodeError:
-            continue
-
-        payload = entry.get("payload") or {}
-        if entry.get("type") == "event_msg" and payload.get("type") in (
-            "user_message",
-            "user_prompt",
-        ):
-            for key in ("message", "prompt", "content", "text"):
-                value = (payload.get(key) or "").strip()
-                if value:
-                    return value[:1000]
-
-        for key in ("prompt", "message", "content", "text"):
-            value = (entry.get(key) or "").strip()
-            if value:
-                return value[:1000]
-
-    return ""
-
-
 def detect_tool(data: dict) -> str:
     """Detect which AI tool sent this hook event.
 
@@ -170,7 +127,7 @@ def normalize(data: dict, tool: str) -> dict | None:
         if base["session_id"] and turn_id:
             base["entry_id"] = f"codex-{base['session_id']}-{turn_id}"
         base.update({
-            "prompt": _extract_codex_prompt(data),
+            "prompt": data.get("prompt", "")[:1000],
             "turn_id": turn_id,
             "transcript_path": data.get("transcript_path", ""),
         })

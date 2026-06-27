@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:developer' as developer;
 import 'dart:io';
 
 import 'package:firebase_auth/firebase_auth.dart';
@@ -52,10 +53,20 @@ class VideoUploadRemoteDatasourceImpl implements VideoUploadRemoteDatasource {
             await http.MultipartFile.fromPath('file', videoFile.path),
           );
 
+    developer.log(
+      '[VideoUpload] [API_CALL] Uploading video: ${videoFile.path} to ${_uri('/api/events/upload-video')}',
+      name: 'VideoUploadRemoteDatasource',
+    );
+
     final streamedResponse = await _client
         .send(request)
         .timeout(AppConfig.networkTimeout);
     final response = await http.Response.fromStream(streamedResponse);
+    
+    developer.log(
+      '[VideoUpload] [API_RESPONSE] Status: ${response.statusCode}, Body: ${response.body}',
+      name: 'VideoUploadRemoteDatasource',
+    );
     final decoded = _decode(response);
 
     if (decoded is! Map<String, dynamic>) {

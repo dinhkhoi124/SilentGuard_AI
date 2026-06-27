@@ -1,35 +1,207 @@
-"""
-Scheduler Service for SilentGuard Background Jobs
-Ref: Section 9 Background Jobs & Section 6 Escalation flow
-"""
+import uuid
+import asyncio
+from datetime import datetime, timezone, timedelta
+from app.core.supabase_client import supabase
+from app.db.queries import get_contacts_sorted
+from app.services.notification_service import send_push, trigger_call
 
-async def periodic_check_job():
+async def periodic_check_job() -> None:
     """
-    Ref: Section 6 and Section 9
-    Interval: every 1 minute
-    1. check_camera_heartbeats()
-    2. check_pending_escalations()
+    Periodic check job executing every 1 minute.
+    Ref: Section 9 Background Jobs & Section 6
     """
     await check_camera_heartbeats()
     await check_pending_escalations()
 
-async def check_camera_heartbeats():
+async def check_camera_heartbeats() -> None:
     """
-    Ref: Section 4.11 / Section 9
-    Identifies cameras that have not sent heartbeats for > 5 minutes and flags them.
+    Check cameras where last_heartbeat is older than 5 minutes.
+    Marks them as offline and dispatches a SYSTEM alert event.
+    Ref: Section 9 & Section 4.19
     """
-    pass
+    five_minutes_ago = (datetime.now(timezone.utc) - timedelta(minutes=5)).isoformat()
+    try:
+        # Get active cameras with stale heartbeat (deleted_at IS NULL, status = 'online', last_heartbeat < 5 mins ago)
+        response = supabase.table("cameras")\
+            .select("*")\
+            .eq("status", "online")\
+            .is_("deleted_at", "null")\
+            .lt("last_heartbeat", five_minutes_ago)\
+            .execute()
+        
+        for camera in (response.data or []):
+            camera_id = camera.get("id")
+            camera_name = camera.get("name", "Camera")
+            household_id = camera.get("household_id")
+            
+            # 1. Update camera status to offline
+            supabase.table("cameras").update({"status": "offline"}).eq("id", camera_id).execute()
+            
+            # 2. Insert SYSTEM event
+            event_id = str(uuid.uuid4())
+            system_event = {
+                "id": event_id,
+                "event_id": f"SYS-ERR-{camera_id[:8]}",
+                "household_id": household_id,
+                "camera_id": camera_id,
+                "event_type": "camera_offline",
+                "severity": "SYSTEM",
+                "confidence": 1.0,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "status": "pending",
+                "llm_message": f"Cảnh báo: {camera_name} mất kết nối liên tục hơn 5 phút. Vui lòng kiểm tra lại thiết bị."
+            }
+            supabase.table("events").insert(system_event).execute()
+            
+            # 3. Push SYSTEM alert to the owner of the household
+            owner_notified = False
+            try:
+                # First check households table for owner_user_id
+                hh_res = supabase.table("households").select("owner_user_id").eq("id", household_id).execute()
+                if hh_res.data and hh_res.data[0].get("owner_user_id"):
+                    owner_user_id = hh_res.data[0]["owner_user_id"]
+                    await send_push(owner_user_id, system_event)
+                    owner_notified = True
+                else:
+                    # Fallback to household_members table check for owner role
+                    members_res = supabase.table("household_members")\
+                        .select("user_id")\
+                        .eq("household_id", household_id)\
+                        .eq("role", "owner")\
+                        .execute()
+                    for m in (members_res.data or []):
+                        if m.get("user_id"):
+                            await send_push(m["user_id"], system_event)
+                            owner_notified = True
+            except Exception as e:
+                print(f"Failed to find or notify household owner for camera offline alert: {e}")
 
-async def check_pending_escalations():
-    """
-    Ref: Section 6
-    Checks events where status='pending', escalate_after <= now()
-    """
-    pass
+            # Backup fallback if no owner was notified
+            if not owner_notified:
+                contacts = await get_contacts_sorted(household_id)
+                for contact in contacts:
+                    await send_push(contact.get("user_id"), system_event)
+                
+    except Exception as e:
+        print(f"Error checking camera heartbeats: {e}")
 
-async def run_escalation(event):
+async def check_pending_escalations() -> None:
     """
-    Ref: Section 6 Escalation flow
-    Triggers contacts list cascade escalation.
+    Retrieve and process events past their escalate_after time.
+    Ref: Section 6 check_pending_escalations
     """
-    pass
+    now = datetime.now(timezone.utc).isoformat()
+    try:
+        response = supabase.table("events")\
+            .select("*")\
+            .eq("status", "pending")\
+            .not_.is_("escalate_after", "null")\
+            .lte("escalate_after", now)\
+            .execute()
+            
+        for event in (response.data or []):
+            await run_escalation(event)
+    except Exception as e:
+        print(f"Error querying pending escalations: {e}")
+
+async def retry_critical_calls():
+    """
+    Chạy mỗi 2 phút. Tìm event CRITICAL còn pending 
+    (chưa được acknowledge) và gọi lại.
+    """
+    try:
+        now = datetime.utcnow().isoformat()
+        # Tìm event CRITICAL còn pending, đã tạo > 2 phút trước
+        two_min_ago = (datetime.utcnow() - timedelta(minutes=2)).isoformat()
+        
+        response = supabase.table("events")\
+            .select("*")\
+            .eq("severity", "CRITICAL")\
+            .eq("status", "pending")\
+            .lte("created_at", two_min_ago)\
+            .execute()
+
+        for event in response.data:
+            household_id = event["household_id"]
+            
+            # Lấy contacts
+            contacts_res = supabase.table("contacts")\
+                .select("user_id, priority_order, users(phone)")\
+                .eq("household_id", household_id)\
+                .order("priority_order")\
+                .execute()
+            
+            phone_numbers = [
+                c["users"]["phone"] 
+                for c in contacts_res.data 
+                if c.get("users") and c["users"].get("phone")
+            ]
+            
+            if phone_numbers:
+                from app.services.call_service import make_calls
+                await asyncio.to_thread(
+                    make_calls,
+                    phone_numbers,
+                    event["event_id"],
+                    event.get("room", "không xác định")
+                )
+                print(f"[scheduler] Retry call for CRITICAL event {event['event_id']}")
+
+    except Exception as e:
+        print(f"Error in retry_critical_calls: {e}")
+
+
+async def run_escalation(event: dict) -> None:
+    """
+    Escalate the alert to backup contacts in order of priority.
+    Ref: Section 6 run_escalation
+    """
+    event_id = event.get("id")
+    household_id = event.get("household_id")
+    severity = event.get("severity")
+
+    contacts = await get_contacts_sorted(household_id)
+    
+    # Section 6: Guard — nếu không có contact backup thì không escalate được
+    if len(contacts) < 2:
+        try:
+            supabase.table("events").update({"escalate_after": None}).eq("id", event_id).execute()
+        except Exception as e:
+            print(f"Failed to clear escalate_after: {e}")
+        return
+
+    try:
+        if severity == "CRITICAL":
+            # For CRITICAL: escalate to all backup contacts (contacts[1:]) via push and VoIP call
+            for c in contacts[1:]:
+                await trigger_call(c, event)
+                await send_push(c.get("user_id"), event)
+                # Log escalation
+                escalation_log = {
+                    "event_id": event_id,
+                    "contact_id": c.get("id"),
+                    "channel": "call",
+                    "status": "sent"
+                }
+                supabase.table("escalations").insert(escalation_log).execute()
+        else: # HIGH
+            # For HIGH: escalate to the next contact (contacts[1]) via VoIP call
+            next_contact = contacts[1]
+            await trigger_call(next_contact, event)
+            # Log escalation
+            escalation_log = {
+                "event_id": event_id,
+                "contact_id": next_contact.get("id"),
+                "channel": "call",
+                "status": "sent"
+            }
+            supabase.table("escalations").insert(escalation_log).execute()
+
+        # Update event escalation status in database
+        supabase.table("events").update({
+            "escalate_after": None,
+            "status": "escalated"
+        }).eq("id", event_id).execute()
+        
+    except Exception as e:
+        print(f"Failed to execute escalation process for event {event_id}: {e}")

@@ -29,7 +29,6 @@ env/
 Thumbs.db
 
 # Data (never commit large data)
-data/
 *.db
 *.db-journal
 *.sqlite3
@@ -63,3 +62,7 @@ out/
 #front end
 frontend/.next/
 frontend/node_modules/
+
+# Agents
+.agents/skills
+skills-lock.json

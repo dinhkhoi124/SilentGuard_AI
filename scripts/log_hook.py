@@ -79,7 +79,9 @@ def normalize(data: dict, tool: str) -> dict | None:
         "repo": repo,
         "branch": git("git rev-parse --abbrev-ref HEAD"),
         "commit": git("git rev-parse --short HEAD"),
-        "student": git("git config user.email"),
+        "student": git("git config user.email") or os.environ.get(
+            "USERNAME", os.environ.get("USER", "unknown")
+        ),
     }
 
     if tool == "claude":
@@ -121,9 +123,12 @@ def normalize(data: dict, tool: str) -> dict | None:
             base.update({"prompt": prompt, "response_summary": answer})
 
     elif tool == "codex":
+        turn_id = data.get("turn_id", "")
+        if base["session_id"] and turn_id:
+            base["entry_id"] = f"codex-{base['session_id']}-{turn_id}"
         base.update({
             "prompt": data.get("prompt", "")[:1000],
-            "turn_id": data.get("turn_id", ""),
+            "turn_id": turn_id,
             "transcript_path": data.get("transcript_path", ""),
         })
 

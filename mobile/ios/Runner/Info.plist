@@ -6,6 +6,12 @@
 		<string>SilentGuard uses your camera to scan the QR code when adding a new monitoring device. The app does not access your camera for any other purpose.</string>
 		<key>NSPhotoLibraryUsageDescription</key>
 		<string>SilentGuard needs access to your photo library so you can select a video to upload for fall detection analysis.</string>
+		<key>NSLocationWhenInUseUsageDescription</key>
+		<string>SilentGuard uses your location to provide better context during emergency alerts.</string>
+		<key>NSLocationAlwaysUsageDescription</key>
+		<string>SilentGuard needs background location access to monitor your safety continuously.</string>
+		<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+		<string>SilentGuard uses your location to provide emergency assistance.</string>
 		<key>CADisableMinimumFrameDurationOnPhone</key>
 		<true/>
 		<key>CFBundleDevelopmentRegion</key>

@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:mobile/core/utils/app_colors.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:mobile/features/home/presentation/bloc/home_bloc.dart';
+import 'package:mobile/features/home/presentation/bloc/home_state.dart';
 
 class AutomationStatusCard extends StatelessWidget {
   const AutomationStatusCard({super.key});
@@ -68,18 +71,26 @@ class AutomationStatusCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: const [
-              _MetaChip(icon: Iconsax.video, label: '2 camera'),
-              _MetaChip(
-                icon: Iconsax.notification_status,
-                label: 'FCM sẵn sàng',
-              ),
-              _MetaChip(icon: Iconsax.flash, label: 'Cập nhật tức thời'),
-            ],
+          BlocBuilder<HomeBloc, HomeState>(
+            builder: (context, state) {
+              int cameraCount = 0;
+              if (state is HomeLoaded) {
+                cameraCount = state.devices.length;
+              }
+              return Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  _MetaChip(icon: Iconsax.video, label: '$cameraCount camera'),
+                  const _MetaChip(
+                    icon: Iconsax.notification_status,
+                    label: 'FCM sẵn sàng',
+                  ),
+                  const _MetaChip(icon: Iconsax.flash, label: 'Cập nhật tức thời'),
+                ],
+              );
+            },
           ),
         ],
       ),

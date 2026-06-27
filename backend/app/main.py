@@ -16,7 +16,7 @@ from app.api.users import router as users_router
 from app.api.settings import router as settings_router
 from app.api.reports import router as reports_router
 from app.api.households import router as households_router
-from app.services.scheduler import periodic_check_job
+from app.services.scheduler import periodic_check_job, retry_critical_calls
 
 # Load environment variables
 load_dotenv()
@@ -25,6 +25,7 @@ load_dotenv()
 async def lifespan(app: FastAPI):
     scheduler = AsyncIOScheduler()
     scheduler.add_job(periodic_check_job, 'interval', minutes=1)
+    scheduler.add_job(retry_critical_calls, 'interval', minutes=2)
     scheduler.start()
     yield
     scheduler.shutdown()
@@ -36,28 +37,18 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Parse CORS origins
-if settings.APP_ENV == "production":
-    if settings.CORS_ORIGINS:
-        origins = [o.strip() for o in settings.CORS_ORIGINS.split(",") if o.strip()]
-    else:
-        # Default trusted domains for production
-        origins = [
-            "https://silentguard.ai",
-            "https://app.silentguard.ai"
-        ]
-else:
-    # Allow all origins in non-production environments
-    origins = ["*"]
+from fastapi.middleware.cors import CORSMiddleware
 
-# CORS middleware
+cors_origins = [o.strip() for o in settings.CORS_ORIGINS.split(",")] if settings.CORS_ORIGINS else ["*"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 # Mount API Routers
 app.include_router(events_router)

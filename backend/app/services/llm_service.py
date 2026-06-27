@@ -1,17 +1,23 @@
 import os
 import json
+from datetime import datetime
 from typing import Optional, List
 from pydantic import BaseModel, Field, field_validator
-from anthropic import Anthropic
+from fastapi import HTTPException
+from openai import AsyncOpenAI
+from app.core.config import settings
 
-# Initialize Anthropic Client
-api_key = os.getenv("ANTHROPIC_API_KEY", "")
-is_mock = not api_key or api_key == "xxxx" or "your-anthropic-key" in api_key
+# Initialize OpenAI Client
+api_key = settings.OPENAI_API_KEY
+is_mock = not api_key or api_key in ("xxxx", "your-openai-key", "your-openrouter-key", "your-anthropic-key")
 
 if not is_mock:
-    client = Anthropic(api_key=api_key)
+    client = AsyncOpenAI(
+        api_key=api_key,
+        timeout=30.0,
+    )
 else:
-    print("Warning: ANTHROPIC_API_KEY is not configured or holds a placeholder value. Running LLM service in mock mode.")
+    print("Warning: OPENAI_API_KEY is not configured or holds a placeholder value. Running LLM service in mock mode.")
     client = None
 
 # Pydantic Schemas for configuration parsing (Section 8)
@@ -37,41 +43,40 @@ class ParsedConfig(BaseModel):
 
 async def generate_alert_message(event: dict) -> str:
     """
-    Generate natural Vietnamese alert message using Claude API.
-    Ref: Section 8 LLM Prompt Templates
+    Generate natural Vietnamese alert message using rule-based templates.
     """
     severity = event.get("severity", "MEDIUM")
     timestamp = event.get("timestamp", "")
     room = event.get("room", "nhà")
     duration_sec = event.get("duration_sec") or event.get("duration_seconds") or 0
 
-    prompt = f"""
-    Một sự cố té ngã vừa được phát hiện:
-    - Mức độ: {severity}
-    - Thời gian: {timestamp}
-    - Phòng: {room}
-    - Bất động: {duration_sec} giây
+    time_str = "00:00"
+    if timestamp:
+        try:
+            ts_clean = timestamp.replace("Z", "+00:00")
+            dt = datetime.fromisoformat(ts_clean)
+            time_str = dt.strftime("%H:%M")
+        except Exception:
+            try:
+                if "T" in timestamp:
+                    time_str = timestamp.split("T")[1][:5]
+                elif " " in timestamp:
+                    time_str = timestamp.split(" ")[1][:5]
+                else:
+                    time_str = timestamp
+            except Exception:
+                time_str = timestamp
 
-    Viết 1-2 câu tin nhắn tự nhiên, ấm áp, rõ ràng cho gia đình bằng tiếng Việt,
-    nêu rõ mức độ nghiêm trọng và hành động nên làm.
-    """
-
-    if is_mock:
-        # Return mock Vietnamese message
-        return f"⚠️ Cảnh báo mức độ {severity}: Phát hiện sự cố té ngã trong {room}. Người thân đang nằm yên khoảng {duration_sec} giây. Vui lòng kiểm tra ngay!"
-
-    try:
-        message = client.messages.create(
-            model="claude-3-5-sonnet-20241022",
-            max_tokens=150,
-            temperature=0.7,
-            system="Bạn là trợ lý ảo SilentGuard AI, luôn gửi tin nhắn tiếng Việt tự nhiên, ấm áp, lịch sự và rõ ràng để trợ giúp gia đình theo dõi người già.",
-            messages=[{"role": "user", "content": prompt}]
-        )
-        return message.content[0].text.strip()
-    except Exception as e:
-        print(f"Error calling Claude API for alert message: {e}")
-        return f"⚠️ Phát hiện té ngã tại {room}. Bất động {duration_sec} giây. Vui lòng kiểm tra!"
+    if severity == "LOW":
+        return f"Người thân vừa té ngã trong {room} lúc {time_str} và đã tự đứng dậy sau {duration_sec} giây. Dù vậy, té ngã ở người cao tuổi có thể gây chấn thương không rõ ngay — nên gọi điện hỏi thăm sức khỏe trong hôm nay."
+    elif severity == "MEDIUM":
+        return f"⚠️ Cảnh báo: Phát hiện té ngã trong {room} lúc {time_str}. Người thân chưa đứng dậy sau {duration_sec} giây. Vui lòng kiểm tra."
+    elif severity == "HIGH":
+        return f"🚨 Khẩn cấp: Phát hiện té ngã trong {room} lúc {time_str}. Người thân bất động hơn {duration_sec} giây. Cần kiểm tra ngay!"
+    elif severity == "CRITICAL":
+        return f"🆘 NGUY HIỂM: Người thân bất động hơn {duration_sec} giây trong {room} kể từ {time_str}. Liên hệ cấp cứu ngay!"
+    else:
+        return f"Cảnh báo hệ thống: Phát hiện bất thường trong {room} lúc {time_str}."
 
 async def generate_daily_report(events: list) -> str:
     """
@@ -94,13 +99,13 @@ async def generate_daily_report(events: list) -> str:
     """
 
     try:
-        message = client.messages.create(
-            model="claude-3-5-sonnet-20241022",
+        response = await client.chat.completions.create(
+            model="gpt-4o-mini",
             max_tokens=300,
             temperature=0.7,
             messages=[{"role": "user", "content": prompt}]
         )
-        return message.content[0].text.strip()
+        return response.choices[0].message.content.strip()
     except Exception as e:
         print(f"Error calling Claude API for daily report: {e}")
         return "Báo cáo ngày hôm nay bình thường. Không có sự kiện khẩn cấp nào chưa được xử lý."
@@ -110,6 +115,13 @@ async def parse_config(message: str) -> ParsedConfig:
     Parse configuration from user chat instructions.
     Ref: Section 8 parse_config
     """
+    MAX_CONFIG_LENGTH = 500  # ký tự
+    if len(message) > MAX_CONFIG_LENGTH:
+        raise HTTPException(
+            status_code=400,
+            detail={"error": {"code": "INPUT_TOO_LONG", "message": f"Nội dung cấu hình tối đa {MAX_CONFIG_LENGTH} ký tự"}}
+        )
+
     prompt = f"""
     Người dùng nói: "{message}"
     Trả về JSON với các field sau (chỉ điền field được đề cập, bỏ qua field không liên quan):
@@ -133,15 +145,18 @@ async def parse_config(message: str) -> ParsedConfig:
         return ParsedConfig(**mock_data)
 
     try:
-        response = client.messages.create(
-            model="claude-3-5-sonnet-20241022",
+        response = await client.chat.completions.create(
+            model="gpt-4o-mini",
             max_tokens=200,
             temperature=0.0,
             messages=[{"role": "user", "content": prompt}]
         )
-        raw = response.content[0].text.strip()
+        raw = response.choices[0].message.content.strip()
         data = json.loads(raw)
         return ParsedConfig(**data)
     except Exception as e:
-        print(f"Error calling Claude API to parse config: {e}")
-        raise ValueError(f"Không thể phân tích cấu hình tự động: {e}")
+        print(f"[parse_config] LLM error: {e}")  # chỉ log server-side
+        raise HTTPException(
+            status_code=503,
+            detail={"error": {"code": "LLM_UNAVAILABLE", "message": "Không thể xử lý cấu hình lúc này, vui lòng thử lại sau"}}
+        )

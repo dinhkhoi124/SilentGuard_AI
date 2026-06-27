@@ -81,15 +81,14 @@ async def process_event(event_data: dict) -> None:
     else:
         severity = event_data.get("severity") or "HIGH"
     
-    if severity == "LOW":
-        event_data["status"] = "logged_only"
-        await save_event(event_data)
-        return
+
 
     # 4. Push TRƯỚC với default message đến liên hệ chính
+    print(f"[Alert Engine] Fetching contacts for household_id: {household_id}")
     contacts = await get_contacts_sorted(household_id)
     if contacts:
         primary = contacts[0]
+        print(f"[Alert Engine] Found {len(contacts)} contacts. Primary contact is: {primary.get('user_id')} ({primary.get('full_name')})")
         # Set default message
         event_data["llm_message"] = f"Cảnh báo ngã phát hiện tại {event_data.get('room', 'nhà')}."
         await send_push(primary.get("user_id"), event_data)
@@ -105,6 +104,32 @@ async def process_event(event_data: dict) -> None:
             supabase.table("escalations").insert(escalation_entry).execute()
         except Exception as e:
             print(f"Error logging primary escalation trace: {e}")
+    else:
+        print(f"[Alert Engine] WARNING: No emergency contacts found for household_id: {household_id}")
+
+    if severity == "CRITICAL":
+        # Lấy số điện thoại của tất cả contacts trong household
+        contacts_res = supabase.table("contacts")\
+            .select("user_id, priority_order, users(phone)")\
+            .eq("household_id", household_id)\
+            .order("priority_order")\
+            .execute()
+        
+        phone_numbers = [
+            c["users"]["phone"] 
+            for c in contacts_res.data 
+            if c.get("users") and c["users"].get("phone")
+        ]
+        
+        if phone_numbers:
+            from app.services.call_service import make_calls
+            await asyncio.to_thread(
+                make_calls,
+                phone_numbers,
+                event_data["event_id"],
+                event_data.get("room", "không xác định")
+            )
+
 
     # 5. Set escalate_after cho các sự kiện khẩn cấp
     created_at_str = event_data.get("created_at") or datetime.now().isoformat()

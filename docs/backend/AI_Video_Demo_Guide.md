@@ -70,7 +70,7 @@ Dành cho AI Engineer gọi khi phát hiện sự kiện té ngã ở trạng th
   ```
 - **Xử lý đặc biệt cho Demo**:
   - Không cần truyền `duration_sec`. Backend tự động ép default thành `999` để đưa vào nhóm ưu tiên cao nhất qua Alert Engine.
-  - Backend bỏ qua bước tính toán lại độ nghiêm trọng (reclassify severity) dựa trên thời gian thực — giữ nguyên severity = `"HIGH"`.
+  - Backend bỏ qua bước tính toán lại độ nghiêm trọng (reclassify severity) dựa trên thời gian thực — giữ nguyên severity nguyên bản do AI gửi lên.
 
 ---
 
@@ -85,7 +85,7 @@ Dưới đây là các phần chỉ phục vụ cho bản Demo cần phải sử
   - *Hiện tại (Demo)*: `upload_token` không có hạn sử dụng và các video tải lên Supabase Storage qua demo chưa được tự động dọn dẹp (cleanup).
   - *Sản xuất (Production)*: Thêm cơ chế hết hạn cho `upload_token` (ví dụ sau 1 giờ) và tự động xóa video sau khi xử lý thành công hoặc thất bại qua scheduler.
 - [ ] **Bypass Severity Reclassification**:
-  - *Hiện tại (Demo)*: Khi `source` là `video_upload`, backend bypass hoàn toàn việc tính toán lại `severity` dựa trên `duration_sec`.
+  - *Hiện tại (Demo)*: Khi `source` là `video_upload`, backend bypass hoàn toàn việc tính toán lại `severity` dựa trên `duration_sec`, giữ nguyên mức độ mà AI Server gửi.
   - *Sản xuất (Production)*: Mọi luồng sự kiện phải đi qua Severity Engine để chuẩn hóa mức độ cảnh báo nhằm tránh sai sót báo động ảo.
 - [ ] **Lưu Trữ Signed URL Quá Hạn**:
   - *Hiện tại (Demo)*: Tạo signed URL có thời hạn 1 năm để tiện demo.

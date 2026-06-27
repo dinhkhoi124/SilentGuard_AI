@@ -1,4 +1,5 @@
 import uuid
+import asyncio
 from datetime import datetime, timezone, timedelta
 from app.core.supabase_client import supabase
 from app.db.queries import get_contacts_sorted
@@ -91,11 +92,10 @@ async def check_pending_escalations() -> None:
     """
     now = datetime.now(timezone.utc).isoformat()
     try:
-        # Query pending events past escalation time
         response = supabase.table("events")\
             .select("*")\
             .eq("status", "pending")\
-            .not_ = {"escalate_after": "is.null"}\
+            .not_.is_("escalate_after", "null")\
             .lte("escalate_after", now)\
             .execute()
             
@@ -103,6 +103,53 @@ async def check_pending_escalations() -> None:
             await run_escalation(event)
     except Exception as e:
         print(f"Error querying pending escalations: {e}")
+
+async def retry_critical_calls():
+    """
+    Chạy mỗi 2 phút. Tìm event CRITICAL còn pending 
+    (chưa được acknowledge) và gọi lại.
+    """
+    try:
+        now = datetime.utcnow().isoformat()
+        # Tìm event CRITICAL còn pending, đã tạo > 2 phút trước
+        two_min_ago = (datetime.utcnow() - timedelta(minutes=2)).isoformat()
+        
+        response = supabase.table("events")\
+            .select("*")\
+            .eq("severity", "CRITICAL")\
+            .eq("status", "pending")\
+            .lte("created_at", two_min_ago)\
+            .execute()
+
+        for event in response.data:
+            household_id = event["household_id"]
+            
+            # Lấy contacts
+            contacts_res = supabase.table("contacts")\
+                .select("user_id, priority_order, users(phone)")\
+                .eq("household_id", household_id)\
+                .order("priority_order")\
+                .execute()
+            
+            phone_numbers = [
+                c["users"]["phone"] 
+                for c in contacts_res.data 
+                if c.get("users") and c["users"].get("phone")
+            ]
+            
+            if phone_numbers:
+                from app.services.call_service import make_calls
+                await asyncio.to_thread(
+                    make_calls,
+                    phone_numbers,
+                    event["event_id"],
+                    event.get("room", "không xác định")
+                )
+                print(f"[scheduler] Retry call for CRITICAL event {event['event_id']}")
+
+    except Exception as e:
+        print(f"Error in retry_critical_calls: {e}")
+
 
 async def run_escalation(event: dict) -> None:
     """

@@ -76,7 +76,6 @@ class _CameraDetailBodyState extends State<_CameraDetailBody> {
   String _currentTime = '';
   late String? _streamUrl;
   late bool _isStreamLoading;
-  late final GlobalKey<CameraVideoPlayerState> _videoPlayerKey;
   late final CameraVideoPlayerController _videoPlayerController;
   Widget? _videoPlayerWidget;
   bool _isStreamRequestInFlight = false;
@@ -95,13 +94,14 @@ class _CameraDetailBodyState extends State<_CameraDetailBody> {
     debugPrint('[CameraDetail] initState streamUrl: $_streamUrl');
     _isStreamLoading = _streamUrl == null;
     debugPrint('[CameraDetail] initState isLoading: $_isStreamLoading');
-    _videoPlayerKey = GlobalKey<CameraVideoPlayerState>();
     _videoPlayerController = CameraVideoPlayerController(
       currentTime: _currentTime,
       isLoading: _isStreamLoading,
       errorMessage: _streamErrorMessage,
     );
-    _videoPlayerWidget = _createVideoPlayer(_streamUrl);
+    _videoPlayerWidget = _streamUrl == null
+        ? null
+        : _createVideoPlayer(_streamUrl!);
     debugPrint(
       '[CameraDetail] VideoPlayer widget created, url: '
       '${_redactedNullableStreamUrl(_streamUrl)}',
@@ -113,7 +113,6 @@ class _CameraDetailBodyState extends State<_CameraDetailBody> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       if (cachedStreamUrl != null) {
-        _videoPlayerKey.currentState?.updateUrl(cachedStreamUrl);
         return;
       }
       _requestStreamUrl(showLoading: _streamUrl == null);
@@ -163,7 +162,8 @@ class _CameraDetailBodyState extends State<_CameraDetailBody> {
           listenWhen: (_, state) =>
               state is CameraStreamUrlLoading ||
               state is CameraStreamUrlLoaded ||
-              state is CameraStreamUrlFailure,
+              state is CameraStreamUrlFailure ||
+              state is CameraPlaybackFailure,
           listener: (context, state) {
             debugPrint(
               '[CameraDetail] BlocListener state: ${state.runtimeType}',
@@ -179,9 +179,6 @@ class _CameraDetailBodyState extends State<_CameraDetailBody> {
                 isLoading: _isStreamLoading,
                 clearError: true,
               );
-              _videoPlayerKey.currentState?.updateDisplayState(
-                isLoading: _isStreamLoading,
-              );
               return;
             }
             if (state is CameraStreamUrlLoaded) {
@@ -193,7 +190,6 @@ class _CameraDetailBodyState extends State<_CameraDetailBody> {
                 '[CameraDetail] URL timestamp: ${DateTime.now().toIso8601String()}',
               );
               _isStreamRequestInFlight = false;
-              _videoPlayerKey.currentState?.updateUrl(state.streamUrl);
               setState(() {
                 _streamUrl = state.streamUrl;
                 _videoPlayerWidget = _createVideoPlayer(state.streamUrl);
@@ -202,9 +198,6 @@ class _CameraDetailBodyState extends State<_CameraDetailBody> {
                 _streamErrorMessage = null;
               });
               _videoPlayerController.update(isLoading: false, clearError: true);
-              _videoPlayerKey.currentState?.updateDisplayState(
-                isLoading: false,
-              );
               return;
             }
             if (state is CameraStreamUrlFailure) {
@@ -220,7 +213,18 @@ class _CameraDetailBodyState extends State<_CameraDetailBody> {
                 isLoading: false,
                 errorMessage: state.message,
               );
-              _videoPlayerKey.currentState?.updateDisplayState(
+              return;
+            }
+            if (state is CameraPlaybackFailure) {
+              if (state.cameraId != widget.device.id) return;
+              debugPrint('[CameraDetail] Playback FAILED: ${state.error}');
+              _isStreamRequestInFlight = false;
+              setState(() {
+                _isStreamLoading = false;
+                _showLoadingForNextStreamRequest = false;
+                _streamErrorMessage = state.message;
+              });
+              _videoPlayerController.update(
                 isLoading: false,
                 errorMessage: state.message,
               );
@@ -263,7 +267,8 @@ class _CameraDetailBodyState extends State<_CameraDetailBody> {
                   buildWhen: (_, state) =>
                       state is CameraStreamUrlLoading ||
                       state is CameraStreamUrlLoaded ||
-                      state is CameraStreamUrlFailure,
+                      state is CameraStreamUrlFailure ||
+                      state is CameraPlaybackFailure,
                   builder: (context, state) => _buildVideoArea(),
                 ),
               ),
@@ -356,10 +361,6 @@ class _CameraDetailBodyState extends State<_CameraDetailBody> {
         isLoading: false,
         errorMessage: _streamErrorMessage,
       );
-      _videoPlayerKey.currentState?.updateDisplayState(
-        isLoading: false,
-        errorMessage: _streamErrorMessage,
-      );
       return;
     }
 
@@ -372,9 +373,6 @@ class _CameraDetailBodyState extends State<_CameraDetailBody> {
     _videoPlayerController.update(
       isLoading: _isStreamLoading,
       clearError: true,
-    );
-    _videoPlayerKey.currentState?.updateDisplayState(
-      isLoading: _isStreamLoading,
     );
     context.read<HomeBloc>().add(
       CameraStreamUrlRequested(
@@ -395,12 +393,19 @@ class _CameraDetailBodyState extends State<_CameraDetailBody> {
     if (_isStreamLoading) {
       return const _VideoLoadingView();
     }
-    return _videoPlayerWidget!;
+    final streamUrl = _streamUrl?.trim();
+    if (streamUrl == null || streamUrl.isEmpty) {
+      return _VideoErrorView(
+        message: 'Chưa có đường dẫn livestream cho camera này.',
+        onRetry: () => _requestStreamUrl(showLoading: true),
+      );
+    }
+    return _videoPlayerWidget ?? _createVideoPlayer(streamUrl);
   }
 
-  Widget _createVideoPlayer(String? streamUrl) {
+  Widget _createVideoPlayer(String streamUrl) {
     return CameraVideoPlayer(
-      key: _videoPlayerKey,
+      key: ValueKey(streamUrl),
       rtspUrl: streamUrl,
       controller: _videoPlayerController,
       onFrameCaptured: widget.onThumbnailCaptured,

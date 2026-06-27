@@ -4,6 +4,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:iconsax/iconsax.dart';
 import 'package:mobile/core/utils/app_colors.dart';
 import 'package:mobile/features/home/domain/entities/camera_device.dart';
 import 'package:mobile/features/home/presentation/pages/camera_detail_page.dart';
@@ -210,8 +211,8 @@ class CameraCard extends StatelessWidget {
                           ),
                           child: Icon(
                             device.isArmed
-                                ? Icons.videocam_off_outlined
-                                : Icons.videocam_outlined,
+                                ? Iconsax.video_slash
+                                : Iconsax.video,
                             size: 16,
                             color: device.isArmed
                                 ? mutedColor
@@ -243,7 +244,7 @@ class CameraCard extends StatelessWidget {
       child: const Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.videocam_outlined, size: 32, color: Colors.white),
+          Icon(Iconsax.video, size: 32, color: Colors.white),
           SizedBox(height: 4),
           Text(
             'SlientGuard',

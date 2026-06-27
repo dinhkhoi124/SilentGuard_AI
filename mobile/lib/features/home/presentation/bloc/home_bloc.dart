@@ -378,6 +378,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
       'DEVICE_OFFLINE' =>
         'Camera đang offline. Vui lòng kiểm tra kết nối thiết bị.',
       'NO_STREAM_URL' => 'Không lấy được stream. Vui lòng thử lại.',
+      '12012' => 'Mất kết nối internet (Camera không phản hồi).',
       _ => 'Lỗi kết nối: ${error.message}',
     };
   }

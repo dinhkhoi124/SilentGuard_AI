@@ -86,10 +86,16 @@ void main() {
       final dataSource = _dataSource(
         (_) async => _imouResponse(
           data: {
-            'liveToken': 'live-token',
-            'hls': 'https://hls.example.com/live/camera.m3u8',
-            'flv': 'https://flv.example.com/live/camera.flv',
             'status': 'ready',
+            'streams': [
+              {
+                'streamId': 1,
+                'status': 'ready',
+                'liveToken': 'live-token',
+                'hls': 'https://hls.example.com/live/camera.m3u8',
+                'flv': 'https://flv.example.com/live/camera.flv',
+              },
+            ],
           },
         ),
       );
@@ -109,18 +115,25 @@ void main() {
       final dataSource = _dataSource(
         (_) async => _imouResponse(
           data: {
+            'status': 'ready',
             'streams': [
               {
                 'streamId': 0,
                 'status': '1',
-                'hls': 'https://hls.example.com:8890/live/camera.m3u8',
-                'liveToken': 'blocked-token',
+                'hls': 'https://hd.example.com/live/camera.m3u8',
+                'liveToken': 'hd-token',
               },
               {
-                'streamId': 0,
+                'streamId': 1,
                 'status': '1',
-                'hls': 'http://hls.example.com:8888/live/camera.m3u8',
-                'liveToken': 'live-token',
+                'hls': 'http://sd.example.com:8888/live/camera.m3u8',
+                'liveToken': 'sd-http-token',
+              },
+              {
+                'streamId': 1,
+                'status': '1',
+                'hls': 'https://sd.example.com:8890/live/camera.m3u8',
+                'liveToken': 'sd-https-token',
               },
             ],
           },
@@ -132,9 +145,36 @@ void main() {
         deviceSn: 'CAM123',
       );
 
-      expect(result.liveToken, 'live-token');
-      expect(result.hlsUrl, 'http://hls.example.com:8888/live/camera.m3u8');
-      expect(result.status, '1');
+      expect(result.liveToken, 'sd-http-token');
+      expect(result.hlsUrl, 'http://sd.example.com:8888/live/camera.m3u8');
+      expect(result.status, 'ready');
+    });
+
+    test('getLiveStreamInfo keeps FLV fallback when HLS is missing', () async {
+      final dataSource = _dataSource(
+        (_) async => _imouResponse(
+          data: {
+            'status': 'ready',
+            'streams': [
+              {
+                'streamId': 1,
+                'status': '1',
+                'flv': 'http://sd.example.com/live/camera.flv',
+                'liveToken': 'sd-flv-token',
+              },
+            ],
+          },
+        ),
+      );
+
+      final result = await dataSource.getLiveStreamInfo(
+        accessToken: 'access-token',
+        deviceSn: 'CAM123',
+      );
+
+      expect(result.liveToken, 'sd-flv-token');
+      expect(result.playbackUrl, 'http://sd.example.com/live/camera.flv');
+      expect(result.flvUrl, 'http://sd.example.com/live/camera.flv');
     });
 
     test('unbindLive posts live token', () async {

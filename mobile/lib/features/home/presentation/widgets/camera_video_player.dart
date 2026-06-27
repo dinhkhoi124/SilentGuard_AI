@@ -249,6 +249,11 @@ class CameraLivePreviewState extends State<CameraLivePreview> {
       'Không thể phát trực tiếp camera. Vui lòng thử tải lại.';
   static const _noStreamUrlMessage =
       'Chưa có đường dẫn phát trực tiếp cho camera này.';
+  static const _retryDelays = [
+    Duration(seconds: 2),
+    Duration(seconds: 4),
+    Duration(seconds: 6),
+  ];
   static bool _nativeMediaKitRegistered = false;
 
   Player? _player;
@@ -257,6 +262,7 @@ class CameraLivePreviewState extends State<CameraLivePreview> {
   final List<StreamSubscription<Object?>> _playerSubscriptions = [];
   bool _isOpening = false;
   bool _hasOpenedUrl = false;
+  bool _hasRenderedFrame = false;
   late bool _externalIsLoading;
   String? _externalErrorMessage;
   String? _errorMessage;
@@ -266,6 +272,10 @@ class CameraLivePreviewState extends State<CameraLivePreview> {
   bool _surfaceReadyScheduled = false;
   Timer? _blackScreenTimer;
   Timer? _surfaceOpenTimer;
+  Timer? _playbackRetryTimer;
+  int _playbackRetryAttempt = 0;
+  bool _reportedPlaybackFailure = false;
+  String? _retryMessage;
 
   @override
   void initState() {
@@ -291,7 +301,14 @@ class CameraLivePreviewState extends State<CameraLivePreview> {
     if (normalizedUrl == _currentUrl && !_isOpening && _hasOpenedUrl) return;
     final changedUrl = normalizedUrl != _currentUrl;
     _currentUrl = normalizedUrl;
-    if (changedUrl) _hasOpenedUrl = false;
+    if (changedUrl) {
+      _hasOpenedUrl = false;
+      _hasRenderedFrame = false;
+      _playbackRetryAttempt = 0;
+      _reportedPlaybackFailure = false;
+      _retryMessage = null;
+      _playbackRetryTimer?.cancel();
+    }
     if (_rejectUnsupportedStream(normalizedUrl)) return;
     _pendingUrl = normalizedUrl;
     unawaited(_preparePlayerAndOpen(normalizedUrl));
@@ -324,6 +341,11 @@ class CameraLivePreviewState extends State<CameraLivePreview> {
       _currentUrl = null;
       _pendingUrl = null;
       _hasOpenedUrl = false;
+      _hasRenderedFrame = false;
+      _playbackRetryAttempt = 0;
+      _reportedPlaybackFailure = false;
+      _retryMessage = null;
+      _playbackRetryTimer?.cancel();
       final player = _player;
       if (player != null) unawaited(player.stop());
       if (mounted && _errorMessage != _noStreamUrlMessage) {
@@ -449,6 +471,7 @@ class CameraLivePreviewState extends State<CameraLivePreview> {
     if (mounted) {
       setState(() {
         _errorMessage = null;
+        _retryMessage = null;
       });
     }
 
@@ -471,6 +494,8 @@ class CameraLivePreviewState extends State<CameraLivePreview> {
       await player.open(_mediaForStream(streamUrl), play: true);
       await player.play();
       _hasOpenedUrl = true;
+      _retryMessage = null;
+      debugPrint('[VideoPlayer] playing url=${_redactedStreamUrl(streamUrl)}');
       _startBlackScreenTimer();
     } catch (error) {
       debugPrint(
@@ -481,10 +506,7 @@ class CameraLivePreviewState extends State<CameraLivePreview> {
         return;
       }
       debugPrint('[media_kit] stream open failed');
-      widget.onPlaybackError?.call(error.toString());
-      if (mounted && _errorMessage != _streamOpenFailedMessage) {
-        setState(() => _errorMessage = _streamOpenFailedMessage);
-      }
+      _handlePlaybackFailure(error, source: 'open', streamUrl: streamUrl);
     } finally {
       _isOpening = false;
       if (mounted) setState(() {});
@@ -502,19 +524,23 @@ class CameraLivePreviewState extends State<CameraLivePreview> {
           return;
         }
         debugPrint('[media_kit] stream playback error');
-        developer.log('Stream playback failed.', name: 'CameraLivePreview');
-        widget.onPlaybackError?.call(error.toString());
-        if (!mounted || _errorMessage == _streamOpenFailedMessage) return;
-        setState(() {
-          _isOpening = false;
-          _errorMessage = _streamOpenFailedMessage;
-        });
+        _handlePlaybackFailure(error, source: 'playback');
+      }),
+      player.stream.playing.listen((playing) {
+        debugPrint('[VideoPlayer] playing=$playing');
+      }),
+      player.stream.buffering.listen((buffering) {
+        debugPrint('[VideoPlayer] buffering=$buffering');
+      }),
+      player.stream.completed.listen((completed) {
+        debugPrint('[VideoPlayer] completed=$completed');
       }),
       player.stream.width.listen((width) {
-        if (width != null && width > 0) _blackScreenTimer?.cancel();
+        if (width != null && width > 0) _markFrameRendered();
         developer.log('video width: $width', name: 'CameraLivePreview');
       }),
       player.stream.height.listen((height) {
+        if (height != null && height > 0) _markFrameRendered();
         developer.log('video height: $height', name: 'CameraLivePreview');
       }),
     ]);
@@ -560,10 +586,85 @@ class CameraLivePreviewState extends State<CameraLivePreview> {
     _blackScreenTimer?.cancel();
     _blackScreenTimer = Timer(const Duration(seconds: 8), () {
       final player = _player;
-      if (!mounted || (player?.state.width ?? 0) > 0) return;
+      if (!mounted || _hasRenderedFrame) return;
+      if ((player?.state.width ?? 0) > 0 || (player?.state.height ?? 0) > 0) {
+        _markFrameRendered();
+        return;
+      }
       if (_errorMessage == _streamOpenFailedMessage) return;
-      widget.onPlaybackError?.call(_streamOpenFailedMessage);
-      setState(() => _errorMessage = _streamOpenFailedMessage);
+      _handlePlaybackFailure(_streamOpenFailedMessage, source: 'black_screen');
+    });
+  }
+
+  void _markFrameRendered() {
+    _blackScreenTimer?.cancel();
+    if (_hasRenderedFrame &&
+        _playbackRetryAttempt == 0 &&
+        _retryMessage == null &&
+        !_reportedPlaybackFailure) {
+      return;
+    }
+    _hasRenderedFrame = true;
+    _playbackRetryAttempt = 0;
+    _reportedPlaybackFailure = false;
+    _retryMessage = null;
+    debugPrint('[VideoPlayer] first frame rendered');
+    if (mounted) setState(() {});
+  }
+
+  void _handlePlaybackFailure(
+    Object error, {
+    required String source,
+    String? streamUrl,
+  }) {
+    final activeUrl = streamUrl ?? _currentUrl;
+    if (activeUrl == null || activeUrl.isEmpty || activeUrl != _currentUrl) {
+      return;
+    }
+
+    if (_playbackRetryAttempt < _retryDelays.length) {
+      final attempt = _playbackRetryAttempt + 1;
+      final delay = _retryDelays[_playbackRetryAttempt];
+      _playbackRetryAttempt = attempt;
+      _playbackRetryTimer?.cancel();
+      debugPrint(
+        '[VideoPlayer] $source failed, retry $attempt/${_retryDelays.length} '
+        'in ${delay.inSeconds}s: $error',
+      );
+      if (mounted) {
+        setState(() {
+          _isOpening = false;
+          _errorMessage = null;
+          _retryMessage =
+              'Đang thử phát lại ($attempt/${_retryDelays.length})...';
+        });
+      }
+      _playbackRetryTimer = Timer(delay, () {
+        if (!mounted || _currentUrl != activeUrl) return;
+        unawaited(_openMedia(activeUrl));
+      });
+      return;
+    }
+
+    _reportPlaybackFailure('$source: $error');
+  }
+
+  void _reportPlaybackFailure(String error) {
+    _playbackRetryTimer?.cancel();
+    if (!_reportedPlaybackFailure) {
+      _reportedPlaybackFailure = true;
+      developer.log(
+        'Stream playback failed after retries.',
+        name: 'CameraLivePreview',
+        error: error,
+      );
+      widget.onPlaybackError?.call(error);
+    }
+    if (!mounted || _errorMessage == _streamOpenFailedMessage) return;
+    setState(() {
+      _isOpening = false;
+      _retryMessage = null;
+      _errorMessage = _streamOpenFailedMessage;
     });
   }
 
@@ -577,6 +678,7 @@ class CameraLivePreviewState extends State<CameraLivePreview> {
     }
     _blackScreenTimer?.cancel();
     _surfaceOpenTimer?.cancel();
+    _playbackRetryTimer?.cancel();
     final player = _player;
     final videoController = _videoController;
     _player = null;
@@ -641,13 +743,22 @@ class CameraLivePreviewState extends State<CameraLivePreview> {
           fit: BoxFit.cover,
           controls: media_kit_video.NoVideoControls,
         ),
-        if (_externalIsLoading || _isOpening) const _VideoLoadingView(),
+        if (_retryMessage != null)
+          _RetryOverlay(message: _retryMessage!)
+        else if (_externalIsLoading || _isOpening)
+          const _VideoLoadingView(),
       ],
     );
   }
 
   Future<void> _retryStream() async {
     final currentUrl = _currentUrl;
+    _playbackRetryTimer?.cancel();
+    _playbackRetryAttempt = 0;
+    _reportedPlaybackFailure = false;
+    _retryMessage = null;
+    _hasOpenedUrl = false;
+    _hasRenderedFrame = false;
     if (mounted && _errorMessage != null) {
       setState(() {
         _errorMessage = null;
@@ -693,6 +804,45 @@ class _VideoLoadingView extends StatelessWidget {
               style: TextStyle(
                 color: Colors.white,
                 fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _RetryOverlay extends StatelessWidget {
+  const _RetryOverlay({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return ColoredBox(
+      color: Colors.black87,
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(
+              width: 30,
+              height: 30,
+              child: CircularProgressIndicator(
+                color: AppColors.primary,
+                strokeWidth: 3,
+              ),
+            ),
+            const SizedBox(height: 14),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 14,
+                height: 1.35,
                 fontWeight: FontWeight.w500,
               ),
             ),

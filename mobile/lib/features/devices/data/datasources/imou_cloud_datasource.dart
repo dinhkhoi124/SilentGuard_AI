@@ -10,11 +10,11 @@ import 'package:mobile/features/devices/data/models/imou_models.dart';
 abstract interface class ImouCloudDataSource {
   Future<ImouAccessToken> getAccessToken();
 
-  Future<void> bindDeviceLive({
+  Future<String?> bindDeviceLive({
     required String accessToken,
     required String deviceSn,
     String channelId = '0',
-    int streamId = 0,
+    int streamId = 1,
   });
 
   Future<ImouLiveStreamInfo> getLiveStreamInfo({
@@ -34,6 +34,8 @@ abstract interface class ImouCloudDataSource {
     required String accessToken,
     required String deviceSn,
   });
+
+  void clearAccessToken();
 }
 
 class ImouCloudDataSourceImpl implements ImouCloudDataSource {
@@ -51,10 +53,14 @@ class ImouCloudDataSourceImpl implements ImouCloudDataSource {
   ImouAccessToken? _cachedToken;
 
   @override
+  void clearAccessToken() {
+    _cachedToken = null;
+  }
+
+  @override
   Future<ImouAccessToken> getAccessToken() async {
     final cached = _cachedToken;
-    if (cached != null &&
-        cached.expireAt.difference(DateTime.now()).inMinutes >= 5) {
+    if (cached != null && cached.expireAt.isAfter(DateTime.now())) {
       return cached;
     }
 
@@ -62,6 +68,10 @@ class ImouCloudDataSourceImpl implements ImouCloudDataSource {
     final data = _dataObject(response);
     final token = _readString(data, ['accessToken', 'token']);
     final expireTime = _readInt(data, ['expireTime', 'expireAt', 'expires']);
+    debugPrint(
+      '[ImouCloud] accessToken result=${_resultLog(response)} '
+      'expireTime=${expireTime ?? 'missing'} token=${_maskToken(token)}',
+    );
     if (token == null || expireTime == null) {
       throw const ImouApiException(
         'INVALID_RESPONSE',
@@ -69,25 +79,23 @@ class ImouCloudDataSourceImpl implements ImouCloudDataSource {
       );
     }
 
-    final expireTimeMs = expireTime < 1000000000000
-        ? expireTime * 1000
-        : expireTime;
+    final validSeconds = expireTime > 600 ? expireTime - 600 : expireTime;
     final accessToken = ImouAccessToken(
       token: token,
-      expireAt: DateTime.fromMillisecondsSinceEpoch(expireTimeMs),
+      expireAt: DateTime.now().add(Duration(seconds: validSeconds - 300)),
     );
     _cachedToken = accessToken;
     return accessToken;
   }
 
   @override
-  Future<void> bindDeviceLive({
+  Future<String?> bindDeviceLive({
     required String accessToken,
     required String deviceSn,
     String channelId = '0',
-    int streamId = 0,
+    int streamId = 1,
   }) async {
-    await _post(
+    final response = await _post(
       '/bindDeviceLive',
       token: accessToken,
       params: {
@@ -97,6 +105,15 @@ class ImouCloudDataSourceImpl implements ImouCloudDataSource {
       },
       ignoredErrorCodes: const {'LV1001'},
     );
+    final data = _dataObject(response);
+    final liveToken = _readString(data, ['liveToken']);
+    debugPrint(
+      '[ImouCloud] bindDeviceLive deviceId=${_maskDeviceId(deviceSn)} '
+      'channelId=$channelId streamId=$streamId result=${_resultLog(response)} '
+      'liveStatus=${_readString(data, ['liveStatus', 'status']) ?? 'unknown'} '
+      'liveToken=${_maskToken(liveToken)}',
+    );
+    return liveToken;
   }
 
   @override
@@ -111,23 +128,30 @@ class ImouCloudDataSourceImpl implements ImouCloudDataSource {
       params: {'deviceId': deviceSn, 'channelId': channelId},
     );
     final data = _dataObject(response);
-    final streamData = _selectedStreamData(data) ?? data;
-    final liveToken =
-        _readString(streamData, ['liveToken', 'token']) ??
-        _readString(data, ['liveToken', 'token']) ??
-        '';
-    final hlsUrl = _readString(streamData, ['hls', 'hlsUrl', 'url']);
-    final flvUrl = _readString(streamData, ['flv', 'flvUrl', 'httpFlv']);
-    final status =
-        _readString(streamData, ['status']) ??
-        _readString(data, ['status']) ??
-        'unknown';
-    return ImouLiveStreamInfo(
-      liveToken: liveToken,
-      hlsUrl: hlsUrl,
-      flvUrl: flvUrl,
-      status: status,
+    final streams = _parseLiveStreams(data);
+    final info = ImouLiveStreamInfo(
+      streams: streams,
+      status: _readString(data, ['status']) ?? 'unknown',
+      bindLiveToken: _readString(data, ['liveToken', 'token']),
     );
+    debugPrint(
+      '[ImouCloud] getLiveStreamInfo result=${_resultLog(response)} '
+      'streams=${streams.length}',
+    );
+    for (final stream in streams) {
+      debugPrint(
+        '[ImouCloud] stream streamId=${stream.streamId ?? 'unknown'} '
+        'status=${stream.status} protocol=${stream.protocol} '
+        'liveToken=${stream.liveToken?.trim().isNotEmpty == true}',
+      );
+    }
+    final selected = info.selectedStream;
+    debugPrint(
+      '[ImouCloud] selected streamId=${selected?.streamId ?? 'none'} '
+      'protocol=${selected?.protocol ?? 'none'} '
+      'url=${_maskUrl(selected?.playbackUrl)}',
+    );
+    return info;
   }
 
   @override
@@ -136,10 +160,14 @@ class ImouCloudDataSourceImpl implements ImouCloudDataSource {
     required String liveToken,
   }) async {
     if (liveToken.trim().isEmpty) return;
-    await _post(
+    final response = await _post(
       '/unbindLive',
       token: accessToken,
       params: {'liveToken': liveToken},
+    );
+    debugPrint(
+      '[ImouCloud] unbindLive liveToken=${_maskToken(liveToken)} '
+      'result=${_resultLog(response)}',
     );
   }
 
@@ -182,6 +210,10 @@ class ImouCloudDataSourceImpl implements ImouCloudDataSource {
     );
     final data = _dataObject(response);
     final online = _readString(data, ['onLine', 'online', 'isOnline']);
+    debugPrint(
+      '[ImouCloud] deviceOnline deviceId=${_maskDeviceId(deviceSn)} '
+      'result=${_resultLog(response)} onLine=${online ?? 'missing'}',
+    );
     return online == '1' || online?.toLowerCase() == 'true';
   }
 
@@ -226,6 +258,9 @@ class ImouCloudDataSourceImpl implements ImouCloudDataSource {
     if (ignoredErrorCodes.contains(code)) return;
 
     final message = map['msg']?.toString().trim();
+    debugPrint(
+      '[ImouCloud] API error code=$code msg=${message?.isNotEmpty == true ? message : 'missing'}',
+    );
     throw ImouApiException(
       code,
       message?.isNotEmpty == true ? message! : 'Imou Cloud trả về lỗi $code.',
@@ -239,31 +274,36 @@ class ImouCloudDataSourceImpl implements ImouCloudDataSource {
     return const {};
   }
 
-  Map<String, dynamic>? _selectedStreamData(Map<String, dynamic> data) {
+  List<ImouLiveStream> _parseLiveStreams(Map<String, dynamic> data) {
     final streams = data['streams'];
-    if (streams is! List) return null;
+    if (streams is! List) {
+      final rootHls = _readString(data, ['hls', 'hlsUrl', 'url']);
+      final rootFlv = _readString(data, ['flv', 'flvUrl', 'httpFlv']);
+      if (rootHls == null && rootFlv == null) return const [];
+      return [
+        ImouLiveStream(
+          streamId: _readInt(data, ['streamId']),
+          status: _readString(data, ['status']) ?? 'unknown',
+          hls: rootHls,
+          flv: rootFlv,
+          liveToken: _readString(data, ['liveToken', 'token']),
+        ),
+      ];
+    }
 
-    final streamMaps = streams
+    return streams
         .whereType<Map>()
         .map((stream) => Map<String, dynamic>.from(stream))
+        .map(
+          (stream) => ImouLiveStream(
+            streamId: _readInt(stream, ['streamId']),
+            status: _readString(stream, ['status']) ?? 'unknown',
+            hls: _readString(stream, ['hls', 'hlsUrl', 'url']),
+            flv: _readString(stream, ['flv', 'flvUrl', 'httpFlv']),
+            liveToken: _readString(stream, ['liveToken', 'token']),
+          ),
+        )
         .toList(growable: false);
-    if (streamMaps.isEmpty) return null;
-
-    for (final stream in streamMaps) {
-      if (_isPlayableHlsUrl(_readString(stream, ['hls', 'hlsUrl', 'url']))) {
-        return stream;
-      }
-    }
-    return streamMaps.first;
-  }
-
-  bool _isPlayableHlsUrl(String? url) {
-    final uri = Uri.tryParse(url ?? '');
-    if (uri == null || uri.host.isEmpty || uri.port == 8890) return false;
-
-    final scheme = uri.scheme.toLowerCase();
-    return (scheme == 'http' || scheme == 'https') &&
-        uri.path.toLowerCase().endsWith('.m3u8');
   }
 
   Object? _dataValue(Map<String, dynamic> response) {
@@ -351,5 +391,33 @@ class ImouCloudDataSourceImpl implements ImouCloudDataSource {
       }
     }
     return null;
+  }
+
+  String _resultLog(Map<String, dynamic> response) {
+    final result = response['result'];
+    if (result is! Map) return 'missing_result';
+    final code = result['code']?.toString() ?? 'missing_code';
+    final msg = result['msg']?.toString() ?? result['message']?.toString();
+    return '$code/${msg ?? 'missing_msg'}';
+  }
+
+  String _maskToken(String? token) {
+    final value = token?.trim() ?? '';
+    if (value.isEmpty) return 'missing';
+    if (value.length <= 8) return '***';
+    return '${value.substring(0, 4)}***${value.substring(value.length - 4)}';
+  }
+
+  String _maskDeviceId(String deviceId) {
+    final value = deviceId.trim();
+    if (value.length <= 6) return '***';
+    return '${value.substring(0, 3)}***${value.substring(value.length - 3)}';
+  }
+
+  String _maskUrl(String? url) {
+    final uri = Uri.tryParse(url ?? '');
+    if (uri == null || uri.host.isEmpty) return 'missing';
+    final port = uri.hasPort ? ':${uri.port}' : '';
+    return '${uri.scheme}://${uri.host}$port';
   }
 }

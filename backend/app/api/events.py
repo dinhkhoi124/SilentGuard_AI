@@ -472,12 +472,13 @@ async def detect_event(
 
 @router.post("/upload_clip", status_code=status.HTTP_201_CREATED)
 async def upload_clip(
+    event_id: str = Form(...),
     file: UploadFile = File(...),
     x_device_key: str = Header(None, alias="X-Device-Key")
 ):
     """
     POST /api/events/upload_clip
-    Uploads a video clip to Supabase Storage and returns the public URL.
+    Uploads a video clip to Supabase Storage and updates the event record with the public URL.
     """
     camera = await verify_device_key_dependency(x_device_key)
     household_id = camera.get("household_id")
@@ -493,6 +494,10 @@ async def upload_clip(
             file_options={"content-type": file.content_type or "video/mp4"}
         )
         clip_url = supabase.storage.from_("clips").get_public_url(filename)
+        
+        # Update the event record with the new clip URL
+        supabase.table("events").update({"clip_path": clip_url}).eq("event_id", event_id).execute()
+        
         return {"clip_url": clip_url}
     except Exception as e:
         print(f"Failed to upload clip to Supabase Storage: {e}")

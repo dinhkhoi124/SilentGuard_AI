@@ -313,9 +313,9 @@ Xử lý:
 1. **Xác thực**:
    - Nếu có `X-Device-Key` -> Thực hiện xác thực thiết bị biên camera bình thường, lấy `camera_id` và `household_id`.
    - Nếu có `X-Upload-Token` -> Tra cứu bảng `video_uploads`. Nếu token hợp lệ và trạng thái là `'pending'`, lấy `household_id`, gán `camera_id = NULL` và `source = 'video_upload'`. Trả về `401 Unauthorized` nếu không hợp lệ.
-2. **Demo fallback**: Nếu `source == 'video_upload'`, tự động ép `severity = 'HIGH'` và `duration_sec = 999`.
+2. **Demo fallback**: Nếu `source == 'video_upload'`, tự động ép `duration_sec = 999` (nhưng giữ nguyên `severity` được phân tích từ AI).
 3. **Insert DB**: Thêm bản ghi vào bảng `events`. Nếu `source == 'video_upload'`, cập nhật trạng thái bảng `video_uploads` thành `'processed'` và liên kết `event_id`.
-4. Nếu `severity != LOW` -> gọi `AlertEngine.process(event)`. (Lưu ý: Bỏ qua bước reclassify severity dựa trên `duration_sec` trong Alert Engine đối với nguồn `video_upload`).
+4. Nếu `event_type == 'fall'` -> gọi `AlertEngine.process(event)`. (Lưu ý: Bỏ qua bước reclassify severity dựa trên `duration_sec` trong Alert Engine đối với nguồn `video_upload`).
 
 Response:
 ```json
@@ -804,6 +804,7 @@ Response:
 ### 4.12g `POST /api/households/invite-requests/{invite_id}/respond` — Trả lời lời mời gia đình
 
 Quyền: Người dùng được mời (invitee).
+**Logic (Smart Switch & Cleanup)**: Khi người dùng đồng ý (`action: accepted`), Backend sẽ tự động kiểm tra nhà mặc định hiện tại của họ. Nếu nhà mặc định là "nhà rỗng" (0 camera, 0 thành viên khác), Backend sẽ tự động cập nhật `active_household_id` sang nhà mới này và xóa bỏ dữ liệu nhà rỗng đi để làm sạch DB.
 
 Header: `Authorization: Bearer <token>`
 

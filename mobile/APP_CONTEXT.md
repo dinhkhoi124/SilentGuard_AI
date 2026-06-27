@@ -74,7 +74,7 @@ Các tác vụ khởi chạy được đo thời gian bằng stopwatch (`_logSta
 
 1. Khởi tạo Firebase: `Firebase.initializeApp(...)` (giới hạn thời gian chờ tối đa 8 giây để tránh treo máy).
 2. Thiết lập Crashlytics xử lý lỗi fatal lỗi Flutter.
-3. Khởi tạo Dependency Injection: Gọi `di.init()` và chờ cho tất cả các singletons sẵn sàng (`di.sl.allReady()`). SharedPreferences được lấy bất đồng bộ (`SharedPreferences.getInstance()`) rồi đưa vào container dưới dạng singleton.
+3. Khởi tạo Dependency Injection: Gọi `di.init()`. Để tránh lỗi deadlock với Firebase callbacks, `SharedPreferences` được lấy bất đồng bộ (`await SharedPreferences.getInstance()`) trước khi truyền vào container và đăng ký dưới dạng lazy singleton. Không còn sử dụng `di.sl.allReady()`.
 4. Tải theme: `ThemeController.load()`.
 5. Dọn dẹp trạng thái tạm dừng giám sát camera đã hết hạn: `MonitoringSuppressService.pruneExpired()`.
 6. Xử lý thông báo FCM khi app được mở từ trạng thái bị tắt hoàn toàn (terminated): `_handleInitialFcmAlert`.
@@ -208,8 +208,7 @@ Route hiện có:
 
 Lưu ý:
 
-- `/faq` đang được khai báo 2 lần trong router, cần cleanup nếu sửa router
-- không có nested shell route; `HomePage` tự quản lý 4 tab bằng `IndexedStack`
+- Không có nested shell route; `HomePage` tự quản lý 4 tab bằng `IndexedStack`
 
 4 tab trong `HomePage`:
 
@@ -419,7 +418,7 @@ Tối ưu hóa chi tiết camera:
 
 `lib/injection_container.dart` quản lý khởi tạo tuần tự và ghi lại thời gian chạy (`_logDiStep`):
 - Đăng ký Client HTTP chuẩn và đăng ký một `ApiClient` riêng có tên instance là `'imou'` dành riêng cho các API của Imou Cloud.
-- Đăng ký `SharedPreferences` bất đồng bộ thay vì `SharedPreferencesAsync`.
+- Khởi tạo `SharedPreferences` trước khi gọi đăng ký DI để tránh deadlock, sau đó đăng ký bằng `registerLazySingleton`.
 - Loại bỏ toàn bộ các đăng ký liên quan đến ONVIF và các data source QR/ảnh cũ bị xóa.
 - Đăng ký đầy đủ các Bloc/Cubit: `AuthBloc`, `HomeBloc`, `VideoUploadBloc`, `SuppressCubit`, `DevicePairingBloc` (chỉ phụ thuộc vào `DeviceRepository`), `EmergencyContactsCubit`, `PendingInvitesCubit` (phụ thuộc vào `SessionRepository` để chuyển đổi household), và các Cubit báo cáo/feedback sự kiện.
 
@@ -475,8 +474,8 @@ Gần đây app đã có nhiều điều chỉnh để nâng cao trải nghiệm
 
 - Branding đang lệch giữa `WatchNest`, `SilentGuard`, và `SlientGuard`
 - Nhiều chuỗi tiếng Việt trong source đang bị lỗi encoding
-- Router có duplicate route `/faq`
 - App shell đang nằm trong `HomePage`, không phải shell route của `go_router`
+- **Gỡ rối (Debugging):** Hiện tượng "silent crash" khi boot thường do cáp kết nối USB không ổn định (mất kết nối ADB) thay vì ứng dụng thực sự bị lỗi. Cần check `flutter devices` khi nghi ngờ.
 - **Khởi động ứng dụng (Startup Flow):** Luôn giữ cho khởi động trước `runApp()` ở mức tối thiểu. Các cấu hình bổ sung phải đặt trong `initializeAfterFirstFrame()` và nhường luồng vẽ giao diện (`_yieldToUi()`).
 - Auth routing hiện release sớm theo Firebase auth, không đợi backend warm-up xong
 - Notification list không chỉ đến từ FCM; startup còn bom thêm pending household invites
@@ -527,3 +526,30 @@ Nếu sửa account/legal:
 ## 15. Tóm tắt 1 câu
 
 App mobile hiện là một ứng dụng Flutter cho giám sát an toàn gia đình được tối ưu hóa startup flow mượt mà, sử dụng luồng phát trực tiếp từ Imou Cloud với cơ chế tối ưu cập nhật video player không nhấp nháy, tự động giải phóng phiên kết nối khi đóng camera, và hỗ trợ quét QR ghép nối thiết bị cực kỳ đơn giản hóa cùng tính năng đổi hộ gia đình nhanh chóng khi nhận lời mời.
+
+---
+
+## 16. Báo cáo Review Imou Livestream Implementation
+*(Thực hiện tự động dựa trên yêu cầu kiểm tra 15 tiêu chí)*
+
+| Mục tiêu / Tiêu chí | File / Vị trí code | Mức độ | Nhận xét / Bằng chứng trong code | Đề xuất sửa |
+|---|---|---|---|---|
+| **1. Base URL & Request envelope** | `imou_cloud_datasource.dart` | OK | Code dùng đúng URL chuẩn `openapi-sg.easy4ip.com/openapi`, kèm đầy đủ các trường `system.ver`, `appId`, `time`, `nonce`, `sign` (MD5 lowercase). Không lộ `appSecret` trong log. | Giữ nguyên. |
+| **2. `deviceSn` vs `deviceId`** | `imou_cloud_datasource.dart` | OK | Nội bộ truyền biến `deviceSn` nhưng params gửi lên API dùng đúng key `deviceId`. Không lẫn lộn. | Giữ nguyên. |
+| **3. `bindDevice` và `code`** | `imou_cloud_datasource.dart` | OK | Flow xem live không gọi `bindDevice` (chỉ dùng lúc pairing). Quá trình lấy luồng đi chuẩn xác: `accessToken → bindDeviceLive → getLiveStreamInfo → player.open`. | Giữ nguyên. |
+| **4. Default stream SD** | `imou_stream_repository_impl.dart` | OK | Có hằng số `_defaultStreamId = 1` và được truyền mặc định vào `bindDeviceLive` / `getLiveStreamInfo`. | Giữ nguyên. |
+| **5. Response shape** | `imou_models.dart`, `imou_cloud_datasource.dart` | OK | Code tách biệt: `bindDeviceLive` đọc `liveToken` từ root, trong khi `getLiveStreamInfo` parse từ mảng `streams[]` bằng `_parseLiveStreams()`. | Giữ nguyên. |
+| **6. Chọn stream priority** | `imou_models.dart` (getter `selectedStream`) | OK | Hàm duyệt bằng mảng `[1, 0]` kết hợp ưu tiên HTTPS trước HTTP đúng chuẩn ưu tiên luồng SD. | Giữ nguyên. |
+| **7. Quản lý `liveToken`** | `imou_models.dart`, `imou_stream_repository_impl.dart` | OK | `liveToken` ưu tiên lấy từ selected stream, nếu thiếu thì fallback về `bindLiveToken`. Lưu trong đối tượng `_ImouStreamSession`. | Giữ nguyên. |
+| **8. `unbindLive`** | `imou_stream_repository_impl.dart`, `home_bloc.dart` | **High** | Có **Race Condition**: Nếu user thoát màn hình *trong khi API getLiveStreamInfo đang pending*, event `CameraDetailClosed` kích hoạt hàm release nhưng không tìm thấy session (do chưa được lưu). Sau đó API trả về, session mới được lưu vào `_activeSessions` và kẹt lại vĩnh viễn không bao giờ được unbind. | Thêm cờ hủy (cancellation flag) hoặc danh sách các `deviceId` vừa bị đóng để block việc tạo session mới hoặc lập tức gọi unbind ngay khi API trả kết quả. |
+| **9. `accessToken` cache** | `imou_cloud_datasource.dart` | OK | Tính đúng `DateTime.now().add(Duration(seconds: ...))` và trừ hao 600s (10 phút). Có cơ chế refresh token đúng 1 lần khi lỗi expired. | Giữ nguyên. |
+| **10. Tách lỗi API vs Playback** | `home_bloc.dart`, `camera_detail_page.dart` | OK | Lỗi API emit `CameraStreamUrlFailure`, lỗi player emit `CameraPlaybackFailure`. Không báo "Camera offline" do lỗi trình phát. | Giữ nguyên. |
+| **11. VideoPlayer lifecycle** | `camera_detail_page.dart` | OK | Không truyền URL giả (unavailable) vào trình phát nữa. Có Loading indicator rõ ràng khi pending. | Giữ nguyên. |
+| **12. Retry playback bằng `media_kit`** | `camera_video_player.dart` | OK | Cấu hình `_retryDelays = [2, 4, 6]`. Có thử mở lại URL nếu lỗi mà không thoát ngay, không gọi unbind khi retry. | Giữ nguyên. |
+| **13. Android HTTP cleartext** | `AndroidManifest.xml` | OK | Đã khai báo `android:usesCleartextTraffic="true"`. Sẵn sàng cho luồng fallback HTTP. | Giữ nguyên. |
+| **14. Codec & Cue 2E** | `camera_video_player.dart` | OK | `media_kit` (FFmpeg) hỗ trợ cả H.264 và H.265, code không ép cứng codec nào. | Giữ nguyên. |
+| **15. Tests** | Thư mục `test/` | **Medium** | Đã cover tốt cho `ImouCloudDataSourceImpl` (`imou_cloud_datasource_test.dart`). Tuy nhiên **thiếu test** cho `ImouStreamRepositoryImpl` và luồng mở stream của `HomeBloc` (đặc biệt là test race condition). | Viết bổ sung Unit test cho Repository và HomeBloc. |
+
+### Đề xuất thứ tự sửa:
+1. **(High) Sửa lỗi rò rỉ kết nối (Race Condition) trong `ImouStreamRepositoryImpl`:** Khắc phục ngay để đảm bảo account Imou không bị quá tải session ảo.
+2. **(Medium) Bổ sung Unit Tests:** Cập nhật test suites để bao phủ các luồng fallback và cancelation mới thêm.

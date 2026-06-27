@@ -627,6 +627,7 @@ Authorization: Bearer <FIREBASE_ID_TOKEN>
 
 ### 3.13g Trả lời lời mời gia đình (`POST /api/households/invite-requests/{invite_id}/respond`)
 Đồng ý hoặc từ chối lời mời gia đình. Nếu đồng ý (`accepted`), người dùng được tự động thêm vào `household_members` với quyền `member` và danh sách liên hệ khẩn cấp `contacts` của hộ gia đình đó.
+**Lưu ý (Smart Switch):** Nếu Hộ gia đình đang kích hoạt (`active_household_id`) của người dùng hiện tại hoàn toàn trống (không có camera, không có thành viên nào khác), Backend sẽ tự động xóa hộ gia đình trống đó và đổi `active_household_id` sang hộ gia đình vừa tham gia. Frontend nên fetch lại dữ liệu camera để cập nhật giao diện ngay lập tức.
 
 - **Headers**:
 ```http

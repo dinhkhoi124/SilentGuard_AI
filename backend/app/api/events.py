@@ -549,7 +549,34 @@ async def update_event_duration(
                 supabase.table("escalation_logs").insert(escalation_entry).execute()
             except Exception:
                 pass
+
+        # Thực hiện gọi điện khẩn cấp nếu mức độ leo thang lên CRITICAL
+        if new_severity == "CRITICAL":
+            try:
+                contacts_res = supabase.table("contacts")\
+                    .select("user_id, priority_order, users(phone)")\
+                    .eq("household_id", household_id)\
+                    .order("priority_order")\
+                    .execute()
                 
+                phone_numbers = [
+                    c["users"]["phone"] 
+                    for c in contacts_res.data 
+                    if c.get("users") and c["users"].get("phone")
+                ]
+                
+                if phone_numbers:
+                    from app.services.call_service import make_calls
+                    import asyncio
+                    await asyncio.to_thread(
+                        make_calls,
+                        phone_numbers,
+                        event_data["event_id"],
+                        event_data.get("room", "không xác định")
+                    )
+            except Exception as e:
+                print(f"Error triggering call on CRITICAL escalation: {e}")
+
     return {"status": "updated", "duration_sec": req.duration_sec, "severity": update_data["severity"]}
 
 

@@ -991,7 +991,7 @@ function AppDownload() {
                         <li>
                           File ứng dụng dạng{" "}
                           <a
-                            href="/downloads/SilentGuard.ipa"
+                            href="/downloads/Runner.ipa"
                             download
                             className="text-brand-glow hover:underline inline-flex items-center gap-0.5"
                           >

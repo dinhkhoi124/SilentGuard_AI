@@ -36,7 +36,7 @@ async def get_dashboard_summary(
                 by_severity[sev] += 1
                 
         # 2. Fetch cameras status
-        cameras_res = supabase.table("cameras").select("*").eq("household_id", household_id).execute()
+        cameras_res = supabase.table("cameras").select("*").eq("household_id", household_id).is_("deleted_at", "null").execute()
         cameras = []
         for cam in (cameras_res.data or []):
             cameras.append({
@@ -60,5 +60,5 @@ async def get_dashboard_summary(
         print(f"Error in get_dashboard_summary: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"error": {"code": "DATABASE_ERROR", "message": f"Failed to compute dashboard stats: {str(e)}"}}
+            detail={"error": {"code": "DATABASE_ERROR", "message": "Lỗi hệ thống nội bộ, vui lòng thử lại sau"}}
         )

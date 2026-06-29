@@ -1,4 +1,5 @@
 import uuid
+import asyncio
 from datetime import datetime, timezone, timedelta
 from app.core.supabase_client import supabase
 from app.db.queries import get_contacts_sorted
@@ -138,10 +139,11 @@ async def retry_critical_calls():
             
             if phone_numbers:
                 from app.services.call_service import make_calls
-                make_calls(
-                    phone_numbers=phone_numbers,
-                    event_id=event["event_id"],
-                    room=event.get("room", "không xác định")
+                await asyncio.to_thread(
+                    make_calls,
+                    phone_numbers,
+                    event["event_id"],
+                    event.get("room", "không xác định")
                 )
                 print(f"[scheduler] Retry call for CRITICAL event {event['event_id']}")
 

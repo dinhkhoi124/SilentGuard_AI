@@ -93,6 +93,23 @@ Authorization: Bearer <FIREBASE_ID_TOKEN>
 
 ---
 
+### 3.2a Xóa tài khoản (GDPR Compliance) (`DELETE /api/users/me`)
+Xóa vĩnh viễn tài khoản người dùng và tất cả dữ liệu cá nhân liên quan. Cần thiết để đáp ứng chính sách xét duyệt của Apple App Store và Google Play.
+
+- **Headers**:
+```http
+Authorization: Bearer <FIREBASE_ID_TOKEN>
+```
+- **Response 200 OK**:
+```json
+{
+  "status": "ok",
+  "message": "Tài khoản đã được xóa thành công"
+}
+```
+
+---
+
 ### 3.3 Đăng ký FCM token nhận Push Notification (`POST /api/users/device-token`)
 Gọi mỗi khi ứng dụng khởi chạy hoặc khi token FCM thay đổi (rotate) để đảm bảo nhận được thông báo khẩn cấp.
 
@@ -549,6 +566,112 @@ Content-Type: application/json
   "elderly_name": "Ong Nguyen Van A",
   "address": "456 Tran Hung Dao",
   "created_at": "2026-06-19T03:00:00Z"
+}
+```
+
+---
+
+### 3.13e Mời thành viên bằng Email (`POST /api/households/invite-by-email`)
+Mời người dùng tham gia hộ gia đình bằng địa chỉ Email của họ. Chỉ áp dụng cho chủ hộ (`owner`).
+
+- **Headers**:
+```http
+Authorization: Bearer <FIREBASE_ID_TOKEN>
+Content-Type: application/json
+```
+- **Request Body**:
+```json
+{
+  "household_id": "household-uuid",
+  "email": "user@example.com"
+}
+```
+- **Response 201 Created**:
+```json
+{
+  "invite_request_id": "invite-uuid",
+  "invitee_id": "user-uuid",
+  "status": "pending"
+}
+```
+
+---
+
+### 3.13f Lấy danh sách lời mời đang chờ xử lý (`GET /api/households/invite-requests/pending`)
+Lấy toàn bộ các lời mời vào hộ gia đình đang ở trạng thái `pending` của người dùng hiện tại.
+
+- **Headers**:
+```http
+Authorization: Bearer <FIREBASE_ID_TOKEN>
+```
+- **Response 200 OK**:
+```json
+{
+  "items": [
+    {
+      "id": "invite-uuid",
+      "household_id": "household-uuid",
+      "household_name": "Nha Ba Me",
+      "elderly_name": "Nguyen Van A",
+      "invited_by_name": "Chủ Hộ A",
+      "invited_by_email": "owner@example.com",
+      "status": "pending",
+      "created_at": "2026-06-24T08:00:00Z"
+    }
+  ],
+  "total": 1
+}
+```
+
+---
+
+### 3.13g Trả lời lời mời gia đình (`POST /api/households/invite-requests/{invite_id}/respond`)
+Đồng ý hoặc từ chối lời mời gia đình. Nếu đồng ý (`accepted`), người dùng được tự động thêm vào `household_members` với quyền `member` và danh sách liên hệ khẩn cấp `contacts` của hộ gia đình đó.
+**Lưu ý (Smart Switch):** Nếu Hộ gia đình đang kích hoạt (`active_household_id`) của người dùng hiện tại hoàn toàn trống (không có camera, không có thành viên nào khác), Backend sẽ tự động xóa hộ gia đình trống đó và đổi `active_household_id` sang hộ gia đình vừa tham gia. Frontend nên fetch lại dữ liệu camera để cập nhật giao diện ngay lập tức.
+
+- **Headers**:
+```http
+Authorization: Bearer <FIREBASE_ID_TOKEN>
+Content-Type: application/json
+```
+- **Request Body**:
+```json
+{
+  "action": "accepted" // Hoặc "declined"
+}
+```
+- **Response 200 OK**:
+```json
+{
+  "status": "accepted"
+}
+```
+
+---
+
+### 3.13h Lấy danh sách thành viên hộ gia đình (`GET /api/households/{household_id}/members`)
+Lấy danh sách tất cả các thành viên hiện tại thuộc hộ gia đình (kèm thông tin liên hệ khẩn cấp của họ nếu có). Áp dụng cho cả chủ hộ (`owner`) và thành viên (`member`).
+
+- **Headers**:
+```http
+Authorization: Bearer <FIREBASE_ID_TOKEN>
+```
+- **Response 200 OK**:
+```json
+{
+  "members": [
+    {
+      "user_id": "user-uuid",
+      "full_name": "Nguyen Van B",
+      "email": "member@example.com",
+      "phone": "0987654321",
+      "role": "member",
+      "joined_at": "2026-06-24T08:00:00.000Z",
+      "is_in_contacts": true,
+      "contacts_priority": 1
+    }
+  ],
+  "total": 1
 }
 ```
 

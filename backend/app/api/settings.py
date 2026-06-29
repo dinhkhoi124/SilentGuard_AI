@@ -34,21 +34,21 @@ async def get_thresholds(
         print(f"Error in get_thresholds: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"error": {"code": "DATABASE_ERROR", "message": f"Failed to retrieve thresholds: {str(e)}"}}
+            detail={"error": {"code": "DATABASE_ERROR", "message": "Lỗi hệ thống nội bộ, vui lòng thử lại sau"}}
         )
 
 @router.put("/settings/thresholds")
 async def update_thresholds(
     req: ThresholdUpdate,
     request: Request,
-    user: dict = Depends(get_current_user),
-    _owner: dict = Depends(require_household_role(owner_only=True))
+    user: dict = Depends(get_current_user)
 ):
     """
     PUT /api/settings/thresholds
     Ref: Section 4.8 of design doc
     """
     household_id = req.household_id
+    verify_owner_role(household_id, user.get("id"))
     try:
         data = {
             "low_max_sec": req.low_max_sec,
@@ -63,7 +63,7 @@ async def update_thresholds(
         print(f"Error in update_thresholds: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"error": {"code": "DATABASE_ERROR", "message": f"Failed to update thresholds: {str(e)}"}}
+            detail={"error": {"code": "DATABASE_ERROR", "message": "Lỗi hệ thống nội bộ, vui lòng thử lại sau"}}
         )
 
 @router.get("/contacts")
@@ -84,15 +84,14 @@ async def get_contacts(
         print(f"Error in get_contacts: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"error": {"code": "DATABASE_ERROR", "message": f"Failed to retrieve contacts: {str(e)}"}}
+            detail={"error": {"code": "DATABASE_ERROR", "message": "Lỗi hệ thống nội bộ, vui lòng thử lại sau"}}
         )
 
 @router.post("/contacts")
 async def create_contact(
     req: ContactCreate,
     request: Request,
-    user: dict = Depends(get_current_user),
-    _owner: dict = Depends(require_household_role(owner_only=True))
+    user: dict = Depends(get_current_user)
 ):
     """
     POST /api/contacts
@@ -100,6 +99,9 @@ async def create_contact(
     """
     household_id = str(req.household_id)
     user_id = str(req.user_id)
+    
+    verify_owner_role(household_id, user.get("id"))
+    
     try:
         # Validate user_id exists in users table and is already household_member of this household
         member_res = supabase.table("household_members")\
@@ -127,7 +129,7 @@ async def create_contact(
         print(f"Error in create_contact: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"error": {"code": "DATABASE_ERROR", "message": f"Failed to create contact: {str(e)}"}}
+            detail={"error": {"code": "DATABASE_ERROR", "message": "Lỗi hệ thống nội bộ, vui lòng thử lại sau"}}
         )
 
 @router.patch("/contacts/{contact_id}")
@@ -189,7 +191,7 @@ async def update_contact(
         print(f"Error in update_contact: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"error": {"code": "DATABASE_ERROR", "message": f"Failed to update contact: {str(e)}"}}
+            detail={"error": {"code": "DATABASE_ERROR", "message": "Lỗi hệ thống nội bộ, vui lòng thử lại sau"}}
         )
 
 @router.delete("/contacts/{contact_id}")
@@ -230,7 +232,7 @@ async def delete_contact(
         print(f"Error in delete_contact: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"error": {"code": "DATABASE_ERROR", "message": f"Failed to delete contact: {str(e)}"}}
+            detail={"error": {"code": "DATABASE_ERROR", "message": "Lỗi hệ thống nội bộ, vui lòng thử lại sau"}}
         )
 
 @router.post("/llm/config")
@@ -249,5 +251,5 @@ async def chat_config(
         print(f"Error in chat_config: {e}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail={"error": {"code": "VALIDATION_ERROR", "message": str(e)}}
+            detail={"error": {"code": "VALIDATION_ERROR", "message": "Lỗi hệ thống nội bộ, vui lòng thử lại sau"}}
         )

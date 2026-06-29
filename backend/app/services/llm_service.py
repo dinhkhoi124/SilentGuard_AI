@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Optional, List
 from pydantic import BaseModel, Field, field_validator
 from fastapi import HTTPException
-from openai import OpenAI
+from openai import AsyncOpenAI
 from app.core.config import settings
 
 # Initialize OpenAI Client
@@ -12,7 +12,7 @@ api_key = settings.OPENAI_API_KEY
 is_mock = not api_key or api_key in ("xxxx", "your-openai-key", "your-openrouter-key", "your-anthropic-key")
 
 if not is_mock:
-    client = OpenAI(
+    client = AsyncOpenAI(
         api_key=api_key,
         timeout=30.0,
     )
@@ -99,7 +99,7 @@ async def generate_daily_report(events: list) -> str:
     """
 
     try:
-        response = client.chat.completions.create(
+        response = await client.chat.completions.create(
             model="gpt-4o-mini",
             max_tokens=300,
             temperature=0.7,
@@ -145,7 +145,7 @@ async def parse_config(message: str) -> ParsedConfig:
         return ParsedConfig(**mock_data)
 
     try:
-        response = client.chat.completions.create(
+        response = await client.chat.completions.create(
             model="gpt-4o-mini",
             max_tokens=200,
             temperature=0.0,

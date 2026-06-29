@@ -13,4 +13,8 @@ abstract final class AppColors {
   static const badgeRed = Color(0xFFFF4D4D);
   static const destructive = Color(0xFFE5484D);
   static const shadow = Color(0x1A3B5EDB);
+  static const safe = Color(0xFF4CAF50);
+  static const warning = Color(0xFFFFC857);
+  static const infoBackground = Color(0xFFEEEBFD);
+  static const googleBlue = Color(0xFF4285F4);
 }

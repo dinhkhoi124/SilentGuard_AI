@@ -615,4 +615,7 @@ async def upload_clip(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={"error": {"code": "UPLOAD_FAILED", "message": "Failed to upload video clip"}}
         )
+<<<<<<< HEAD
 
+=======
+>>>>>>> dec0aff427ad22bba41fd2b4da512f67c5497479

@@ -5,7 +5,9 @@ Ref: Section 7 - Notification Service in design document.
 from typing import Any
 import asyncio
 from firebase_admin import messaging
+
 from app.core.supabase_client import supabase
+
 
 async def send_push(user_id: str, event_data: dict) -> bool:
     """
@@ -63,6 +65,7 @@ async def send_push(user_id: str, event_data: dict) -> bool:
     except Exception as e:
         print(f"Failed to send push notification to user {user_id}: {e}")
         return False
+
 
 async def trigger_call(contact: dict, event_data: dict) -> bool:
     """

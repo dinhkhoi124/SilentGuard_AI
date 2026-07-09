@@ -1,0 +1,156 @@
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --font-sans: "Public Sans", ui-sans-serif, system-ui, sans-serif;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+
+  --color-brand: var(--brand);
+  --color-brand-foreground: var(--brand-foreground);
+  --color-brand-light: var(--brand-light);
+  --color-brand-glow: var(--brand-glow);
+  --color-accent: var(--accent);
+
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+
+  --color-primary: var(--brand);
+  --color-primary-foreground: var(--brand-foreground);
+  --color-secondary: var(--surface-2);
+  --color-secondary-foreground: var(--ink);
+  --color-accent-foreground: var(--background);
+  --color-card: var(--background);
+  --color-card-foreground: var(--ink);
+  --color-popover: var(--background);
+  --color-popover-foreground: var(--ink);
+  --color-destructive: oklch(0.62 0.22 27);
+  --color-destructive-foreground: oklch(0.98 0 0);
+  --color-input: var(--border);
+  --color-ring: var(--brand);
+  --color-ring-offset-background: var(--background);
+
+  --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.5rem;
+  --radius-2xl: 2rem;
+  --radius-3xl: 3rem;
+
+  --shadow-glow: 0 30px 80px -30px color-mix(in oklab, var(--brand) 35%, transparent);
+  --shadow-soft: 0 12px 40px -12px rgb(0 0 0 / 0.08);
+
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+:root {
+  --background: oklch(0.985 0.005 80);          /* stone-50 warm */
+  --surface: oklch(1 0 0);
+  --surface-2: oklch(0.96 0.008 80);            /* stone-100 */
+  --ink: oklch(0.21 0.01 260);                  /* zinc-900 */
+  --ink-soft: oklch(0.45 0.012 260);            /* zinc-600 */
+  --foreground: var(--ink);
+  --muted: oklch(0.96 0.008 80);
+  --muted-foreground: oklch(0.5 0.012 260);
+  --border: oklch(0.21 0.01 260 / 0.08);
+
+  --brand: oklch(0.42 0.11 152);                /* deep emerald ~#166534 */
+  --brand-foreground: oklch(0.985 0.005 80);
+  --brand-light: oklch(0.97 0.04 152);          /* #f0fdf4 */
+  --brand-glow: oklch(0.55 0.16 152);
+  --accent: oklch(0.74 0.17 55);                /* warm orange #fb923c */
+
+  --radius: 1rem;
+}
+
+.dark {
+  --background: oklch(0.18 0.012 260);
+  --surface: oklch(0.21 0.013 260);
+  --surface-2: oklch(0.24 0.014 260);
+  --ink: oklch(0.985 0.005 80);
+  --ink-soft: oklch(0.78 0.012 260);
+  --foreground: var(--ink);
+  --muted: oklch(0.24 0.014 260);
+  --muted-foreground: oklch(0.7 0.012 260);
+  --border: oklch(1 0 0 / 0.08);
+  --brand: oklch(0.65 0.15 152);
+  --brand-foreground: oklch(0.15 0.01 260);
+  --brand-light: oklch(0.27 0.04 152);
+  --brand-glow: oklch(0.72 0.18 152);
+  --accent: oklch(0.78 0.16 55);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    font-feature-settings: "ss01", "cv11";
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+@layer utilities {
+  .text-balance { text-wrap: balance; }
+  .text-pretty { text-wrap: pretty; }
+
+  .grain {
+    background-image:
+      radial-gradient(transparent 1px, color-mix(in oklab, var(--ink) 2%, transparent) 1px);
+    background-size: 3px 3px;
+  }
+
+  @keyframes float-y {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-12px); }
+  }
+  .animate-float { animation: float-y 6s var(--ease-out-expo) infinite; }
+
+  @keyframes pulse-ring {
+    0% { transform: scale(0.8); opacity: 0.7; }
+    100% { transform: scale(2.4); opacity: 0; }
+  }
+  .pulse-ring::before,
+  .pulse-ring::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 9999px;
+    border: 1px solid var(--brand);
+    animation: pulse-ring 2.6s var(--ease-out-expo) infinite;
+  }
+  .pulse-ring::after { animation-delay: 1.3s; }
+
+  /* Custom Slim Scrollbar for Modals */
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 999px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 999px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.3);
+  }
+}

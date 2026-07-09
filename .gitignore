@@ -29,8 +29,8 @@ env/
 Thumbs.db
 
 # Data (never commit large data)
-data/
 *.db
+*.db-journal
 *.sqlite3
 
 # Logs
@@ -58,3 +58,11 @@ out/
 # AI logs — tracked structure, ignored content
 .ai-log/*.jsonl
 .ai-log/archive/
+
+#front end
+frontend/.next/
+frontend/node_modules/
+
+# Agents
+.agents/skills
+skills-lock.json

@@ -10,6 +10,7 @@ router = APIRouter(prefix="/api/reports", tags=["Reports"])
 async def get_daily_report(
     household_id: str,
     date: str = Query(default=None),
+    message: str = Query(default=None, description="Tin nhắn của người dùng để trò chuyện (chatbot)"),
     user: dict = Depends(get_current_user),
 ):
     """
@@ -33,19 +34,20 @@ async def get_daily_report(
     if not date:
         date = datetime.utcnow().strftime("%Y-%m-%d")
     try:
-        # 1. Try to fetch existing report
-        res = supabase.table("daily_reports")\
-            .select("*")\
-            .eq("household_id", household_id)\
-            .eq("report_date", date)\
-            .execute()
-            
-        if res.data:
-            return {
-                "date": date,
-                "summary": res.data[0].get("summary"),
-                "events": [] # Can be populated as needed
-            }
+        # 1. Try to fetch existing report if not chatting
+        if not message:
+            res = supabase.table("daily_reports")\
+                .select("*")\
+                .eq("household_id", household_id)\
+                .eq("report_date", date)\
+                .execute()
+                
+            if res.data:
+                return {
+                    "date": date,
+                    "summary": res.data[0].get("summary"),
+                    "events": [] # Can be populated as needed
+                }
             
         # 2. Dynamic generation: Fetch all events of the date
         start_ts = f"{date}T00:00:00Z"
@@ -61,15 +63,16 @@ async def get_daily_report(
         events = events_res.data or []
         
         # 3. Call LLM Claude Service
-        report_text = await generate_daily_report(events)
+        report_text = await generate_daily_report(events, user_message=message)
         
-        # 4. Save report in DB
-        new_report = {
-            "household_id": household_id,
-            "report_date": date,
-            "summary": report_text
-        }
-        supabase.table("daily_reports").insert(new_report).execute()
+        # 4. Save report in DB (only if not chatting)
+        if not message:
+            new_report = {
+                "household_id": household_id,
+                "report_date": date,
+                "summary": report_text
+            }
+            supabase.table("daily_reports").insert(new_report).execute()
         
         return {
             "date": date,

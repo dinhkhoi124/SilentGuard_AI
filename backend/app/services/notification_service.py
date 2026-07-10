@@ -5,9 +5,7 @@ Ref: Section 7 - Notification Service in design document.
 from typing import Any
 import asyncio
 from firebase_admin import messaging
-
 from app.core.supabase_client import supabase
-
 
 async def send_push(user_id: str, event_data: dict) -> bool:
     """
@@ -55,6 +53,14 @@ async def send_push(user_id: str, event_data: dict) -> bool:
                 },
                 payload=messaging.APNSPayload(aps=messaging.Aps(content_available=True)),
             ),
+            webpush=messaging.WebpushConfig(
+                notification=messaging.WebpushNotification(
+                    title=f"Cảnh báo {severity} — {room}",
+                    body=body_msg,
+                    icon="/icons/Icon-192.png",
+                    badge="/icons/Icon-192.png"
+                )
+            ),
             token=fcm_token,
         )
 
@@ -66,21 +72,40 @@ async def send_push(user_id: str, event_data: dict) -> bool:
         print(f"Failed to send push notification to user {user_id}: {e}")
         return False
 
-
 async def trigger_call(contact: dict, event_data: dict) -> bool:
     """
-    Sends call triggers using Twilio or equivalent VoIP provider.
+    Gọi điện khẩn cấp cho người liên hệ thông qua Twilio Studio Flow.
+    Lấy số điện thoại từ DB nếu contact chưa có sẵn trường 'phone'.
     Ref: Section 6
     """
     try:
-        phone = contact.get("phone", "unknown")
-        room = event_data.get("room", "nhà")
-        severity = event_data.get("severity", "MEDIUM")
-        print(f"[VOIP CALL] Calling emergency backup contact: {contact.get('full_name')} at {phone}")
-        print(f"[VOIP CALL] Playing message: Cảnh báo mức độ {severity} phát hiện ngã tại {room}!")
+        # Ưu tiên lấy phone trực tiếp từ contact dict.
+        # Nếu không có (do join query chưa include), fallback query DB.
+        phone = contact.get("phone") or contact.get("users", {}).get("phone")
+
+        if not phone:
+            user_id = contact.get("user_id")
+            if not user_id:
+                print(f"[trigger_call] Không có user_id trong contact, bỏ qua.")
+                return False
+            res = supabase.table("users").select("phone").eq("id", user_id).execute()
+            if res.data and res.data[0].get("phone"):
+                phone = res.data[0]["phone"]
+            else:
+                print(f"[trigger_call] Không tìm thấy số điện thoại cho user {user_id}, bỏ qua.")
+                return False
+
+        from app.services.call_service import make_calls
+        results = await asyncio.to_thread(
+            make_calls,
+            [phone],
+            str(event_data.get("event_id", "")),
+            str(event_data.get("room", "không xác định"))
+        )
+        print(f"[trigger_call] Đã gọi Twilio cho {phone}: {results}")
         return True
     except Exception as e:
-        print(f"Failed to trigger VOIP call: {e}")
+        print(f"[trigger_call] Lỗi khi gọi Twilio: {e}")
         return False
 
 

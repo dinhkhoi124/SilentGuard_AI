@@ -318,7 +318,14 @@ async def get_upload_url(
         )
 
     household_id = camera.get("household_id", "household-uuid")
-    storage_path = f"{household_id}/{req.filename}"
+    
+    # Sanitize filename to avoid 400 Bad Request on Supabase
+    import re, unicodedata
+    nfkd = unicodedata.normalize('NFKD', req.filename)
+    ascii_str = nfkd.encode('ASCII', 'ignore').decode('ASCII')
+    safe_filename = re.sub(r'[^a-zA-Z0-9.\-_]', '_', ascii_str)
+    
+    storage_path = f"{household_id}/{safe_filename}"
     
     try:
         # Generate signed upload URL from Supabase Storage client

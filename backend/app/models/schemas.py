@@ -16,6 +16,10 @@ class UploadUrlResponse(BaseModel):
     clip_path: str
     expires_in: int = 300
 
+class EventDurationUpdate(BaseModel):
+    duration_sec: int
+    status: str
+
 # ----------------------------------------------------
 # 4.1 Event Detect Request
 # ----------------------------------------------------

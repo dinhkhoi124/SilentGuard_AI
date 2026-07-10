@@ -16,7 +16,7 @@ from app.api.users import router as users_router
 from app.api.settings import router as settings_router
 from app.api.reports import router as reports_router
 from app.api.households import router as households_router
-from app.services.scheduler import periodic_check_job, retry_critical_calls
+from app.services.scheduler import periodic_check_job, retry_critical_calls, escalate_pending_events
 
 # Load environment variables
 load_dotenv()
@@ -26,8 +26,11 @@ async def lifespan(app: FastAPI):
     scheduler = AsyncIOScheduler()
     scheduler.add_job(periodic_check_job, 'interval', minutes=1)
     scheduler.add_job(retry_critical_calls, 'interval', minutes=2)
+    scheduler.add_job(escalate_pending_events, 'interval', seconds=30)
     scheduler.start()
+    
     yield
+    
     scheduler.shutdown()
 
 app = FastAPI(
@@ -50,6 +53,8 @@ app.add_middleware(
 )
 
 
+from app.api.streams import router as streams_router
+
 # Mount API Routers
 app.include_router(events_router)
 app.include_router(cameras_router)
@@ -59,6 +64,7 @@ app.include_router(users_router)
 app.include_router(settings_router)
 app.include_router(reports_router)
 app.include_router(households_router)
+app.include_router(streams_router)
 
 @app.get("/health", status_code=status.HTTP_200_OK)
 async def health_check():

@@ -78,9 +78,9 @@ async def generate_alert_message(event: dict) -> str:
     else:
         return f"Cảnh báo hệ thống: Phát hiện bất thường trong {room} lúc {time_str}."
 
-async def generate_daily_report(events: list) -> str:
+async def generate_daily_report(events: list, user_message: str = None) -> str:
     """
-    Generate natural language daily report summary.
+    Generate natural language daily report summary or act as chatbot based on events.
     Ref: Section 8 daily report generator
     """
     if is_mock:
@@ -93,21 +93,41 @@ async def generate_daily_report(events: list) -> str:
         )
     events_str = "\n".join(events_summary)
 
-    prompt = f"""
-    Tổng hợp danh sách các sự kiện té ngã / bất động của một ngày dưới đây thành một đoạn báo cáo tóm tắt 24h tự nhiên, ấm áp, ngắn gọn gửi cho gia đình:
-    {events_str}
-    """
+    if user_message:
+        prompt = f"""
+        Bạn là trợ lý ảo của hệ thống theo dõi sức khỏe người cao tuổi.
+        Người dùng đang hỏi: "{user_message}"
+        Dựa vào danh sách sự kiện té ngã/bất động dưới đây, hãy trả lời câu hỏi của người dùng một cách ngắn gọn, tự nhiên và ấm áp.
+        
+        Yêu cầu quan trọng:
+        - Tuyệt đối trung thực với dữ liệu được cung cấp. Không tự bịa thêm thông tin, sự kiện, chỉ số.
+        - TUYỆT ĐỐI KHÔNG BỊA RA TÊN NGƯỜI. Luôn dùng các từ chung chung như "người thân", "ông/bà", "người dùng" nếu không có tên cụ thể.
+        
+        Danh sách sự kiện:
+        {events_str if events_str else "Không có sự kiện nào."}
+        """
+    else:
+        prompt = f"""
+        Tổng hợp danh sách các sự kiện té ngã / bất động của một ngày dưới đây thành một đoạn báo cáo tóm tắt 24h tự nhiên, ấm áp, ngắn gọn gửi cho gia đình.
+        Yêu cầu quan trọng:
+        - Tuyệt đối trung thực với dữ liệu được cung cấp. Không tự bịa thêm thông tin, sự kiện hay chỉ số.
+        - TUYỆT ĐỐI KHÔNG BỊA RA TÊN NGƯỜI. Hãy gọi là "người thân" hoặc "ông/bà".
+        - Nếu danh sách sự kiện trống, hãy viết một câu ngắn gọn thông báo rằng hôm nay không ghi nhận sự kiện bất thường nào, mọi người đều an toàn.
+
+        Danh sách sự kiện:
+        {events_str if events_str else "Không có sự kiện nào."}
+        """
 
     try:
         response = await client.chat.completions.create(
             model="gpt-4o-mini",
             max_tokens=300,
-            temperature=0.7,
+            temperature=0.3,
             messages=[{"role": "user", "content": prompt}]
         )
         return response.choices[0].message.content.strip()
     except Exception as e:
-        print(f"Error calling Claude API for daily report: {e}")
+        print(f"Error calling OpenAI API for daily report: {e}")
         return "Báo cáo ngày hôm nay bình thường. Không có sự kiện khẩn cấp nào chưa được xử lý."
 
 async def parse_config(message: str) -> ParsedConfig:
@@ -132,7 +152,8 @@ async def parse_config(message: str) -> ParsedConfig:
       "dedup_window_sec": <int>,
       "suppress_windows": [{{"start": "HH:MM", "end": "HH:MM", "max_still_sec": <int>}}]
     }}
-    Chỉ trả JSON, không giải thích thêm.
+    Chỉ trả định dạng JSON hợp lệ, không giải thích thêm.
+    Tuyệt đối không tự suy diễn hoặc điền các giá trị không được đề cập trong câu nói của người dùng.
     """
 
     if is_mock:
@@ -149,9 +170,16 @@ async def parse_config(message: str) -> ParsedConfig:
             model="gpt-4o-mini",
             max_tokens=200,
             temperature=0.0,
+            response_format={ "type": "json_object" },
             messages=[{"role": "user", "content": prompt}]
         )
         raw = response.choices[0].message.content.strip()
+        # Loại bỏ markdown backticks nếu LLM vẫn trả về dạng ```json
+        if raw.startswith("```json"):
+            raw = raw[7:-3].strip()
+        elif raw.startswith("```"):
+            raw = raw[3:-3].strip()
+            
         data = json.loads(raw)
         return ParsedConfig(**data)
     except Exception as e:

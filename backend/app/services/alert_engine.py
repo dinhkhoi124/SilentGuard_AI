@@ -81,29 +81,34 @@ async def process_event(event_data: dict) -> None:
     else:
         severity = event_data.get("severity") or "HIGH"
     
+    if severity == "LOW":
+        print(f"[AlertEngine] Severity = LOW — lưu pending, bắn Alert lần đầu.")
+        event_data["status"] = "pending"
 
 
-    # 4. Push TRƯỚC với default message đến liên hệ chính
+
+    # 4. Push TRƯỚC với default message đến TẤT CẢ các liên hệ
     print(f"[Alert Engine] Fetching contacts for household_id: {household_id}")
     contacts = await get_contacts_sorted(household_id)
     if contacts:
-        primary = contacts[0]
-        print(f"[Alert Engine] Found {len(contacts)} contacts. Primary contact is: {primary.get('user_id')} ({primary.get('full_name')})")
+        print(f"[Alert Engine] Found {len(contacts)} contacts. Blasting Push Notification to all.")
         # Set default message
         event_data["llm_message"] = f"Cảnh báo ngã phát hiện tại {event_data.get('room', 'nhà')}."
-        await send_push(primary.get("user_id"), event_data)
         
-        # Log escalation
-        try:
-            escalation_entry = {
-                "event_id": event_id,
-                "contact_id": primary.get("id"),
-                "channel": "push",
-                "status": "sent"
-            }
-            supabase.table("escalations").insert(escalation_entry).execute()
-        except Exception as e:
-            print(f"Error logging primary escalation trace: {e}")
+        for contact in contacts:
+            await send_push(contact.get("user_id"), event_data)
+            
+            # Log escalation
+            try:
+                escalation_entry = {
+                    "event_id": event_id,
+                    "contact_id": contact.get("id"),
+                    "channel": "push",
+                    "status": "sent"
+                }
+                supabase.table("escalations").insert(escalation_entry).execute()
+            except Exception as e:
+                print(f"Error logging escalation trace for contact {contact.get('id')}: {e}")
     else:
         print(f"[Alert Engine] WARNING: No emergency contacts found for household_id: {household_id}")
 
@@ -129,7 +134,6 @@ async def process_event(event_data: dict) -> None:
                 event_data["event_id"],
                 event_data.get("room", "không xác định")
             )
-
 
     # 5. Set escalate_after cho các sự kiện khẩn cấp
     created_at_str = event_data.get("created_at") or datetime.now().isoformat()

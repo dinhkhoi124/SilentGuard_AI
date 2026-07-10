@@ -110,9 +110,9 @@ async def retry_critical_calls():
     (chưa được acknowledge) và gọi lại.
     """
     try:
-        now = datetime.utcnow().isoformat()
+        now = datetime.now(timezone.utc).isoformat()
         # Tìm event CRITICAL còn pending, đã tạo > 2 phút trước
-        two_min_ago = (datetime.utcnow() - timedelta(minutes=2)).isoformat()
+        two_min_ago = (datetime.now(timezone.utc) - timedelta(minutes=2)).isoformat()
         
         response = supabase.table("events")\
             .select("*")\
@@ -205,3 +205,67 @@ async def run_escalation(event: dict) -> None:
         
     except Exception as e:
         print(f"Failed to execute escalation process for event {event_id}: {e}")
+
+async def escalate_pending_events() -> None:
+    """
+    Tự động đếm thời gian cho các sự kiện đang pending (cấp độ thấp)
+    và nâng cấp mức độ cảnh báo nếu người dùng vẫn chưa đứng dậy.
+    """
+    try:
+        from app.services.severity_engine import classify_severity
+        from app.db.queries import get_thresholds
+        from app.services.alert_engine import process_event
+        
+        now = datetime.now(timezone.utc)
+        
+        # Chỉ quét các sự kiện fall đang pending (LOW, MEDIUM, HIGH)
+        response = supabase.table("events")\
+            .select("*")\
+            .eq("status", "pending")\
+            .eq("event_type", "fall")\
+            .execute()
+            
+        for event in (response.data or []):
+            event_id = event.get("id")
+            created_at_str = event.get("created_at")
+            if not created_at_str:
+                continue
+                
+            try:
+                created_at = datetime.fromisoformat(created_at_str.replace("Z", "+00:00"))
+            except Exception:
+                continue
+                
+            duration_sec = int((now - created_at).total_seconds())
+            
+            # Cập nhật duration_sec mới nhất vào DB
+            supabase.table("events").update({"duration_sec": duration_sec}).eq("id", event_id).execute()
+            
+            # Tính toán lại severity
+            household_id = event.get("household_id")
+            thresholds = await get_thresholds(household_id)
+            new_severity = classify_severity(duration_sec, thresholds)
+            
+            current_severity = event.get("severity")
+            
+            # Bảng xếp hạng mức độ
+            severity_levels = {"LOW": 1, "MEDIUM": 2, "HIGH": 3, "CRITICAL": 4}
+            
+            curr_level = severity_levels.get(current_severity, 1)
+            new_level = severity_levels.get(new_severity, 1)
+            
+            # Nếu mức độ tăng lên, cập nhật và bắn AlertEngine
+            if new_level > curr_level:
+                print(f"[scheduler] Escalate event {event_id} from {current_severity} to {new_severity} (duration: {duration_sec}s)")
+                supabase.table("events").update({"severity": new_severity}).eq("id", event_id).execute()
+                
+                # Sửa event data để truyền vào AlertEngine
+                event["severity"] = new_severity
+                event["duration_sec"] = duration_sec
+                
+                # Kích hoạt lại process_event để nó gọi send_push và các logic khác
+                await process_event(event)
+
+    except Exception as e:
+        print(f"Error in escalate_pending_events: {e}")
+

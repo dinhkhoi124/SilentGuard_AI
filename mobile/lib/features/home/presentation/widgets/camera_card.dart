@@ -244,10 +244,10 @@ class CameraCard extends StatelessWidget {
       child: const Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Iconsax.video, size: 32, color: Colors.white),
+          Icon(Iconsax.smart_home5, size: 32, color: Colors.white),
           SizedBox(height: 4),
           Text(
-            'SlientGuard',
+            'SilentGuard',
             style: TextStyle(
               fontFamily: 'Syne Mono',
               fontSize: 11,

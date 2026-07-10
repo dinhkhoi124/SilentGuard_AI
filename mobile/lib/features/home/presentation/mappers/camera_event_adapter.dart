@@ -60,7 +60,7 @@ class CameraEventAdapter {
       EventStatus.dismissed => 'Báo động giả',
       EventStatus.escalated => 'Đã chuyển tiếp',
       EventStatus.loggedOnly => 'Chỉ ghi nhận',
-      EventStatus.unknown => 'Không rõ',
+      EventStatus.recovered => 'Đã hồi phục',
     };
   }
 

@@ -1,9 +1,8 @@
 import 'dart:async';
 import 'dart:developer' as developer;
-import 'dart:io';
 
 import 'package:dartz/dartz.dart';
-import 'package:http/http.dart' as http;
+import 'package:mobile/core/error/exceptions.dart';
 import 'package:mobile/core/network/api_client.dart';
 import 'package:mobile/features/session/data/datasources/session_remote_datasource.dart';
 import 'package:mobile/features/session/domain/entities/backend_session.dart';
@@ -60,21 +59,9 @@ class SessionRepositoryImpl implements SessionRepository {
     } on ApiException catch (error, stackTrace) {
       _logFailure(error, stackTrace);
       return Left(_mapApiException(error));
-    } on TimeoutException catch (error, stackTrace) {
+    } on NoInternetException catch (error, stackTrace) {
       _logFailure(error, stackTrace);
-      return const Left(
-        SessionFailure('Không thể kết nối máy chủ. Kết nối quá thời gian chờ.'),
-      );
-    } on SocketException catch (error, stackTrace) {
-      _logFailure(error, stackTrace);
-      return const Left(
-        SessionFailure('Không thể kết nối máy chủ. Vui lòng kiểm tra mạng.'),
-      );
-    } on http.ClientException catch (error, stackTrace) {
-      _logFailure(error, stackTrace);
-      return const Left(
-        SessionFailure('Không thể kết nối máy chủ. Vui lòng kiểm tra mạng.'),
-      );
+      return Left(SessionFailure(error.message));
     } catch (error, stackTrace) {
       _logFailure(error, stackTrace);
       return const Left(
@@ -123,34 +110,12 @@ class SessionRepositoryImpl implements SessionRepository {
       ); // FIX: keep the retry policy local to session provisioning.
       if (generation == _cacheGeneration) _cachedSession = session;
       return Right(session);
-    } on TimeoutException catch (error, stackTrace) {
+    } on NoInternetException catch (error, stackTrace) {
       _logFailure(error, stackTrace);
-      return const Left(
+      return Left(
         SessionFailure(
-          'Không thể kết nối máy chủ. Kết nối quá thời gian chờ.',
-          kind: SessionFailureKind
-              .backendUnavailable, // FIX: timeout means backend unavailable, not expired Firebase auth.
-        ),
-      );
-    } on ApiException catch (error, stackTrace) {
-      _logFailure(error, stackTrace);
-      return Left(_mapApiException(error));
-    } on SocketException catch (error, stackTrace) {
-      _logFailure(error, stackTrace);
-      return const Left(
-        SessionFailure(
-          'Không thể kết nối máy chủ. Vui lòng kiểm tra mạng.',
-          kind: SessionFailureKind
-              .backendUnavailable, // FIX: network failure should warm up/retry, not logout.
-        ),
-      );
-    } on http.ClientException catch (error, stackTrace) {
-      _logFailure(error, stackTrace);
-      return const Left(
-        SessionFailure(
-          'Không thể kết nối máy chủ. Vui lòng kiểm tra mạng.',
-          kind: SessionFailureKind
-              .backendUnavailable, // FIX: HTTP client failure is a backend availability path.
+          error.message,
+          kind: SessionFailureKind.backendUnavailable,
         ),
       );
     } catch (error, stackTrace) {
@@ -213,9 +178,7 @@ class SessionRepositoryImpl implements SessionRepository {
   }
 
   bool _isRetryableProvisionError(Object error) {
-    if (error is TimeoutException ||
-        error is SocketException ||
-        error is http.ClientException) {
+    if (error is NoInternetException) {
       return true; // FIX: network and timeout failures are transient backend availability problems.
     }
     if (error is ApiException) {

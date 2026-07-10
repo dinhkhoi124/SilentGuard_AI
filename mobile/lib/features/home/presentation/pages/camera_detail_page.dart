@@ -6,10 +6,10 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:iconsax/iconsax.dart';
 import 'package:mobile/core/services/local_notification_service.dart';
 import 'package:mobile/core/utils/app_colors.dart';
 import 'package:mobile/features/home/domain/entities/camera_device.dart';
-import 'package:mobile/features/home/domain/entities/camera_event.dart';
 import 'package:mobile/features/home/presentation/bloc/home_bloc.dart';
 import 'package:mobile/features/home/presentation/bloc/home_event.dart';
 import 'package:mobile/features/home/presentation/bloc/home_state.dart';
@@ -19,13 +19,19 @@ import 'package:mobile/features/home/presentation/cubit/suppress_cubit.dart';
 import 'package:mobile/features/home/presentation/mappers/camera_event_adapter.dart';
 import 'package:mobile/features/home/presentation/widgets/camera_action_buttons.dart';
 import 'package:mobile/features/home/presentation/widgets/camera_event_history_header.dart';
-import 'package:mobile/features/home/presentation/widgets/camera_event_tile.dart';
+import 'package:mobile/features/home/presentation/cubit/event_feedback_cubit.dart';
+import 'package:mobile/features/home/presentation/cubit/event_feedback_state.dart';
 import 'package:mobile/features/home/presentation/widgets/camera_latest_event_card.dart';
 import 'package:mobile/features/home/presentation/widgets/camera_safety_status.dart';
 import 'package:mobile/core/widgets/app_empty_state.dart';
+import 'package:mobile/features/home/presentation/widgets/event_history_card.dart';
+import 'package:mobile/features/home/presentation/widgets/event_date_header_delegate.dart';
+import 'package:mobile/features/home/presentation/widgets/event_history_skeleton.dart';
+import 'package:mobile/features/reports/domain/entities/event_history_item.dart';
 import 'package:mobile/features/home/presentation/widgets/camera_top_bar.dart';
 import 'package:mobile/features/home/presentation/widgets/camera_video_player.dart';
 import 'package:mobile/injection_container.dart';
+import 'package:intl/intl.dart';
 
 class CameraDetailArgs {
   const CameraDetailArgs({required this.device, this.onThumbnailCaptured});
@@ -71,26 +77,42 @@ class _CameraDetailBody extends StatefulWidget {
   State<_CameraDetailBody> createState() => _CameraDetailBodyState();
 }
 
-class _CameraDetailBodyState extends State<_CameraDetailBody> {
+class _CameraDetailBodyState extends State<_CameraDetailBody>
+    with WidgetsBindingObserver {
   Timer? _clockTimer;
   String _currentTime = '';
   late String? _streamUrl;
   late bool _isStreamLoading;
   late final CameraVideoPlayerController _videoPlayerController;
   Widget? _videoPlayerWidget;
+  int _videoPlayerRefreshToken = 0;
   bool _isStreamRequestInFlight = false;
   bool _showLoadingForNextStreamRequest = false;
   String? _streamErrorMessage;
+  Timer? _reconnectTimer;
+  Timer? _loadingPhaseTimer;
+  Timer? _resumeRefreshFallbackTimer;
+  bool _isStreamInFailureState = false;
+  bool _hasFirstFrameRendered = false;
+  bool _refreshStreamOnNextResume = false;
+  DateTime? _lastResumeRefreshAt;
+  CameraStreamLoadingPhase _loadingPhase =
+      CameraStreamLoadingPhase.authenticating;
+  DateTime? _selectedDate = DateTime.now();
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     context.read<SuppressCubit>().loadState(widget.device.id);
     context.read<HomeBloc>().add(const ResetCameraStreamUrlEvent());
     final cachedStreamUrl = _normalizedUrl(
       context.read<HomeBloc>().lastKnownStreamUrl,
     );
     _streamUrl = cachedStreamUrl ?? _normalizedUrl(widget.device.rtspUrl);
+    _loadingPhase = _streamUrl == null
+        ? CameraStreamLoadingPhase.authenticating
+        : CameraStreamLoadingPhase.loadingFrame;
     debugPrint('[CameraDetail] initState streamUrl: $_streamUrl');
     _isStreamLoading = _streamUrl == null;
     debugPrint('[CameraDetail] initState isLoading: $_isStreamLoading');
@@ -99,9 +121,13 @@ class _CameraDetailBodyState extends State<_CameraDetailBody> {
       isLoading: _isStreamLoading,
       errorMessage: _streamErrorMessage,
     );
+    final homeState = context.read<HomeBloc>().state;
+    final Uint8List? cachedThumb = homeState is HomeLoaded
+        ? homeState.cameraThumbnails[widget.device.id]
+        : null;
     _videoPlayerWidget = _streamUrl == null
         ? null
-        : _createVideoPlayer(_streamUrl!);
+        : _createVideoPlayer(_streamUrl!, cachedThumb);
     debugPrint(
       '[CameraDetail] VideoPlayer widget created, url: '
       '${_redactedNullableStreamUrl(_streamUrl)}',
@@ -134,6 +160,66 @@ class _CameraDetailBodyState extends State<_CameraDetailBody> {
     _currentTime = nextTime;
   }
 
+  Uint8List? _cachedThumbnail() {
+    final homeState = context.read<HomeBloc>().state;
+    return homeState is HomeLoaded
+        ? homeState.cameraThumbnails[widget.device.id]
+        : null;
+  }
+
+  void _refreshLivePreviewAfterResume() {
+    if (!mounted) return;
+
+    final now = DateTime.now();
+    final lastRefreshAt = _lastResumeRefreshAt;
+    if (lastRefreshAt != null &&
+        now.difference(lastRefreshAt) < const Duration(seconds: 2)) {
+      return;
+    }
+    _lastResumeRefreshAt = now;
+
+    final streamUrl = _streamUrl?.trim();
+    if (streamUrl == null || streamUrl.isEmpty) {
+      _requestStreamUrl(showLoading: true);
+      return;
+    }
+
+    debugPrint(
+      '[CameraDetail] refreshing live preview after app resume: '
+      '${_redactedStreamUrl(streamUrl)}',
+    );
+    _reconnectTimer?.cancel();
+    _loadingPhaseTimer?.cancel();
+    _resumeRefreshFallbackTimer?.cancel();
+    _isStreamInFailureState = false;
+    final cachedThumb = _cachedThumbnail();
+
+    setState(() {
+      _videoPlayerRefreshToken++;
+      _videoPlayerWidget = _createVideoPlayer(streamUrl, cachedThumb);
+      _streamErrorMessage = null;
+      _isStreamLoading = false;
+      _showLoadingForNextStreamRequest = false;
+      _hasFirstFrameRendered = false;
+      _loadingPhase = CameraStreamLoadingPhase.loadingFrame;
+    });
+    _videoPlayerController.update(isLoading: false, clearError: true);
+    _scheduleResumeRefreshFallback();
+  }
+
+  void _scheduleResumeRefreshFallback() {
+    _resumeRefreshFallbackTimer?.cancel();
+    _resumeRefreshFallbackTimer = Timer(const Duration(seconds: 6), () {
+      if (!mounted || _hasFirstFrameRendered || _isStreamRequestInFlight) {
+        return;
+      }
+      debugPrint(
+        '[CameraDetail] resume preview did not render a frame; requesting fresh stream URL',
+      );
+      _requestStreamUrl(showLoading: true);
+    });
+  }
+
   @override
   void dispose() {
     debugPrint(
@@ -146,8 +232,26 @@ class _CameraDetailBodyState extends State<_CameraDetailBody> {
       );
     }
     _clockTimer?.cancel();
+    _reconnectTimer?.cancel();
+    _loadingPhaseTimer?.cancel();
+    _resumeRefreshFallbackTimer?.cancel();
     _videoPlayerController.dispose();
+    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    debugPrint('[CameraDetail] didChangeAppLifecycleState: $state');
+    if (state == AppLifecycleState.paused) {
+      _refreshStreamOnNextResume = true;
+      return;
+    }
+
+    if (state == AppLifecycleState.resumed && _refreshStreamOnNextResume) {
+      _refreshStreamOnNextResume = false;
+      _refreshLivePreviewAfterResume();
+    }
   }
 
   @override
@@ -170,11 +274,18 @@ class _CameraDetailBodyState extends State<_CameraDetailBody> {
             );
             if (state is CameraStreamUrlLoading &&
                 state.cameraId == widget.device.id) {
+              _isStreamInFailureState = false;
+              _reconnectTimer?.cancel();
+              _loadingPhaseTimer?.cancel();
+              _resumeRefreshFallbackTimer?.cancel();
               setState(() {
                 _isStreamLoading =
                     _streamUrl == null || _showLoadingForNextStreamRequest;
                 _streamErrorMessage = null;
+                _hasFirstFrameRendered = false;
+                _loadingPhase = CameraStreamLoadingPhase.authenticating;
               });
+              if (_isStreamLoading) _scheduleConnectingPhase();
               _videoPlayerController.update(
                 isLoading: _isStreamLoading,
                 clearError: true,
@@ -190,12 +301,33 @@ class _CameraDetailBodyState extends State<_CameraDetailBody> {
                 '[CameraDetail] URL timestamp: ${DateTime.now().toIso8601String()}',
               );
               _isStreamRequestInFlight = false;
+              _isStreamInFailureState = false;
+              _reconnectTimer?.cancel();
+              _loadingPhaseTimer?.cancel();
+              _resumeRefreshFallbackTimer?.cancel();
+
+              final serialNumber = widget.device.serialNumber?.trim() ?? '';
+              if (serialNumber.isNotEmpty) {
+                context.read<HomeBloc>().resetStreamRetryCount(serialNumber);
+              }
+
+              final homeState = context.read<HomeBloc>().state;
+              final Uint8List? cachedThumb = homeState is HomeLoaded
+                  ? homeState.cameraThumbnails[widget.device.id]
+                  : null;
+
               setState(() {
+                _videoPlayerRefreshToken++;
                 _streamUrl = state.streamUrl;
-                _videoPlayerWidget = _createVideoPlayer(state.streamUrl);
+                _videoPlayerWidget = _createVideoPlayer(
+                  state.streamUrl,
+                  cachedThumb,
+                );
                 _isStreamLoading = false;
                 _showLoadingForNextStreamRequest = false;
                 _streamErrorMessage = null;
+                _hasFirstFrameRendered = false;
+                _loadingPhase = CameraStreamLoadingPhase.loadingFrame;
               });
               _videoPlayerController.update(isLoading: false, clearError: true);
               return;
@@ -204,6 +336,10 @@ class _CameraDetailBodyState extends State<_CameraDetailBody> {
               if (state.cameraId != widget.device.id) return;
               debugPrint('[CameraDetail] Stream FAILED: ${state.message}');
               _isStreamRequestInFlight = false;
+              _isStreamInFailureState = true;
+              _reconnectTimer?.cancel();
+              _loadingPhaseTimer?.cancel();
+              _resumeRefreshFallbackTimer?.cancel();
               setState(() {
                 _isStreamLoading = false;
                 _showLoadingForNextStreamRequest = false;
@@ -213,12 +349,32 @@ class _CameraDetailBodyState extends State<_CameraDetailBody> {
                 isLoading: false,
                 errorMessage: state.message,
               );
+
+              final isOffline =
+                  widget.device.status.toLowerCase() == 'offline' ||
+                  state.message.toLowerCase().contains('offline') ||
+                  state.message.toLowerCase().contains('ngoại tuyến');
+
+              if (isOffline) return;
+
+              final serialNumber = widget.device.serialNumber?.trim() ?? '';
+              if (serialNumber.isNotEmpty) {
+                final homeBloc = context.read<HomeBloc>();
+                if (homeBloc.getStreamRetryCount(serialNumber) < 3) {
+                  homeBloc.incrementStreamRetryCount(serialNumber);
+                  _scheduleReconnect();
+                }
+              }
               return;
             }
             if (state is CameraPlaybackFailure) {
               if (state.cameraId != widget.device.id) return;
               debugPrint('[CameraDetail] Playback FAILED: ${state.error}');
               _isStreamRequestInFlight = false;
+              _isStreamInFailureState = true;
+              _reconnectTimer?.cancel();
+              _loadingPhaseTimer?.cancel();
+              _resumeRefreshFallbackTimer?.cancel();
               setState(() {
                 _isStreamLoading = false;
                 _showLoadingForNextStreamRequest = false;
@@ -228,6 +384,15 @@ class _CameraDetailBodyState extends State<_CameraDetailBody> {
                 isLoading: false,
                 errorMessage: state.message,
               );
+
+              final serialNumber = widget.device.serialNumber?.trim() ?? '';
+              if (serialNumber.isNotEmpty) {
+                final homeBloc = context.read<HomeBloc>();
+                if (homeBloc.getStreamRetryCount(serialNumber) < 3) {
+                  homeBloc.incrementStreamRetryCount(serialNumber);
+                  _scheduleReconnect();
+                }
+              }
             }
           },
         ),
@@ -309,15 +474,70 @@ class _CameraDetailBodyState extends State<_CameraDetailBody> {
               ),
             ),
             const SliverToBoxAdapter(child: SizedBox(height: 16)),
-            const SliverToBoxAdapter(child: CameraEventHistoryHeader()),
+            SliverToBoxAdapter(
+              child: CameraEventHistoryHeader(
+                selectedDate: _selectedDate,
+                onCalendarTap: _showCalendarSheet,
+              ),
+            ),
             // Event history list — driven by CameraEventHistoryCubit
-            BlocBuilder<CameraEventHistoryCubit, CameraEventHistoryState>(
-              builder: (context, state) {
+            Builder(
+              builder: (context) {
+                final state = context.watch<CameraEventHistoryCubit>().state;
                 return switch (state) {
                   CameraEventHistoryInitial() || CameraEventHistoryLoading() =>
                     _SliverEventSection(child: _HistoryLoadingBody()),
-                  CameraEventHistoryLoaded(:final items) => _SliverEventList(
-                    events: CameraEventAdapter.fromList(items),
+                  CameraEventHistoryLoaded(:final items) => Builder(
+                    builder: (context) {
+                      final filteredEvents = _selectedDate == null
+                          ? items
+                          : items.where((e) {
+                              final d = e.timestamp?.toLocal();
+                              if (d == null) return false;
+                              return d.year == _selectedDate!.year &&
+                                  d.month == _selectedDate!.month &&
+                                  d.day == _selectedDate!.day;
+                            }).toList();
+
+                      if (filteredEvents.isEmpty && _selectedDate != null) {
+                        return SliverMainAxisGroup(
+                          slivers: [
+                            SliverToBoxAdapter(
+                              child: _DailySummaryBar(
+                                items: filteredEvents,
+                                selectedDate: _selectedDate,
+                              ),
+                            ),
+                            const SliverToBoxAdapter(
+                              child: Padding(
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 20,
+                                ),
+                                child: AppEmptyState(
+                                  icon: Iconsax.calendar_edit,
+                                  title: 'Không có sự kiện',
+                                  message: 'Không có sự kiện nào vào ngày này',
+                                  compact: true,
+                                ),
+                              ),
+                            ),
+                          ],
+                        );
+                      }
+
+                      return SliverMainAxisGroup(
+                        slivers: [
+                          SliverToBoxAdapter(
+                            child: _DailySummaryBar(
+                              items: items,
+                              selectedDate: _selectedDate,
+                            ),
+                          ),
+                          _SliverEventGroupedList(items: filteredEvents),
+                        ],
+                      );
+                    },
                   ),
                   CameraEventHistoryEmpty() => _SliverEventSection(
                     child: _HistoryEmptyBody(message: 'Chưa có sự kiện nào.'),
@@ -350,6 +570,7 @@ class _CameraDetailBodyState extends State<_CameraDetailBody> {
       return;
     }
     if (serialNumber.isEmpty) {
+      _loadingPhaseTimer?.cancel();
       setState(() {
         _streamUrl = null;
         _showLoadingForNextStreamRequest = false;
@@ -365,11 +586,18 @@ class _CameraDetailBodyState extends State<_CameraDetailBody> {
     }
 
     _isStreamRequestInFlight = true;
+    _loadingPhaseTimer?.cancel();
+    final nextIsStreamLoading = showLoading || _streamUrl == null;
     setState(() {
       _showLoadingForNextStreamRequest = showLoading;
-      _isStreamLoading = showLoading || _streamUrl == null;
+      _isStreamLoading = nextIsStreamLoading;
       _streamErrorMessage = null;
+      _hasFirstFrameRendered = false;
+      _loadingPhase = nextIsStreamLoading
+          ? CameraStreamLoadingPhase.authenticating
+          : CameraStreamLoadingPhase.loadingFrame;
     });
+    if (_isStreamLoading) _scheduleConnectingPhase();
     _videoPlayerController.update(
       isLoading: _isStreamLoading,
       clearError: true,
@@ -382,7 +610,44 @@ class _CameraDetailBodyState extends State<_CameraDetailBody> {
     );
   }
 
+  void _scheduleConnectingPhase() {
+    _loadingPhaseTimer?.cancel();
+    _loadingPhaseTimer = Timer(const Duration(milliseconds: 900), () {
+      if (!mounted || !_isStreamLoading || _streamErrorMessage != null) return;
+      if (_streamUrl != null) return;
+      setState(() {
+        _loadingPhase = CameraStreamLoadingPhase.connectingStream;
+      });
+    });
+  }
+
+  void _handleFirstFrameRendered() {
+    if (!mounted || _hasFirstFrameRendered) return;
+    _loadingPhaseTimer?.cancel();
+    _resumeRefreshFallbackTimer?.cancel();
+    setState(() {
+      _hasFirstFrameRendered = true;
+      _isStreamLoading = false;
+      _showLoadingForNextStreamRequest = false;
+    });
+    _videoPlayerController.update(isLoading: false, clearError: true);
+  }
+
+  void _scheduleReconnect() {
+    _reconnectTimer?.cancel();
+    _reconnectTimer = Timer(const Duration(seconds: 2), () {
+      if (mounted && _isStreamInFailureState) {
+        _requestStreamUrl(showLoading: true);
+      }
+    });
+  }
+
   Widget _buildVideoArea() {
+    final homeState = context.read<HomeBloc>().state;
+    final Uint8List? cachedThumb = homeState is HomeLoaded
+        ? homeState.cameraThumbnails[widget.device.id]
+        : null;
+
     final errorMessage = _streamErrorMessage;
     if (errorMessage != null && errorMessage.trim().isNotEmpty) {
       return _VideoErrorView(
@@ -390,26 +655,77 @@ class _CameraDetailBodyState extends State<_CameraDetailBody> {
         onRetry: () => _requestStreamUrl(showLoading: true),
       );
     }
-    if (_isStreamLoading) {
-      return const _VideoLoadingView();
-    }
     final streamUrl = _streamUrl?.trim();
     if (streamUrl == null || streamUrl.isEmpty) {
+      if (_isStreamLoading) {
+        return _buildLoadingShell(cachedThumb);
+      }
       return _VideoErrorView(
         message: 'Chưa có đường dẫn livestream cho camera này.',
         onRetry: () => _requestStreamUrl(showLoading: true),
       );
     }
-    return _videoPlayerWidget ?? _createVideoPlayer(streamUrl);
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        _videoPlayerWidget ?? _createVideoPlayer(streamUrl, cachedThumb),
+        Positioned.fill(
+          child: IgnorePointer(
+            ignoring: _hasFirstFrameRendered,
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 260),
+              switchInCurve: Curves.easeOutCubic,
+              switchOutCurve: Curves.easeInCubic,
+              child: _hasFirstFrameRendered
+                  ? const SizedBox.shrink(key: ValueKey('camera-ready'))
+                  : _buildLoadingShell(
+                      cachedThumb,
+                      key: const ValueKey('camera-loading'),
+                    ),
+            ),
+          ),
+        ),
+      ],
+    );
   }
 
-  Widget _createVideoPlayer(String streamUrl) {
+  Widget _buildLoadingShell(Uint8List? cachedThumb, {Key? key}) {
+    return LayoutBuilder(
+      key: key,
+      builder: (context, constraints) {
+        final width = constraints.maxWidth - 32;
+        final height = width * 9 / 16;
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: SizedBox(
+              width: width,
+              height: height,
+              child: CameraLoadingOverlay(
+                phase: _loadingPhase,
+                placeholderImage: cachedThumb,
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _createVideoPlayer(String streamUrl, Uint8List? cachedThumb) {
     return CameraVideoPlayer(
-      key: ValueKey(streamUrl),
+      key: ValueKey(
+        'camera-live-${widget.device.id}-$_videoPlayerRefreshToken',
+      ),
       rtspUrl: streamUrl,
+      placeholderImage: cachedThumb,
       controller: _videoPlayerController,
       onFrameCaptured: widget.onThumbnailCaptured,
       onRetry: () => _requestStreamUrl(showLoading: true),
+      onFirstFrameRendered: _handleFirstFrameRendered,
+      loadingPhase: CameraStreamLoadingPhase.loadingFrame,
+      showLoadingOverlay: false,
       onPlaybackError: (error) {
         if (!mounted) return;
         context.read<HomeBloc>().add(
@@ -462,6 +778,68 @@ class _CameraDetailBodyState extends State<_CameraDetailBody> {
             await suppressCubit.pauseMonitoring(widget.device.id, minutes);
             if (sheetContext.mounted) Navigator.of(sheetContext).pop();
           },
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showCalendarSheet() async {
+    final now = DateTime.now();
+    final firstDate = now.subtract(const Duration(days: 30));
+    final initialDate = _selectedDate ?? now;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      barrierColor: AppColors.darkText.withValues(alpha: 0.22),
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.only(bottom: 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 12, 8),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Chọn ngày',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.darkText,
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () {
+                        setState(() => _selectedDate = null);
+                        Navigator.of(sheetContext).pop();
+                      },
+                      style: TextButton.styleFrom(
+                        foregroundColor: AppColors.primary,
+                      ),
+                      child: const Text('Xem tất cả'),
+                    ),
+                  ],
+                ),
+              ),
+              Divider(
+                height: 1,
+                color: AppColors.border.withValues(alpha: 0.4),
+              ),
+              CalendarDatePicker(
+                initialDate: initialDate,
+                firstDate: firstDate,
+                lastDate: now,
+                onDateChanged: (date) {
+                  setState(() => _selectedDate = date);
+                  Navigator.of(sheetContext).pop();
+                },
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -580,20 +958,6 @@ class _CameraDetailBodyState extends State<_CameraDetailBody> {
 
 // ─── helper sliver wrappers ───────────────────────────────────────────────────
 
-class _VideoLoadingView extends StatelessWidget {
-  const _VideoLoadingView();
-
-  @override
-  Widget build(BuildContext context) {
-    return const ColoredBox(
-      color: Colors.black,
-      child: Center(
-        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
-      ),
-    );
-  }
-}
-
 class _VideoErrorView extends StatelessWidget {
   const _VideoErrorView({required this.message, required this.onRetry});
 
@@ -609,11 +973,7 @@ class _VideoErrorView extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(
-              Icons.videocam_off_rounded,
-              size: 48,
-              color: Colors.white54,
-            ),
+            const Icon(Iconsax.video, size: 48, color: Colors.white54),
             const SizedBox(height: 12),
             Text(
               message,
@@ -646,16 +1006,182 @@ class _SliverEventSection extends StatelessWidget {
   }
 }
 
-class _SliverEventList extends StatelessWidget {
-  const _SliverEventList({required this.events});
-  final List<CameraEvent> events;
+class _SliverEventGroupedList extends StatelessWidget {
+  const _SliverEventGroupedList({required this.items});
+  final List<EventHistoryItem> items;
 
   @override
   Widget build(BuildContext context) {
-    return SliverList(
-      delegate: SliverChildBuilderDelegate(
-        (_, index) => CameraEventTile(event: events[index]),
-        childCount: events.length,
+    if (items.isEmpty) {
+      return const SliverToBoxAdapter(child: SizedBox.shrink());
+    }
+
+    final Map<String, List<EventHistoryItem>> grouped = {};
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final yesterday = today.subtract(const Duration(days: 1));
+
+    for (final item in items) {
+      String groupKey = 'Không rõ';
+      if (item.timestamp != null) {
+        final itemDate = DateTime(
+          item.timestamp!.year,
+          item.timestamp!.month,
+          item.timestamp!.day,
+        );
+        if (itemDate == today) {
+          groupKey = 'Hôm nay';
+        } else if (itemDate == yesterday) {
+          groupKey = 'Hôm qua';
+        } else {
+          final d = itemDate.day.toString().padLeft(2, '0');
+          final m = itemDate.month.toString().padLeft(2, '0');
+          final y = itemDate.year;
+          groupKey = '$d/$m/$y';
+        }
+      }
+      grouped.putIfAbsent(groupKey, () => []).add(item);
+    }
+
+    return SliverMainAxisGroup(
+      slivers: grouped.entries.map((entry) {
+        return SliverMainAxisGroup(
+          slivers: [
+            SliverPersistentHeader(
+              pinned: true,
+              delegate: EventDateHeaderDelegate(title: entry.key),
+            ),
+            SliverList(
+              delegate: SliverChildBuilderDelegate((context, index) {
+                final item = entry.value[index];
+                return BlocProvider(
+                  create: (_) => sl<EventFeedbackCubit>(param1: item.eventId),
+                  child: Builder(
+                    builder: (context) {
+                      return BlocConsumer<
+                        EventFeedbackCubit,
+                        EventFeedbackState
+                      >(
+                        listener: (context, state) {
+                          if (state is EventFeedbackSuccess) {
+                            context
+                                .read<CameraEventHistoryCubit>()
+                                .updateEventStatus(
+                                  item.eventId,
+                                  EventStatus.acknowledged,
+                                );
+                          }
+                        },
+                        builder: (context, state) {
+                          return EventHistoryCard(
+                            item: item,
+                            isSubmitting: state is EventFeedbackSubmitting,
+                            onFeedback: () {
+                              final cubit = context.read<EventFeedbackCubit>();
+                              showModalBottomSheet<void>(
+                                context: context,
+                                builder: (_) => BlocProvider.value(
+                                  value: cubit,
+                                  child: const EventFeedbackBottomSheet(),
+                                ),
+                                backgroundColor: Colors.transparent,
+                                isScrollControlled: true,
+                              );
+                            },
+                          );
+                        },
+                      );
+                    },
+                  ),
+                );
+              }, childCount: entry.value.length),
+            ),
+          ],
+        );
+      }).toList(),
+    );
+  }
+}
+
+class _DailySummaryBar extends StatelessWidget {
+  const _DailySummaryBar({required this.items, this.selectedDate});
+  final List<EventHistoryItem> items;
+  final DateTime? selectedDate;
+
+  String get _subtitleDateLabel {
+    if (selectedDate == null) return 'Tất cả';
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final yesterday = today.subtract(const Duration(days: 1));
+    final selectedDay = DateTime(
+      selectedDate!.year,
+      selectedDate!.month,
+      selectedDate!.day,
+    );
+
+    if (selectedDay == today) return 'Hôm nay';
+    if (selectedDay == yesterday) return 'Hôm qua';
+
+    String prefix = DateFormat('EEEE, dd/MM', 'vi').format(selectedDate!);
+    return prefix.substring(0, 1).toUpperCase() + prefix.substring(1);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    int count = 0;
+    int severeCount = 0;
+
+    for (final item in items) {
+      bool matchDate = true;
+      if (selectedDate != null) {
+        if (item.timestamp == null) {
+          matchDate = false;
+        } else {
+          matchDate =
+              item.timestamp!.year == selectedDate!.year &&
+              item.timestamp!.month == selectedDate!.month &&
+              item.timestamp!.day == selectedDate!.day;
+        }
+      }
+
+      if (matchDate) {
+        count++;
+        if (item.severity == EventSeverity.high ||
+            item.severity == EventSeverity.critical) {
+          severeCount++;
+        }
+      }
+    }
+
+    String labelText;
+    final prefix = _subtitleDateLabel;
+
+    if (count == 0) {
+      if (selectedDate == null) {
+        labelText = 'Chưa có sự kiện nào';
+      } else {
+        labelText = 'Chưa có sự kiện vào ngày này';
+      }
+    } else {
+      labelText = '$prefix · $count sự kiện · $severeCount nghiêm trọng';
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: AppColors.surfaceSoft,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Text(
+          labelText,
+          style: const TextStyle(
+            fontSize: 14,
+            color: AppColors.darkText,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
       ),
     );
   }
@@ -666,31 +1192,7 @@ class _SliverEventList extends StatelessWidget {
 class _HistoryLoadingBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-      child: Center(
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SizedBox(
-              width: 18,
-              height: 18,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                color: AppColors.primary,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Text(
-              'Đang tải lịch sử sự kiện...',
-              style: Theme.of(
-                context,
-              ).textTheme.bodyMedium?.copyWith(color: AppColors.mutedText),
-            ),
-          ],
-        ),
-      ),
-    );
+    return const EventHistorySkeleton();
   }
 }
 

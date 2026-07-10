@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:mobile/core/services/daily_report_notification_service.dart';
 import 'package:mobile/features/devices/data/models/imou_models.dart';
 import 'package:mobile/features/devices/domain/repositories/imou_stream_repository.dart';
 import 'package:mobile/features/home/domain/entities/camera_device.dart';
@@ -10,8 +11,10 @@ import 'package:mobile/features/home/domain/usecases/get_camera_devices.dart';
 import 'package:mobile/features/home/domain/usecases/get_weather.dart';
 import 'package:mobile/features/home/presentation/bloc/home_event.dart';
 import 'package:mobile/features/home/presentation/bloc/home_state.dart';
+import 'package:mobile/core/services/connectivity_service.dart';
 import 'package:mobile/features/session/domain/failures/session_failure.dart';
 import 'package:mobile/features/session/domain/repositories/session_repository.dart';
+import 'package:mobile/injection_container.dart' as di;
 
 class HomeBloc extends Bloc<HomeEvent, HomeState> {
   HomeBloc({
@@ -20,6 +23,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     required this.deleteCameraDevice,
     required this.sessionRepository,
     required this.imouStreamRepository,
+    required this.connectivityService,
   }) : super(const HomeInitial()) {
     // Đăng ký các sự kiện (events) với các hàm xử lý tương ứng
     on<HomeStarted>((event, emit) => _loadHome(emit));
@@ -37,6 +41,13 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     on<CameraStreamPlaybackFailed>(_onCameraStreamPlaybackFailed);
     on<HomeAccessoryToggled>(_onAccessoryToggled);
     on<NotificationTapped>((event, emit) {});
+
+    _networkSubscription = connectivityService.onNetworkRestored.listen((_) {
+      if (_lastStateWasNetworkError) {
+        _lastStateWasNetworkError = false;
+        add(const HomeRetryRequested(silent: true));
+      }
+    });
   }
 
   final GetWeather getWeather;
@@ -44,6 +55,10 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
   final DeleteCameraDevice deleteCameraDevice;
   final ImouStreamRepository imouStreamRepository;
   final SessionRepository sessionRepository;
+  final ConnectivityService connectivityService;
+
+  StreamSubscription<void>? _networkSubscription;
+  bool _lastStateWasNetworkError = false;
 
   String? lastKnownStreamUrl;
   List<CameraDevice> _activeDevices = [];
@@ -51,6 +66,17 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
   Timer? _backendRetryTimer;
   final Map<String, int> _streamRequestGenerations = {};
   final Set<String> _closedStreamSerials = {};
+  final Map<String, int> _streamRetryCounts = {};
+
+  int getStreamRetryCount(String serialNumber) =>
+      _streamRetryCounts[serialNumber] ?? 0;
+  void incrementStreamRetryCount(String serialNumber) {
+    _streamRetryCounts[serialNumber] = getStreamRetryCount(serialNumber) + 1;
+  }
+
+  void resetStreamRetryCount(String serialNumber) {
+    _streamRetryCounts.remove(serialNumber);
+  }
 
   /// Tải dữ liệu chính cho trang chủ bao gồm thời tiết, danh sách camera, và kiểm tra session
   Future<void> _loadHome(Emitter<HomeState> emit, {bool silent = false}) async {
@@ -60,6 +86,13 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
 
     if (!silent) {
       emit(const HomeLoading());
+    }
+
+    final isOnline = await connectivityService.isConnected;
+    if (!isOnline) {
+      _lastStateWasNetworkError = true;
+      emit(const HomeError('Không có kết nối mạng'));
+      return;
     }
 
     final sessionReady = await _ensureSessionReady(emit);
@@ -82,9 +115,13 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
           emit(HomeUnauthorized(failure));
           return;
         }
+        if (failure.contains('Không có kết nối mạng')) {
+          _lastStateWasNetworkError = true;
+        }
         emit(HomeError(failure));
       },
       (devices) {
+        _lastStateWasNetworkError = false;
         devicesLoaded = true;
         _activeDevices = List.of(devices);
         emit(
@@ -135,6 +172,9 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
       },
       (_) {
         sessionReady = true;
+        // Fix A: session just provisioned for the first time (cold start).
+        // householdId is now available — sync daily report notification schedule.
+        di.sl<DailyReportNotificationService>().syncSchedule().ignore();
       },
     );
     return sessionReady;
@@ -146,6 +186,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
       return;
     }
     _backendRetryTimer = Timer(const Duration(seconds: 5), () {
+      if (isClosed) return;
       add(const HomeRetryRequested(silent: true));
     });
   }
@@ -432,6 +473,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
   /// Hủy và dọn dẹp các tài nguyên (như timer) khi bloc đóng
   @override
   Future<void> close() {
+    _networkSubscription?.cancel();
     _backendRetryTimer?.cancel();
     return super.close();
   }

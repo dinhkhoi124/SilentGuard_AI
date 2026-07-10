@@ -203,7 +203,7 @@ class _ProfileHeader extends StatelessWidget {
       if (localPart.isNotEmpty) return localPart;
     }
 
-    return 'Người dùng SlientGuard';
+    return 'Người dùng SilentGuard';
   }
 }
 

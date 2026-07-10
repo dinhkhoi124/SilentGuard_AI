@@ -2,8 +2,7 @@ import 'dart:async';
 import 'dart:developer' as developer;
 import 'dart:io';
 
-import 'package:http/http.dart' as http;
-import 'package:mobile/core/network/api_client.dart';
+import 'package:mobile/core/error/exceptions.dart';
 import 'package:mobile/features/video_upload/data/datasources/video_upload_remote_datasource.dart';
 import 'package:mobile/features/video_upload/domain/entities/video_upload_result.dart';
 import 'package:mobile/features/video_upload/domain/repositories/video_upload_repository.dart';
@@ -23,18 +22,9 @@ class VideoUploadRepositoryImpl implements VideoUploadRepository {
         householdId: householdId,
         videoFile: videoFile,
       );
-    } on ApiException catch (error, stackTrace) {
+    } on NoInternetException catch (error, stackTrace) {
       _logFailure(error, stackTrace);
-      rethrow;
-    } on TimeoutException catch (error, stackTrace) {
-      _logFailure(error, stackTrace);
-      throw const VideoUploadException('Upload request timed out.');
-    } on SocketException catch (error, stackTrace) {
-      _logFailure(error, stackTrace);
-      throw const VideoUploadException('Upload request failed due to network.');
-    } on http.ClientException catch (error, stackTrace) {
-      _logFailure(error, stackTrace);
-      throw const VideoUploadException('Upload HTTP client request failed.');
+      throw VideoUploadException(error.message);
     } catch (error, stackTrace) {
       _logFailure(error, stackTrace);
       throw const VideoUploadException('Upload request failed.');

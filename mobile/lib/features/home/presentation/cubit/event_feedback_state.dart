@@ -18,10 +18,11 @@ final class EventFeedbackSubmitting extends EventFeedbackState {
 }
 
 final class EventFeedbackSuccess extends EventFeedbackState {
-  const EventFeedbackSuccess({required this.label, this.note});
+  const EventFeedbackSuccess({required this.label, this.note, this.warning});
 
   final EventFeedbackLabel label;
   final String? note;
+  final String? warning;
 }
 
 final class EventFeedbackFailure extends EventFeedbackState {

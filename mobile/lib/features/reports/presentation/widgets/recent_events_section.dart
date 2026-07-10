@@ -9,6 +9,8 @@ import 'package:mobile/core/widgets/app_empty_state.dart';
 import 'package:mobile/features/reports/presentation/widgets/recent_event_tile.dart';
 import 'package:mobile/features/reports/presentation/widgets/report_section_header.dart';
 
+const int _recentEventLimit = 5;
+
 class RecentEventsSection extends StatelessWidget {
   const RecentEventsSection({super.key, required this.onEventTap});
 
@@ -140,9 +142,10 @@ class _ErrorBody extends StatelessWidget {
   Widget build(BuildContext context) {
     return AppEmptyState(
       icon: Icons.cloud_off_rounded,
-      title: 'Lỗi kết nối',
-      message:
-          'Không thể tải lịch sử sự kiện. Vui lòng kiểm tra mạng và thử lại.',
+      title: message == 'Không có kết nối mạng'
+          ? 'Chưa kết nối mạng'
+          : 'Lỗi kết nối',
+      message: message,
       primaryActionLabel: 'Thử lại',
       onPrimaryAction: onRetry,
       compact: true,
@@ -168,6 +171,7 @@ class _LoadedBody extends StatelessWidget {
     final dividerColor = isDark
         ? Theme.of(context).colorScheme.outline
         : AppColors.background;
+    final visibleItems = items.take(_recentEventLimit).toList(growable: false);
 
     return Column(
       children: [
@@ -179,16 +183,16 @@ class _LoadedBody extends StatelessWidget {
                 : AppColors.primary,
             backgroundColor: Colors.transparent,
           ),
-        for (var i = 0; i < items.length; i++) ...[
+        for (var i = 0; i < visibleItems.length; i++) ...[
           RecentEventTile(
-            time: EventHistoryDisplayMapper.timeLabel(items[i]),
-            title: EventHistoryDisplayMapper.title(items[i]),
-            subtitle: EventHistoryDisplayMapper.subtitle(items[i]),
-            statusBadge: EventHistoryDisplayMapper.statusBadge(items[i]),
-            icon: EventHistoryDisplayMapper.icon(items[i]),
-            onTap: () => onEventTap(items[i]),
+            time: EventHistoryDisplayMapper.timeLabel(visibleItems[i]),
+            title: EventHistoryDisplayMapper.title(visibleItems[i]),
+            subtitle: EventHistoryDisplayMapper.subtitle(visibleItems[i]),
+            statusBadge: EventHistoryDisplayMapper.statusBadge(visibleItems[i]),
+            icon: EventHistoryDisplayMapper.icon(visibleItems[i]),
+            onTap: () => onEventTap(visibleItems[i]),
           ),
-          if (i < items.length - 1)
+          if (i < visibleItems.length - 1)
             Divider(height: 1, indent: 80, endIndent: 20, color: dividerColor),
         ],
       ],

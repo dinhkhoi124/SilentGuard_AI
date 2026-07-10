@@ -1,8 +1,7 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:dartz/dartz.dart';
-import 'package:http/http.dart' as http;
+import 'package:mobile/core/error/exceptions.dart';
 import 'package:mobile/core/network/api_client.dart';
 import 'package:mobile/features/home/data/datasources/alert_review_remote_data_source.dart';
 import 'package:mobile/features/home/domain/entities/alert_review_feedback.dart';
@@ -25,12 +24,8 @@ class AlertReviewRepositoryImpl implements AlertReviewRepository {
       return const Right(null);
     } on ApiException catch (error) {
       return Left(error.message);
-    } on TimeoutException {
-      return const Left('Không thể kết nối mạng. Kết nối quá thời gian chờ.');
-    } on SocketException {
-      return const Left('Không thể kết nối mạng. Vui lòng kiểm tra kết nối.');
-    } on http.ClientException {
-      return const Left('Không thể kết nối mạng. Vui lòng kiểm tra kết nối.');
+    } on NoInternetException catch (error) {
+      return Left(error.message);
     } catch (_) {
       return const Left('Lỗi không xác định. Vui lòng thử lại.');
     }

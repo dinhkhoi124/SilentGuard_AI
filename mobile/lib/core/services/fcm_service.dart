@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:mobile/core/network/api_client.dart';
 import 'package:mobile/core/services/local_notification_service.dart';
@@ -109,11 +110,24 @@ class FcmService with WidgetsBindingObserver {
   Future<void> registerToken() async {
     try {
       await requestNotificationPermission();
-      final token = await _messaging.getToken().timeout(_messagingTimeout);
-      developer.log(
-        '[FCM_TOKEN] Current FCM Token: $token',
-        name: 'FcmService',
-      );
+      String? token;
+      try {
+        token = await _messaging.getToken().timeout(const Duration(seconds: 5));
+      } catch (e, st) {
+        developer.log(
+          'FCM getToken() timed out or failed; skipping token registration.',
+          name: 'FcmService',
+          error: e,
+          stackTrace: st,
+        );
+        return;
+      }
+      if (kDebugMode) {
+        developer.log(
+          '[FCM_TOKEN] Current FCM Token: ${_maskToken(token)}',
+          name: 'FcmService',
+        );
+      }
       await _registerTokenValue(token, source: 'current');
     } catch (error, stackTrace) {
       developer.log(
@@ -172,19 +186,26 @@ class FcmService with WidgetsBindingObserver {
       return;
     }
 
-    try {
-      await _apiClient
-          .postObject('/api/users/device-token', {'fcm_token': normalizedToken})
-          .timeout(_backendRegistrationTimeout);
-      developer.log('[FCM] token registered from $source.', name: 'FcmService');
-    } catch (error, stackTrace) {
-      developer.log(
-        'FCM token registration failed from $source.',
-        name: 'FcmService',
-        error: error,
-        stackTrace: stackTrace,
-      );
-    }
+    Future.microtask(() async {
+      try {
+        await _apiClient
+            .postObject('/api/users/device-token', {
+              'fcm_token': normalizedToken,
+            })
+            .timeout(_backendRegistrationTimeout);
+        developer.log(
+          '[FCM] token registered from $source.',
+          name: 'FcmService',
+        );
+      } catch (error, stackTrace) {
+        developer.log(
+          'FCM token registration failed from $source.',
+          name: 'FcmService',
+          error: error,
+          stackTrace: stackTrace,
+        );
+      }
+    });
   }
 
   NotificationAlert _alertFromMessage(RemoteMessage message) {
@@ -291,5 +312,12 @@ class FcmService with WidgetsBindingObserver {
     await _tokenRefreshSubscription?.cancel();
     await _foregroundSubscription?.cancel();
     await _openedSubscription?.cancel();
+  }
+
+  String _maskToken(String? token) {
+    final value = token?.trim() ?? '';
+    if (value.isEmpty) return 'missing';
+    if (value.length <= 8) return '***';
+    return '${value.substring(0, 4)}***${value.substring(value.length - 4)}';
   }
 }

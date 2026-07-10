@@ -95,7 +95,7 @@ class _SignUpPageState extends State<SignUpPage> {
                     children: [
                       Flexible(
                         child: Text(
-                          'Tham gia SlientGuard',
+                          'Tham gia SilentGuard',
                           style: TextStyle(
                             color: AppColors.darkText,
                             fontSize: 26,
@@ -181,7 +181,7 @@ class _SignUpPageState extends State<SignUpPage> {
                                     decoration: TextDecoration.underline,
                                   ),
                                 ),
-                                TextSpan(text: ' của SlientGuard.'),
+                                TextSpan(text: ' của SilentGuard.'),
                               ],
                             ),
                           ),

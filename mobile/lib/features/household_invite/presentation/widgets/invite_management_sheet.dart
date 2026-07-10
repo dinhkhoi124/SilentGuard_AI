@@ -119,13 +119,12 @@ class _SheetContent extends StatelessWidget {
                     controller: scrollController,
                     slivers: [
                       SliverList(
-                        delegate: SliverChildBuilderDelegate((
-                          context,
-                          index,
-                        ) {
+                        delegate: SliverChildBuilderDelegate((context, index) {
                           final member = members[index];
                           final hasName = member.fullName.trim().isNotEmpty;
-                          final displayName = hasName ? member.fullName : member.email;
+                          final displayName = hasName
+                              ? member.fullName
+                              : member.email;
                           final displayEmail = hasName ? member.email : '';
 
                           return Padding(
@@ -147,7 +146,9 @@ class _SheetContent extends StatelessWidget {
                                 boxShadow: [
                                   if (!isDark)
                                     BoxShadow(
-                                      color: Colors.black.withValues(alpha: 0.02),
+                                      color: Colors.black.withValues(
+                                        alpha: 0.02,
+                                      ),
                                       blurRadius: 8,
                                       offset: const Offset(0, 2),
                                     ),
@@ -161,7 +162,9 @@ class _SheetContent extends StatelessWidget {
                                 leading: CircleAvatar(
                                   radius: 22,
                                   backgroundColor: isDark
-                                      ? theme.colorScheme.surfaceContainerHighest
+                                      ? theme
+                                            .colorScheme
+                                            .surfaceContainerHighest
                                       : const Color(0xFFF1F5F9),
                                   child: Text(
                                     displayName[0].toUpperCase(),
@@ -195,8 +198,11 @@ class _SheetContent extends StatelessWidget {
                                           vertical: 2,
                                         ),
                                         decoration: BoxDecoration(
-                                          color: theme.colorScheme.primary.withValues(alpha: 0.1),
-                                          borderRadius: BorderRadius.circular(6),
+                                          color: theme.colorScheme.primary
+                                              .withValues(alpha: 0.1),
+                                          borderRadius: BorderRadius.circular(
+                                            6,
+                                          ),
                                         ),
                                         child: Text(
                                           'Chủ hộ',
@@ -218,7 +224,9 @@ class _SheetContent extends StatelessWidget {
                                           displayEmail,
                                           style: TextStyle(
                                             color: isDark
-                                                ? theme.colorScheme.onSurfaceVariant
+                                                ? theme
+                                                      .colorScheme
+                                                      .onSurfaceVariant
                                                 : const Color(0xFF64748B),
                                             fontWeight: FontWeight.w500,
                                             fontSize: 13,

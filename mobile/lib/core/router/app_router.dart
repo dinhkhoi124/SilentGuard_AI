@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mobile/core/router/auth_notifier.dart';
-import 'package:mobile/core/widgets/wave_text_loader.dart';
+import 'package:mobile/core/widgets/silent_guard_splash_screen.dart';
 import 'package:mobile/features/auth/presentation/pages/signup_page.dart';
 import 'package:mobile/features/auth/presentation/pages/welcome_page.dart';
 import 'package:mobile/features/automation/presentation/pages/emergency_contacts_page.dart';
@@ -77,10 +77,7 @@ class AppRouter {
     routes: [
       GoRoute(
         path: '/loading',
-        builder: (context, state) => const Scaffold(
-          backgroundColor: AppColors.background,
-          body: WaveTextLoader(),
-        ),
+        builder: (context, state) => const SilentGuardSplashScreen(),
       ),
       GoRoute(
         path: '/onboarding',
@@ -98,10 +95,14 @@ class AppRouter {
       GoRoute(path: '/signup', builder: (context, state) => const SignUpPage()),
       GoRoute(
         path: '/home',
-        builder: (context, state) => BlocProvider(
-          create: (_) => sl<HomeBloc>(),
-          child: const HomePage(),
-        ),
+        builder: (context, state) {
+          final initialTab =
+              state.extra is int ? state.extra as int : 0;
+          return BlocProvider(
+            create: (_) => sl<HomeBloc>(),
+            child: HomePage(initialTab: initialTab),
+          );
+        },
       ),
       GoRoute(
         path: '/add-device',

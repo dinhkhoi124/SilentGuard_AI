@@ -1,7 +1,7 @@
 abstract final class AppConfig {
   static const String apiBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'https://c2-app-128-production.up.railway.app',
+    defaultValue: 'https://c2-app-128-production-b968.up.railway.app',
   );
 
   static const String googleSignInServerClientId = String.fromEnvironment(
@@ -24,8 +24,6 @@ abstract final class AppConfig {
     'IMOU_APP_SECRET',
     defaultValue: '201c43cf082041a48e5bd69be23cf4',
   );
-
-
 
   static const Duration networkTimeout = Duration(seconds: 15);
 }

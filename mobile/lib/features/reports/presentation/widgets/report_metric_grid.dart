@@ -4,7 +4,18 @@ import 'package:mobile/features/reports/presentation/widgets/report_metric_tile.
 import 'package:mobile/features/reports/presentation/widgets/report_section_header.dart';
 
 class ReportMetricGrid extends StatelessWidget {
-  const ReportMetricGrid({super.key});
+  const ReportMetricGrid({
+    super.key,
+    required this.processedEvents,
+    required this.falseAlarms,
+    required this.cameraOnline,
+    required this.responseRate,
+  });
+
+  final String processedEvents;
+  final String falseAlarms;
+  final String cameraOnline;
+  final String responseRate;
 
   @override
   Widget build(BuildContext context) {
@@ -14,10 +25,10 @@ class ReportMetricGrid extends StatelessWidget {
         const ReportSectionHeader(title: 'Chỉ số nhanh'),
         const SizedBox(height: 12),
         Row(
-          children: const [
+          children: [
             Expanded(
               child: ReportMetricTile(
-                value: '4',
+                value: processedEvents,
                 label: 'Đã xử lý',
                 icon: Iconsax.task_square,
               ),
@@ -25,7 +36,7 @@ class ReportMetricGrid extends StatelessWidget {
             SizedBox(width: 12),
             Expanded(
               child: ReportMetricTile(
-                value: '1',
+                value: falseAlarms,
                 label: 'Báo động giả',
                 icon: Iconsax.info_circle,
               ),
@@ -34,10 +45,10 @@ class ReportMetricGrid extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         Row(
-          children: const [
+          children: [
             Expanded(
               child: ReportMetricTile(
-                value: '2/2',
+                value: cameraOnline,
                 label: 'Camera online',
                 icon: Iconsax.video,
               ),
@@ -45,7 +56,7 @@ class ReportMetricGrid extends StatelessWidget {
             SizedBox(width: 12),
             Expanded(
               child: ReportMetricTile(
-                value: '100%',
+                value: responseRate,
                 label: 'Tỷ lệ phản hồi',
                 icon: Iconsax.shield_tick,
               ),

@@ -9,14 +9,10 @@ class BottomNavBar extends StatelessWidget {
     super.key,
     required this.selectedIndex,
     required this.onSelected,
-    required this.onUploadSelected,
-    this.uploadDisabled = false,
   });
 
   final int selectedIndex;
   final ValueChanged<int> onSelected;
-  final VoidCallback onUploadSelected;
-  final bool uploadDisabled;
 
   @override
   Widget build(BuildContext context) {
@@ -48,24 +44,26 @@ class BottomNavBar extends StatelessWidget {
                 active: selectedIndex == 1,
                 onTap: () => onSelected(1),
               ),
+              /* Tạm ẩn tab RTMP
               _NavItem(
                 icon: Iconsax.video,
-                label: 'Gửi video',
-                onTap: uploadDisabled ? null : onUploadSelected,
-                disabled: uploadDisabled,
+                label: 'Live RTMP',
+                active: selectedIndex == 2,
+                onTap: () => onSelected(2),
               ),
+              */
               _NavItem(
                 icon: Iconsax.chart,
                 label: 'Báo cáo',
-                active: selectedIndex == 2,
+                active: selectedIndex == 3,
                 hasBadge: false, // TODO: set to true if there are new reports
-                onTap: () => onSelected(2),
+                onTap: () => onSelected(3),
               ),
               _NavItem(
                 icon: Iconsax.profile_circle,
                 label: 'Tài khoản',
-                active: selectedIndex == 3,
-                onTap: () => onSelected(3),
+                active: selectedIndex == 4,
+                onTap: () => onSelected(4),
               ),
             ],
           ),
@@ -82,6 +80,7 @@ class _NavItem extends StatelessWidget {
     required this.onTap,
     this.active = false,
     this.hasBadge = false,
+    // ignore: unused_element_parameter
     this.disabled = false,
   });
 

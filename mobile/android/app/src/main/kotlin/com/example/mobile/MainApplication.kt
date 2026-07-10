@@ -5,7 +5,7 @@ import io.flutter.app.FlutterApplication
 class MainApplication : FlutterApplication() {
     override fun onCreate() {
         super.onCreate()
-        // Keep Application startup empty so native media plugins are not
-        // intentionally initialized before the UI FlutterEngine is ready.
+        // No plugin registrant needed for firebase_messaging 16.x
+        // The background executor uses its own mechanism
     }
 }

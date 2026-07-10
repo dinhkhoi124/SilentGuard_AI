@@ -10,6 +10,7 @@ import 'package:mobile/features/home/domain/repositories/home_repository.dart';
 import 'package:mobile/features/home/domain/usecases/delete_camera_device.dart';
 import 'package:mobile/features/home/domain/usecases/get_camera_devices.dart';
 import 'package:mobile/features/home/domain/usecases/get_weather.dart';
+import 'package:mobile/core/services/connectivity_service.dart';
 import 'package:mobile/features/home/presentation/bloc/home_bloc.dart';
 import 'package:mobile/features/home/presentation/bloc/home_event.dart';
 import 'package:mobile/features/home/presentation/bloc/home_state.dart';
@@ -34,6 +35,7 @@ void main() {
           deleteCameraDevice: DeleteCameraDevice(_FakeHomeRepository()),
           sessionRepository: _FakeSessionRepository(),
           imouStreamRepository: imouRepository,
+          connectivityService: _FakeConnectivityService(),
         );
         final states = <HomeState>[];
         final subscription = bloc.stream.listen(states.add);
@@ -83,6 +85,24 @@ class _FakeImouStreamRepository implements ImouStreamRepository {
     releaseCalls++;
     if (!releaseRequested.isCompleted) releaseRequested.complete();
   }
+
+  Future<void> logEvent(
+    String name, {
+    Map<String, dynamic>? parameters,
+  }) async {}
+}
+
+class _FakeConnectivityService implements ConnectivityService {
+  @override
+  Future<bool> get isConnected async => true;
+  @override
+  Stream<bool> get onConnectivityChanged => const Stream.empty();
+  @override
+  Stream<void> get onNetworkRestored => const Stream.empty();
+  @override
+  Future<void> initialize() async {}
+  @override
+  Future<void> dispose() async {}
 }
 
 class _FakeHomeRepository implements HomeRepository {

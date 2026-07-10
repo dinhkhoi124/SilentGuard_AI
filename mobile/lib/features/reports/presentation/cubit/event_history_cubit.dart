@@ -22,11 +22,8 @@ class EventHistoryCubit extends Cubit<EventHistoryState> {
   Future<void> loadInitial() async {
     final householdId = _sessionRepository.currentHouseholdId;
     if (householdId == null || householdId.isEmpty) {
-      emit(
-        const EventHistoryError(
-          'Không thể xác định hộ gia đình. Vui lòng đăng nhập lại.',
-        ),
-      );
+      // Do not emit an error here; wait for session to become available.
+      emit(const EventHistoryLoading());
       return;
     }
 

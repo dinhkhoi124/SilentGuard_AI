@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mobile/core/utils/app_colors.dart';
+import 'package:mobile/core/widgets/app_empty_state.dart';
 import 'package:mobile/features/devices/domain/entities/paired_device.dart';
 import 'package:mobile/features/devices/presentation/bloc/device_pairing_bloc.dart';
 import 'package:mobile/features/devices/presentation/bloc/device_pairing_event.dart';
@@ -131,17 +132,21 @@ class _ErrorView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _MessageLayout(
-      icon: Icons.warning_amber_rounded,
-      title: 'Không thể thêm thiết bị',
-      message: message,
+    return Center(
       child: Padding(
-        padding: const EdgeInsets.only(top: 24),
-        child: FilledButton(
-          onPressed: () => context.read<DevicePairingBloc>().add(
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        child: AppEmptyState(
+          icon: message == 'Không có kết nối mạng'
+              ? Icons.wifi_off_rounded
+              : Icons.warning_amber_rounded,
+          title: message == 'Không có kết nối mạng'
+              ? 'Chưa kết nối mạng'
+              : 'Không thể thêm thiết bị',
+          message: message,
+          primaryActionLabel: 'Thử lại',
+          onPrimaryAction: () => context.read<DevicePairingBloc>().add(
             const DevicePairingRetryRequested(),
           ),
-          child: const Text('Thử lại'),
         ),
       ),
     );

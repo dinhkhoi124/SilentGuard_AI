@@ -11,9 +11,7 @@ void main() {
   setUp(() async {
     SharedPreferences.setMockInitialValues({});
     final prefs = await SharedPreferences.getInstance();
-    cubit = SuppressCubit(
-      MonitoringSuppressService(sharedPreferences: prefs),
-    );
+    cubit = SuppressCubit(MonitoringSuppressService(sharedPreferences: prefs));
   });
 
   tearDown(() => cubit.close());

@@ -44,9 +44,7 @@ class EventHistoryItemModel {
     final rawConf = json['confidence'];
     if (rawConf is num) confidence = rawConf.toDouble();
 
-    int? durationSec;
-    final rawDur = json['duration_sec'];
-    if (rawDur is num) durationSec = rawDur.toInt();
+    final durationSec = _intFrom(json['duration_sec']);
 
     final rawClip = json['clip_path'];
     final clipPath = (rawClip is String && rawClip.isNotEmpty) ? rawClip : null;
@@ -67,6 +65,13 @@ class EventHistoryItemModel {
   static String _stringOr(dynamic value, String fallback) {
     if (value is String && value.isNotEmpty) return value;
     return fallback;
+  }
+
+  static int? _intFrom(dynamic value) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    if (value is String) return int.tryParse(value.trim());
+    return null;
   }
 
   EventHistoryItem toEntity() {

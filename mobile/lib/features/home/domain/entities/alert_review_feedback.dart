@@ -14,10 +14,5 @@ class AlertReviewFeedback extends Equatable {
   final double? clipTimestamp;
 
   @override
-  List<Object?> get props => [
-    eventId,
-    action,
-    note,
-    clipTimestamp,
-  ];
+  List<Object?> get props => [eventId, action, note, clipTimestamp];
 }

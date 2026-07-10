@@ -5,6 +5,7 @@ import 'dart:developer' as developer;
 
 import 'package:flutter/widgets.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:mobile/core/services/daily_report_notification_service.dart';
 import 'package:mobile/core/services/fcm_service.dart';
 import 'package:mobile/core/services/monitoring_suppress_service.dart';
 import 'package:mobile/features/auth/domain/entities/app_user.dart';
@@ -14,6 +15,7 @@ import 'package:mobile/features/auth/domain/repositories/auth_repository.dart';
 import 'package:mobile/features/auth/presentation/bloc/auth_event.dart';
 import 'package:mobile/features/auth/presentation/bloc/auth_state.dart';
 import 'package:mobile/features/session/domain/repositories/session_repository.dart';
+import 'package:mobile/injection_container.dart' as di;
 
 class AuthBloc extends Bloc<AuthEvent, AuthState> {
   AuthBloc({
@@ -167,14 +169,26 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   ) async {
     emit(const AuthProvisioning());
     final sessionResult = await _sessionRepository.provisionSession();
-    sessionResult.fold((failure) => emit(AuthFailure(failure.message)), (_) {
-      developer.log(
-        '[GoogleAuth] AuthBloc emitting AuthSuccess after backend provisioning.',
-        name: 'AuthBloc',
-      );
-      emit(AuthSuccess(user));
-      _scheduleFcmTokenRegistration();
-    });
+    await sessionResult.fold(
+      (failure) async => emit(AuthFailure(failure.message)),
+      (_) async {
+        developer.log(
+          '[GoogleAuth] AuthBloc emitting AuthSuccess after backend provisioning.',
+          name: 'AuthBloc',
+        );
+        emit(AuthSuccess(user));
+        _scheduleFcmTokenRegistration();
+        // Fix A: sync daily report notification schedule now that householdId is ready.
+        try {
+          await di.sl<DailyReportNotificationService>().syncSchedule();
+        } catch (e) {
+          developer.log(
+            'DailyReportNotificationService.syncSchedule failed after login: $e',
+            name: 'AuthBloc',
+          );
+        }
+      },
+    );
   }
 
   void _scheduleFcmTokenRegistration() {

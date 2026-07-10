@@ -8,11 +8,12 @@ import 'package:flutter/scheduler.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:remixicon/remixicon.dart';
 import 'package:mobile/core/utils/app_colors.dart';
 import 'package:mobile/core/theme/app_spacing.dart';
 import 'package:mobile/core/widgets/wave_text_loader.dart';
 import 'package:mobile/features/auth/presentation/bloc/auth_bloc.dart'; // FIX: session-expired UI needs to trigger sign-out.
-import 'package:mobile/features/auth/presentation/bloc/auth_event.dart'; // FIX: reuse existing logout event instead of changing router/auth logic.
+import 'package:mobile/features/auth/presentation/bloc/auth_event.dart';
 import 'package:mobile/features/automation/presentation/pages/automation_page.dart';
 import 'package:mobile/features/account/presentation/pages/account_page.dart';
 import 'package:mobile/features/reports/presentation/pages/reports_page.dart';
@@ -32,25 +33,34 @@ import 'package:mobile/features/video_upload/presentation/bloc/video_upload_bloc
 import 'package:mobile/features/video_upload/presentation/widgets/video_upload_intro_sheet.dart';
 
 class HomePage extends StatefulWidget {
-  const HomePage({super.key});
+  const HomePage({super.key, this.initialTab = 0});
+
+  final int initialTab;
 
   @override
   State<HomePage> createState() => _HomePageState();
 }
 
 class _HomePageState extends State<HomePage> {
-  int _selectedTab = 0;
+  late int _selectedTab;
 
   @override
   void initState() {
     super.initState();
+    _selectedTab = widget.initialTab;
     SchedulerBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       context.read<HomeBloc>().add(const HomeStarted());
     });
   }
 
-  static const _tabTitles = ['Nhà của tôi', 'Tự động', 'Báo cáo', 'Tài khoản'];
+  static const _tabTitles = [
+    'Nhà của tôi',
+    'Tự động',
+    'Live RTMP',
+    'Báo cáo',
+    'Tài khoản',
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -116,7 +126,7 @@ class _HomePageState extends State<HomePage> {
               ),
               actions: [
                 _TopBarButton(
-                  icon: Iconsax.cpu,
+                  icon: Remix.openai_fill,
                   tooltip: 'Trợ lý AI',
                   onPressed: () {},
                 ),
@@ -141,11 +151,13 @@ class _HomePageState extends State<HomePage> {
                   children: [
                     IndexedStack(
                       index: _selectedTab,
-                      children: const [
-                        _HomeTab(),
-                        AutomationPage(),
-                        ReportsPage(),
-                        AccountPage(),
+                      children: [
+                        const _HomeTab(),
+                        const AutomationPage(),
+                        // const RtmpLivePage(),
+                        const SizedBox.shrink(), // Tạm ẩn tab RTMP
+                        ReportsPage(isActive: _selectedTab == 3),
+                        const AccountPage(),
                       ],
                     ),
                     if (uploadInProgress)
@@ -162,13 +174,7 @@ class _HomePageState extends State<HomePage> {
             floatingActionButton: _selectedTab == 0 ? const _HomeFabs() : null,
             bottomNavigationBar: BottomNavBar(
               selectedIndex: _selectedTab,
-              uploadDisabled: context.select(
-                (VideoUploadBloc bloc) => bloc.state is VideoUploadLoading,
-              ),
               onSelected: (index) => setState(() => _selectedTab = index),
-              onUploadSelected: () {
-                _showVideoUploadIntroSheet(context);
-              },
             ),
           ),
         ),
@@ -198,6 +204,7 @@ class _HomePageState extends State<HomePage> {
       );
   }
 
+  // ignore: unused_element
   void _showVideoUploadIntroSheet(BuildContext context) {
     showModalBottomSheet(
       context: context,
@@ -268,49 +275,49 @@ class _LoadedHome extends StatelessWidget {
           physics: const AlwaysScrollableScrollPhysics(),
           slivers: [
             SliverPadding(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.pagePadding,
-              6,
-              AppSpacing.pagePadding,
-              120,
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.pagePadding,
+                6,
+                AppSpacing.pagePadding,
+                120,
+              ),
+              sliver: SliverList.list(
+                children: [
+                  SafetyWeatherCard(
+                    weather: state.weather,
+                    totalCameras: state.devices.length,
+                    onlineCameras: state.devices
+                        .where((d) => d.status.toLowerCase() == 'online')
+                        .length,
+                  ),
+                  const SizedBox(height: 28),
+                  const _DevicesHeader(),
+                  const SizedBox(height: 16),
+                  RoomFilterChips(
+                    selectedRoom: state.selectedRoom,
+                    onSelected: (room) =>
+                        context.read<HomeBloc>().add(RoomFilterChanged(room)),
+                  ),
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 400),
+                    transitionBuilder: (child, animation) {
+                      return FadeTransition(opacity: animation, child: child);
+                    },
+                    child: state.devices.isEmpty
+                        ? _EmptyDeviceSection(
+                            key: const ValueKey('empty'),
+                            onAddDevice: () => _handleAddDevicePressed(context),
+                          )
+                        : _InlineDeviceGrid(
+                            key: const ValueKey('grid'),
+                            devices: state.devices,
+                            cameraThumbnails: state.cameraThumbnails,
+                          ),
+                  ),
+                ],
+              ),
             ),
-            sliver: SliverList.list(
-              children: [
-                SafetyWeatherCard(
-                  weather: state.weather,
-                  totalCameras: state.devices.length,
-                  onlineCameras: state.devices
-                      .where((d) => d.status.toLowerCase() == 'online')
-                      .length,
-                ),
-                const SizedBox(height: 28),
-                const _DevicesHeader(),
-                const SizedBox(height: 16),
-                RoomFilterChips(
-                  selectedRoom: state.selectedRoom,
-                  onSelected: (room) =>
-                      context.read<HomeBloc>().add(RoomFilterChanged(room)),
-                ),
-                AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 400),
-                  transitionBuilder: (child, animation) {
-                    return FadeTransition(opacity: animation, child: child);
-                  },
-                  child: state.devices.isEmpty
-                      ? _EmptyDeviceSection(
-                          key: const ValueKey('empty'),
-                          onAddDevice: () => _handleAddDevicePressed(context),
-                        )
-                      : _InlineDeviceGrid(
-                          key: const ValueKey('grid'),
-                          devices: state.devices,
-                          cameraThumbnails: state.cameraThumbnails,
-                        ),
-                ),
-              ],
-            ),
-          ),
-        ],
+          ],
         ),
       ),
     );
@@ -343,7 +350,7 @@ class _InlineDeviceGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    Theme.of(context);
     return Column(
       children: [
         GridView.builder(
@@ -399,6 +406,9 @@ class _InlineDeviceGrid extends StatelessWidget {
           },
         ),
         const SizedBox(height: 16),
+        // Temporarily hidden duplicated "Thêm thiết bị" button.
+        // Use bottom-right FAB instead.
+        /*
         ElevatedButton.icon(
           onPressed: () => _handleAddDevicePressed(context),
           icon: const Icon(Iconsax.add, size: 18),
@@ -412,6 +422,8 @@ class _InlineDeviceGrid extends StatelessWidget {
             textStyle: theme.textTheme.titleSmall,
           ),
         ),
+        */
+        const SizedBox.shrink(),
       ],
     );
   }

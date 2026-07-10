@@ -1,6 +1,7 @@
 // lib/features/home/presentation/widgets/camera_action_buttons.dart
 
 import 'package:flutter/material.dart';
+import 'package:iconsax/iconsax.dart';
 import 'package:mobile/core/utils/app_colors.dart';
 
 import 'package:mobile/features/automation/presentation/widgets/emergency_call_sheet.dart';
@@ -30,18 +31,18 @@ class CameraActionButtons extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           _ActionButton(
-            icon: Icons.phone,
+            icon: Iconsax.call_calling5,
             label: 'Gọi khẩn cấp',
             onTap: () => EmergencyCallSheet.show(context),
           ),
-          const _ActionButton(icon: Icons.textsms, label: 'Nhắn tin'),
+          const _ActionButton(icon: Iconsax.messages5, label: 'Nhắn tin'),
           _ActionButton(
-            icon: Icons.people,
+            icon: Iconsax.people5,
             label: 'Người nhận\ncảnh báo',
             onTap: () => InviteManagementSheet.show(context),
           ),
           _ActionButton(
-            icon: monitoringIcon,
+            icon: Iconsax.monitor_recorder5,
             label: monitoringLabel,
             onTap: onMonitoringTap,
             isLoading: monitoringLoading,

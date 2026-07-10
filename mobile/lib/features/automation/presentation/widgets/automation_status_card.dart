@@ -87,7 +87,10 @@ class AutomationStatusCard extends StatelessWidget {
                     icon: Iconsax.notification_status,
                     label: 'FCM sẵn sàng',
                   ),
-                  const _MetaChip(icon: Iconsax.flash, label: 'Cập nhật tức thời'),
+                  const _MetaChip(
+                    icon: Iconsax.flash,
+                    label: 'Cập nhật tức thời',
+                  ),
                 ],
               );
             },

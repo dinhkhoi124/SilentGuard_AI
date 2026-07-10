@@ -52,88 +52,80 @@ class _NotificationsPageState extends State<NotificationsPage>
       child: BlocBuilder<NotificationsCubit, NotificationsState>(
         builder: (context, state) {
           final alertNotifications = state.notifications
-            .where((n) => n.type != 'household_invite')
-            .toList();
-        final inviteNotifications = state.notifications
-            .where((n) => n.type == 'household_invite')
-            .toList();
+              .where((n) => n.type != 'household_invite')
+              .toList();
+          final inviteNotifications = state.notifications
+              .where((n) => n.type == 'household_invite')
+              .toList();
 
-        final unreadAlerts = alertNotifications.where((n) => !n.isRead).length;
-        final unreadInvites = inviteNotifications
-            .where((n) => !n.isRead)
-            .length;
+          final unreadAlerts = alertNotifications
+              .where((n) => !n.isRead)
+              .length;
+          final unreadInvites = inviteNotifications
+              .where((n) => !n.isRead)
+              .length;
 
-        final hasUnreadInCurrentTab =
-            (_tabController.index == 0 && unreadAlerts > 0) ||
-            (_tabController.index == 1 && unreadInvites > 0);
-
-        return BlocListener<PendingInvitesCubit, PendingInvitesState>(
-          listener: (context, pendingState) {
-            if (pendingState is RespondSuccess &&
-                pendingState.action == 'accepted') {
-              di.sl<SessionRepository>().provisionSession();
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Bạn đã tham gia gia đình thành công. Camera và thông báo đã được bật.'),
-                  backgroundColor: AppColors.safe,
+          return BlocListener<PendingInvitesCubit, PendingInvitesState>(
+            listener: (context, pendingState) {
+              if (pendingState is PendingInvitesError) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(pendingState.message),
+                    backgroundColor: AppColors.destructive,
+                  ),
+                );
+              }
+              if (pendingState is RespondSuccess &&
+                  pendingState.action == 'accepted') {
+                di.sl<SessionRepository>().provisionSession();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      'Bạn đã tham gia gia đình thành công. Camera và thông báo đã được bật.',
+                    ),
+                    backgroundColor: AppColors.safe,
+                  ),
+                );
+                context.go('/home');
+              }
+            },
+            child: Scaffold(
+              appBar: AppBar(
+                title: const Text('Thông báo'),
+                centerTitle: true,
+                leading: IconButton(
+                  icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
+                  onPressed: () => context.pop(),
+                  tooltip: 'Quay lại',
                 ),
-              );
-              context.go('/home');
-            }
-          },
-          child: Scaffold(
-            appBar: AppBar(
-              title: const Text('Thông báo'),
-              centerTitle: true,
-              leading: IconButton(
-                icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
-                onPressed: () => context.pop(),
-                tooltip: 'Quay lại',
-              ),
-              actions: [
-                TextButton(
-                  onPressed: hasUnreadInCurrentTab
-                      ? () {
-                          if (_tabController.index == 0) {
-                            for (final n in alertNotifications) {
-                              if (!n.isRead) {
-                                context.read<NotificationsCubit>().markRead(
-                                  n.id,
-                                );
-                              }
-                            }
-                          } else if (_tabController.index == 1) {
-                            for (final n in inviteNotifications) {
-                              if (!n.isRead) {
-                                context.read<NotificationsCubit>().markRead(
-                                  n.id,
-                                );
-                              }
-                            }
+                actions: [
+                  TextButton(
+                    onPressed: state.hasUnread
+                        ? () {
+                            context.read<NotificationsCubit>().markAllRead();
                           }
-                        }
-                      : null,
-                  child: const Text('Đánh dấu đã đọc'),
-                ),
-              ],
-              bottom: NotificationSegmentedTabBar(
-                controller: _tabController,
-                unreadAlerts: unreadAlerts,
-                unreadInvites: unreadInvites,
-              ),
-            ),
-            body: SafeArea(
-              child: TabBarView(
-                controller: _tabController,
-                children: [
-                  _buildNotificationList(context, alertNotifications, false),
-                  _buildNotificationList(context, inviteNotifications, true),
+                        : null,
+                    child: const Text('Đánh dấu đã đọc'),
+                  ),
                 ],
+                bottom: NotificationSegmentedTabBar(
+                  controller: _tabController,
+                  unreadAlerts: unreadAlerts,
+                  unreadInvites: unreadInvites,
+                ),
+              ),
+              body: SafeArea(
+                child: TabBarView(
+                  controller: _tabController,
+                  children: [
+                    _buildNotificationList(context, alertNotifications, false),
+                    _buildNotificationList(context, inviteNotifications, true),
+                  ],
+                ),
               ),
             ),
-          ),
-        );
-      },
+          );
+        },
       ),
     );
   }
@@ -265,9 +257,7 @@ class _NotificationCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: isDark ? theme.colorScheme.surfaceContainer : Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: AppColors.border.withValues(alpha: 0.5),
-        ),
+        border: Border.all(color: AppColors.border.withValues(alpha: 0.5)),
         boxShadow: [
           if (!isDark)
             BoxShadow(
@@ -284,87 +274,88 @@ class _NotificationCard extends StatelessWidget {
           onTap: onTap,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 52,
-                height: 52,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: AppColors.border.withValues(alpha: 0.75),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 52,
+                  height: 52,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: AppColors.border.withValues(alpha: 0.75),
+                    ),
+                  ),
+                  child: Icon(
+                    _severityIcon(notification),
+                    color: accent,
+                    size: 22,
                   ),
                 ),
-                child: Icon(
-                  _severityIcon(notification),
-                  color: accent,
-                  size: 22,
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          notification.displayTitle,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.titleSmall
+                              ?.copyWith(
+                                color: AppColors.darkText,
+                                fontWeight: notification.isRead
+                                    ? FontWeight.w700
+                                    : FontWeight.w800,
+                              ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          notification.displayBody,
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(color: AppColors.mutedText),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          _formatReceivedAt(notification.receivedAt),
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                color: AppColors.mutedText,
+                                fontWeight: FontWeight.w600,
+                              ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.only(top: 2),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                const SizedBox(width: 10),
+                Padding(
+                  padding: const EdgeInsets.only(top: 5),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(
-                        notification.displayTitle,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          color: AppColors.darkText,
-                          fontWeight: notification.isRead
-                              ? FontWeight.w700
-                              : FontWeight.w800,
+                      if (!notification.isRead) ...[
+                        DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: accent,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const SizedBox(width: 9, height: 9),
                         ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        notification.displayBody,
-                        maxLines: 3,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: AppColors.mutedText,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        _formatReceivedAt(notification.receivedAt),
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppColors.mutedText,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
+                        const SizedBox(width: 14),
+                      ],
                     ],
                   ),
                 ),
-              ),
-              const SizedBox(width: 10),
-              Padding(
-                padding: const EdgeInsets.only(top: 5),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (!notification.isRead) ...[
-                      DecoratedBox(
-                        decoration: BoxDecoration(
-                          color: accent,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const SizedBox(width: 9, height: 9),
-                      ),
-                      const SizedBox(width: 14),
-                    ],
-                  ],
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
-    ),
     );
   }
 
@@ -432,38 +423,36 @@ class _InviteNotificationCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return BlocBuilder<PendingInvitesCubit, PendingInvitesState>(
       builder: (context, state) {
-          final isResponding =
-              state is RespondingToInvite &&
-              state.inviteRequestId == notification.inviteRequestId;
-          final successState =
-              state is RespondSuccess &&
-                  state.inviteRequestId == notification.inviteRequestId
-              ? state
-              : null;
+        final isResponding =
+            state is RespondingToInvite &&
+            state.inviteRequestId == notification.inviteRequestId;
+        final successState =
+            state is RespondSuccess &&
+                state.inviteRequestId == notification.inviteRequestId
+            ? state
+            : null;
 
-          final theme = Theme.of(context);
-          final isDark = theme.brightness == Brightness.dark;
+        final theme = Theme.of(context);
+        final isDark = theme.brightness == Brightness.dark;
 
-          return Container(
-            decoration: BoxDecoration(
-              color: isDark ? theme.colorScheme.surfaceContainer : Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: AppColors.border.withValues(alpha: 0.5),
-              ),
-              boxShadow: [
-                if (!isDark)
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.02),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-              ],
-            ),
-            child: Material(
-              color: Colors.transparent,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        return Container(
+          decoration: BoxDecoration(
+            color: isDark ? theme.colorScheme.surfaceContainer : Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppColors.border.withValues(alpha: 0.5)),
+            boxShadow: [
+              if (!isDark)
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.02),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+            ],
+          ),
+          child: Material(
+            color: Colors.transparent,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -630,8 +619,8 @@ class _InviteNotificationCard extends StatelessWidget {
               ),
             ),
           ),
-          );
-        },
+        );
+      },
     );
   }
 }

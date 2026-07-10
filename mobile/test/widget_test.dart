@@ -5,14 +5,14 @@ void main() {
   test('AppUser exposes Firebase Auth profile fields', () {
     const user = AppUser(
       uid: 'uid-1',
-      email: 'user@SlientGuard.vn',
-      displayName: 'SlientGuard User',
+      email: 'user@SilentGuard.vn',
+      displayName: 'SilentGuard User',
       photoUrl: 'https://example.com/avatar.png',
     );
 
     expect(user.uid, 'uid-1');
-    expect(user.email, 'user@SlientGuard.vn');
-    expect(user.displayName, 'SlientGuard User');
+    expect(user.email, 'user@SilentGuard.vn');
+    expect(user.displayName, 'SilentGuard User');
     expect(user.photoUrl, 'https://example.com/avatar.png');
   });
 }

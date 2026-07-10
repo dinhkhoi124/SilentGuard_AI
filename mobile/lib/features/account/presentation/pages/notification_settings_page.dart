@@ -1,8 +1,10 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:mobile/core/theme/app_spacing.dart';
+import 'package:mobile/core/services/daily_report_notification_service.dart';
 import 'package:mobile/core/utils/app_colors.dart';
 import 'package:mobile/features/account/presentation/widgets/account_page_header.dart';
+import 'package:mobile/injection_container.dart';
 
 class NotificationSettingsPage extends StatefulWidget {
   const NotificationSettingsPage({super.key});
@@ -13,6 +15,8 @@ class NotificationSettingsPage extends StatefulWidget {
 }
 
 class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
+  late final DailyReportNotificationService _dailyReportNotificationService;
+
   // Mock local state
   final Map<String, bool> _preferences = {
     'Cảnh báo té ngã': true,
@@ -45,6 +49,14 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    _dailyReportNotificationService = sl<DailyReportNotificationService>();
+    _preferences['Báo cáo hằng ngày'] =
+        _dailyReportNotificationService.isEnabled;
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Scaffold(
@@ -64,11 +76,8 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
                   return _NotificationPreferenceTile(
                     title: key,
                     value: value,
-                    onChanged: (newValue) {
-                      setState(() {
-                        _preferences[key] = newValue;
-                      });
-                    },
+                    onChanged: (newValue) =>
+                        _onPreferenceChanged(key, newValue),
                   );
                 },
               ),
@@ -77,6 +86,32 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
         ),
       ),
     );
+  }
+
+  Future<void> _onPreferenceChanged(String key, bool newValue) async {
+    setState(() {
+      _preferences[key] = newValue;
+    });
+
+    if (key != 'Báo cáo hằng ngày') return;
+
+    final scheduled = await _dailyReportNotificationService.setEnabled(
+      newValue,
+    );
+    if (!mounted || scheduled || !newValue) return;
+
+    setState(() {
+      _preferences[key] = false;
+    });
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Chưa thể bật báo cáo hằng ngày. Vui lòng kiểm tra quyền thông báo hoặc hộ gia đình hiện tại.',
+          ),
+        ),
+      );
   }
 }
 

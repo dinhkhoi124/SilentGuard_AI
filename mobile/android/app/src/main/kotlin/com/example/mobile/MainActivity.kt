@@ -82,19 +82,10 @@ class MainActivity : FlutterActivity() {
         )
         addPlugin(
             flutterEngine,
-            com.aaassseee.screen_brightness_android.ScreenBrightnessAndroidPlugin(),
-            "screen_brightness_android"
-        )
-        addPlugin(
-            flutterEngine,
             io.flutter.plugins.sharedpreferences.SharedPreferencesPlugin(),
             "shared_preferences_android"
         )
-        addPlugin(
-            flutterEngine,
-            com.kurenai7968.volume_controller.VolumeControllerPlugin(),
-            "volume_controller"
-        )
+        
         addPlugin(
             flutterEngine,
             dev.fluttercommunity.plus.wakelock.WakelockPlusPlugin(),
@@ -131,6 +122,6 @@ class MainActivity : FlutterActivity() {
 
     private companion object {
         const val TAG = "MainActivity"
-        const val MEDIA_KIT_CHANNEL = "SlientGuard/media_kit"
+        const val MEDIA_KIT_CHANNEL = "SilentGuard/media_kit"
     }
 }

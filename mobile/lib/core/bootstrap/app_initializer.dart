@@ -5,6 +5,8 @@ import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/foundation.dart';
 import 'package:mobile/core/router/app_router.dart';
 import 'package:mobile/core/router/auth_notifier.dart';
+import 'package:mobile/core/services/connectivity_service.dart';
+import 'package:mobile/core/services/daily_report_notification_service.dart';
 import 'package:mobile/core/services/fcm_service.dart';
 import 'package:mobile/core/services/local_notification_service.dart';
 import 'package:mobile/core/services/monitoring_suppress_service.dart';
@@ -13,6 +15,7 @@ import 'package:mobile/features/household_invite/data/datasources/household_invi
 import 'package:mobile/features/notifications/domain/entities/notification_alert.dart';
 import 'package:mobile/features/notifications/presentation/cubit/notifications_cubit.dart';
 import 'package:mobile/injection_container.dart' as di;
+import 'package:intl/date_symbol_data_local.dart';
 
 class AppInitializationResult {
   const AppInitializationResult({
@@ -32,19 +35,28 @@ class AppInitializer {
   Future<AppInitializationResult> initializeAfterFirstFrame({
     AppRouter? appRouter,
   }) async {
+    final stopwatch = Stopwatch()..start();
+
+    await _logStartupAsync(
+      'intl.initializeDateFormatting',
+      () => initializeDateFormatting('vi', null),
+    );
+    debugPrint('[STEP] initializeDateFormatting done');
+    await _yieldToUi();
+
     final initializeFirebase = this.initializeFirebase;
     if (initializeFirebase != null) {
-      await _logStartupAsync(
-        'Firebase.initializeApp',
-        () => initializeFirebase().timeout(
-          const Duration(seconds: 8),
-          onTimeout: () {
-            debugPrint(
-              '[AppInitializer] Firebase init timeout — continuing anyway',
-            );
-          },
-        ),
-      );
+      await _logStartupAsync('Firebase.initializeApp', () async {
+        try {
+          // Firebase plugins require the main isolate and platform channels.
+          // Isolate.run() must NOT be used here — it will deadlock platform channels.
+          await initializeFirebase();
+        } catch (e) {
+          debugPrint(
+            '[STARTUP] Firebase init failed: $e — continuing in degraded mode',
+          );
+        }
+      });
       debugPrint('[STEP] Firebase.initializeApp done');
       await _yieldToUi();
       debugPrint('[STEP] yield after Firebase.initializeApp done');
@@ -63,6 +75,15 @@ class AppInitializer {
     debugPrint('[STEP] yield after di.init done');
 
     await _logStartupAsync(
+      'ConnectivityService.initialize',
+      () => di.sl<ConnectivityService>().initialize(),
+    );
+
+    // Wait one full frame before ThemeController so Android's ANR watchdog
+    // receives a heartbeat frame and does not flag the process as frozen.
+    await Future<void>.delayed(const Duration(milliseconds: 16));
+
+    await _logStartupAsync(
       'ThemeController.load',
       () => di.sl<ThemeController>().load(),
     );
@@ -76,7 +97,9 @@ class AppInitializer {
     );
     debugPrint('[STEP] MonitoringSuppressService.pruneExpired done');
     await _yieldToUi();
-    debugPrint('[STEP] yield after MonitoringSuppressService.pruneExpired done');
+    debugPrint(
+      '[STEP] yield after MonitoringSuppressService.pruneExpired done',
+    );
 
     final notificationsCubit = di.sl<NotificationsCubit>();
     final resolvedRouter = appRouter ?? AppRouter(di.sl());
@@ -99,6 +122,13 @@ class AppInitializer {
     debugPrint('[STEP] yield after initializeLocalNotifications done');
 
     await _logStartupAsync(
+      'DailyReportNotificationService.syncSchedule',
+      () => di.sl<DailyReportNotificationService>().syncSchedule(),
+    );
+    debugPrint('[STEP] DailyReportNotificationService.syncSchedule done');
+    await _yieldToUi();
+
+    await _logStartupAsync(
       'AppInitializer.loadPendingInvites',
       () => _loadPendingInvites(notificationsCubit),
     );
@@ -107,6 +137,19 @@ class AppInitializer {
     debugPrint('[STEP] yield after loadPendingInvites done');
 
     debugPrint('[STEP] returning AppInitializationResult');
+
+    stopwatch.stop();
+
+    if (kDebugMode) {
+      const realDeviceBudgetMs = 3000;
+      debugPrint(
+        '[STARTUP] Total initializeAfterFirstFrame: ${stopwatch.elapsedMilliseconds}ms'
+        '${stopwatch.elapsedMilliseconds >= realDeviceBudgetMs ? " ⚠️ EXCEEDS ${realDeviceBudgetMs}ms real device budget" : ""}',
+      );
+      // Do NOT assert here — emulator timing is unreliable and an AssertionError
+      // surfaces as an ANR/crash on Android before error boundaries can catch it.
+    }
+
     return AppInitializationResult(
       appRouter: resolvedRouter,
       notificationsCubit: notificationsCubit,
@@ -114,24 +157,32 @@ class AppInitializer {
   }
 
   void scheduleMessagingSetup(AppInitializationResult result) {
-    unawaited(
-      _initializeMessagingSetup(result).catchError((error, stackTrace) {
-        debugPrint('[CRASH] scheduleMessagingSetup failed: $error\n$stackTrace');
-        // Re-throw so Crashlytics catches it
-        Error.throwWithStackTrace(error, stackTrace as StackTrace);
-      }),
-    );
+    // Delay FCM setup well past first interactive frame to avoid competing
+    // with the initial render and triggering the Android ANR watchdog.
+    // microtask() runs before the next frame; 500ms ensures the UI is visible.
+    Future<void>.delayed(const Duration(milliseconds: 500)).then((_) async {
+      try {
+        await _initializeMessagingSetup(result);
+      } catch (error, stackTrace) {
+        debugPrint(
+          '[CRASH] scheduleMessagingSetup failed: $error\n$stackTrace',
+        );
+      }
+    });
   }
 
   Future<void> _initializeMessagingSetup(AppInitializationResult result) async {
     try {
       await _logStartupAsync(
         'AppInitializer.FcmService.initialize',
-        () => di.sl<FcmService>().initialize(
-          notificationsCubit: result.notificationsCubit,
-          onNotificationTap: (alert) =>
-              _openNotificationAlert(result.appRouter, alert),
-        ),
+        () => di
+            .sl<FcmService>()
+            .initialize(
+              notificationsCubit: result.notificationsCubit,
+              onNotificationTap: (alert) =>
+                  _openNotificationAlert(result.appRouter, alert),
+            )
+            .timeout(const Duration(seconds: 10)),
       );
     } catch (error, stackTrace) {
       developer.log(
@@ -173,6 +224,9 @@ class AppInitializer {
             alert,
           ),
         );
+      },
+      onNavigateToTap: (destination) {
+        _openDestination(resolvedRouter, destination);
       },
     );
     if (initialLocalAlert == null) return;
@@ -224,7 +278,9 @@ class AppInitializer {
 
   Future<NotificationAlert?> _takeInitialFcmAlert() async {
     try {
-      return await di.sl<FcmService>().takeInitialAlert();
+      return await di.sl<FcmService>().takeInitialAlert().timeout(
+        const Duration(seconds: 5),
+      );
     } catch (error, stackTrace) {
       developer.log(
         'Initial FCM alert lookup failed; continuing startup.',
@@ -238,10 +294,12 @@ class AppInitializer {
 
   Future<NotificationAlert?> _initializeLocalNotifications({
     required void Function(NotificationAlert alert) onAlertTap,
+    void Function(String destination)? onNavigateToTap,
   }) async {
     try {
       return await di.sl<LocalNotificationService>().initialize(
         onAlertNotificationTap: onAlertTap,
+        onNavigateToTap: onNavigateToTap,
       );
     } catch (error, stackTrace) {
       developer.log(
@@ -280,6 +338,21 @@ class AppInitializer {
       name: 'AppInitializer',
     );
     appRouter.router.go('/home');
+  }
+
+  /// Navigate to a named destination from a navigate_to notification payload.
+  void _openDestination(AppRouter appRouter, String destination) {
+    developer.log(
+      '[FCM] navigate_to tapped: destination=$destination',
+      name: 'AppInitializer',
+    );
+    switch (destination) {
+      case 'reports':
+        // Tab index 3 = Reports (see _tabTitles in home_page.dart).
+        appRouter.router.go('/home', extra: 3);
+      default:
+        appRouter.router.go('/home');
+    }
   }
 
   Future<void> _handleLocalNotificationTap(

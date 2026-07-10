@@ -34,6 +34,7 @@ class DeviceRemoteDataSourceImpl implements DeviceRemoteDataSource {
     final response = await _apiClient.getList(
       '/api/cameras?household_id=$householdId',
     );
+
     return response
         .whereType<Map>()
         .map(
@@ -53,17 +54,20 @@ class DeviceRemoteDataSourceImpl implements DeviceRemoteDataSource {
         'household_id': householdId,
         ...PairedDeviceModel.toPairingJson(resolvedDevice: resolvedDevice),
       };
-      debugPrint('POST /api/cameras householdId: $householdId');
-      debugPrint('POST /api/cameras body: ${jsonEncode(requestBody)}');
+      if (kDebugMode) {
+        debugPrint('POST /api/cameras householdId: $householdId');
+        debugPrint('POST /api/cameras body: ${jsonEncode(requestBody)}');
+      }
 
       final response = await _apiClient.postObject('/api/cameras', requestBody);
-      
-      developer.log('=== ADD CAM RESPONSE: ${jsonEncode(response)} ===', name: 'DeviceRemoteDataSource');
-      final payloadData = _payload(response);
-      final apiKey = payloadData['api_key'] ?? response['api_key'];
-      if (apiKey != null) {
-        developer.log('=== DEVICE API KEY: $apiKey ===', name: 'DeviceRemoteDataSource');
+
+      if (kDebugMode) {
+        developer.log(
+          '=== ADD CAM RESPONSE: ${jsonEncode(_redactSensitive(response))} ===',
+          name: 'DeviceRemoteDataSource',
+        );
       }
+      final payloadData = _payload(response);
 
       return PairedDeviceModel.fromJson({
         ...payloadData,
@@ -74,7 +78,9 @@ class DeviceRemoteDataSourceImpl implements DeviceRemoteDataSource {
         'serial_number': resolvedDevice.serialNumber,
       }).toEntity();
     } on ApiException catch (e) {
-      debugPrint('POST /api/cameras response ${e.statusCode}: ${e.message}');
+      if (kDebugMode) {
+        debugPrint('POST /api/cameras response ${e.statusCode}: ${e.message}');
+      }
       if (e.statusCode == 409 || e.message.contains('DUPLICATE_SERIAL')) {
         throw const ApiException(
           'Camera này đã được đăng ký. Kiểm tra lại thiết bị.',
@@ -111,5 +117,27 @@ class DeviceRemoteDataSourceImpl implements DeviceRemoteDataSource {
       if (value is Map) return Map<String, dynamic>.from(value);
     }
     return response;
+  }
+
+  Map<String, dynamic> _redactSensitive(Map<String, dynamic> value) {
+    return value.map((key, entry) {
+      final normalizedKey = key.toLowerCase();
+      if (normalizedKey.contains('api_key') ||
+          normalizedKey.contains('apikey') ||
+          normalizedKey.contains('token') ||
+          normalizedKey == 'household_id') {
+        return MapEntry(key, '<redacted>');
+      }
+      if (entry is Map<String, dynamic>) {
+        return MapEntry(key, _redactSensitive(entry));
+      }
+      if (entry is Map) {
+        return MapEntry(
+          key,
+          _redactSensitive(Map<String, dynamic>.from(entry)),
+        );
+      }
+      return MapEntry(key, entry);
+    });
   }
 }

@@ -38,7 +38,7 @@ class NotificationAlert extends Equatable {
   String get displayTitle {
     final trimmedTitle = title?.trim() ?? '';
     if (trimmedTitle.isNotEmpty) return trimmedTitle;
-    
+
     if (type == 'household_invite') {
       return 'Lời mời tham gia hộ gia đình';
     }

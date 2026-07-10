@@ -46,6 +46,23 @@ class ImouLiveStreamInfo {
   }
 }
 
+class ImouRtmpLiveInfo {
+  const ImouRtmpLiveInfo({
+    required this.deviceId,
+    required this.channelId,
+    this.rtmpSd,
+    this.rtmpHd,
+  });
+
+  final String deviceId;
+  final String channelId;
+  final String? rtmpSd;
+  final String? rtmpHd;
+
+  /// Returns HD URL if available, falls back to SD.
+  String? get bestUrl => rtmpHd?.isNotEmpty == true ? rtmpHd : rtmpSd;
+}
+
 class ImouLiveStream {
   const ImouLiveStream({
     required this.streamId,

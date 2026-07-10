@@ -38,7 +38,7 @@ class ReportsHeader extends StatelessWidget {
               borderRadius: BorderRadius.circular(20),
             ),
             child: Text(
-              '7 ngày',
+              'Hôm nay có gì?',
               style: theme.textTheme.labelLarge?.copyWith(
                 color: isDark
                     ? theme.colorScheme.onSurface

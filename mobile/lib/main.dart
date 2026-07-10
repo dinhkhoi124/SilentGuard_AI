@@ -10,17 +10,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:mobile/core/bootstrap/app_initializer.dart';
+import 'package:mobile/core/connectivity/connectivity_cubit.dart';
 import 'package:mobile/core/router/app_router.dart';
 import 'package:mobile/core/services/local_notification_service.dart';
 import 'package:mobile/core/services/monitoring_suppress_service.dart';
 import 'package:mobile/core/theme/app_theme.dart';
 import 'package:mobile/core/theme/theme_controller.dart';
+import 'package:mobile/core/widgets/silent_guard_splash_screen.dart';
 import 'package:mobile/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:mobile/features/notifications/data/datasources/notification_local_data_source.dart';
 import 'package:mobile/features/notifications/presentation/cubit/notifications_cubit.dart';
 import 'package:mobile/features/video_upload/presentation/bloc/video_upload_bloc.dart';
 import 'package:mobile/firebase_options.dart';
 import 'package:mobile/injection_container.dart' as di;
+import 'package:mobile/core/widgets/offline_banner_layer.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 @pragma('vm:entry-point')
@@ -106,8 +109,12 @@ Future<void> _initializeFirebase() async {
   if (Firebase.apps.isEmpty) {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
+    ).timeout(
+      const Duration(seconds: 10),
+      onTimeout: () => throw TimeoutException('Firebase init timed out'),
     );
   }
+
   FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
 }
 
@@ -137,7 +144,10 @@ class _BootstrapAppState extends State<BootstrapApp> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      unawaited(_initializePostFrame());
+      // Delay to ensure the first frame is actually presented to the GPU before heavy init blocks the main thread
+      Future.delayed(const Duration(milliseconds: 100), () {
+        if (mounted) unawaited(_initializePostFrame());
+      });
     });
   }
 
@@ -174,9 +184,22 @@ class _BootstrapAppState extends State<BootstrapApp> {
 
   @override
   Widget build(BuildContext context) {
+    ErrorWidget.builder = (FlutterErrorDetails details) {
+      debugPrint('BOOTSTRAP CRASH: ${details.exception}');
+      debugPrint('STACK: ${details.stack}');
+      return const Scaffold(
+        body: Center(child: Text('Bootstrap crashed - check logs')),
+      );
+    };
+
     debugPrint('[STEP] BootstrapApp.build called');
     final appRouter = _appRouter;
-    if (appRouter != null) return MyApp(appRouter: appRouter);
+    if (appRouter != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        debugPrint('[TIMING] Home screen first frame complete');
+      });
+      return MyApp(appRouter: appRouter);
+    }
 
     return _BootstrapShell(error: _initializationError);
   }
@@ -190,24 +213,24 @@ class _BootstrapShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'WatchNest',
+      title: 'SilentGuard',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       locale: const Locale('vi', 'VN'),
-      home: Scaffold(
-        backgroundColor: AppTheme.light.scaffoldBackgroundColor,
-        body: Center(
-          child: error == null
-              ? const CircularProgressIndicator()
-              : Padding(
+      home: error == null
+          ? const SilentGuardSplashScreen()
+          : Scaffold(
+              backgroundColor: AppTheme.light.scaffoldBackgroundColor,
+              body: Center(
+                child: Padding(
                   padding: const EdgeInsets.all(24),
                   child: Text(
                     'Không thể khởi động ứng dụng.\n$error',
                     textAlign: TextAlign.center,
                   ),
                 ),
-        ),
-      ),
+              ),
+            ),
     );
   }
 }
@@ -223,6 +246,7 @@ class MyApp extends StatelessWidget {
 
     return MultiBlocProvider(
       providers: [
+        BlocProvider(create: (_) => di.sl<ConnectivityCubit>()),
         BlocProvider(create: (_) => di.sl<AuthBloc>()),
         BlocProvider(create: (_) => di.sl<VideoUploadBloc>()),
         BlocProvider.value(value: di.sl<NotificationsCubit>()),
@@ -231,13 +255,16 @@ class MyApp extends StatelessWidget {
         animation: themeController,
         builder: (context, _) {
           return MaterialApp.router(
-            title: 'WatchNest',
+            title: 'SilentGuard',
             debugShowCheckedModeBanner: false,
             theme: AppTheme.light,
             darkTheme: AppTheme.dark,
             themeMode: themeController.themeMode,
             locale: const Locale('vi', 'VN'),
             routerConfig: appRouter.router,
+            builder: (context, child) {
+              return OfflineBannerLayer(child: child!);
+            },
           );
         },
       ),

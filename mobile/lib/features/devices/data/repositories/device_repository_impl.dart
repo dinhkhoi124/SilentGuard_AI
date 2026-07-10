@@ -1,9 +1,8 @@
 import 'dart:async';
 import 'dart:developer' as developer;
-import 'dart:io';
 
 import 'package:dartz/dartz.dart';
-import 'package:http/http.dart' as http;
+import 'package:mobile/core/error/exceptions.dart';
 import 'package:mobile/core/network/api_client.dart';
 import 'package:mobile/features/devices/data/datasources/device_permission_data_source.dart';
 import 'package:mobile/features/devices/data/datasources/device_remote_data_source.dart';
@@ -51,21 +50,9 @@ class DeviceRepositoryImpl implements DeviceRepository {
     } on ApiException catch (error, stackTrace) {
       _logFailure(error, stackTrace);
       return Left(_messageForApiException(error));
-    } on TimeoutException catch (error, stackTrace) {
+    } on NoInternetException catch (error, stackTrace) {
       _logFailure(error, stackTrace);
-      return const Left(
-        'Không thể kết nối mạng. Kết nối quá thời gian chờ.', // FIX: let HomeBloc classify timeout as backend unavailable.
-      );
-    } on SocketException catch (error, stackTrace) {
-      _logFailure(error, stackTrace);
-      return const Left(
-        'Không thể kết nối mạng. Vui lòng kiểm tra WiFi và địa chỉ máy chủ.', // FIX: let HomeBloc classify network errors as backend unavailable.
-      );
-    } on http.ClientException catch (error, stackTrace) {
-      _logFailure(error, stackTrace);
-      return const Left(
-        'Không thể kết nối mạng. Vui lòng kiểm tra WiFi và địa chỉ máy chủ.', // FIX: let HomeBloc classify client errors as backend unavailable.
-      );
+      return Left(error.message);
     } catch (error, stackTrace) {
       _logFailure(error, stackTrace);
       return const Left('Lỗi không xác định. Vui lòng thử lại.');

@@ -1,8 +1,11 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 
 import 'package:http/http.dart' as http;
 import 'package:mobile/core/config/app_config.dart';
+import 'package:mobile/core/error/exceptions.dart';
 
 class ApiClient {
   ApiClient({http.Client? client, String? baseUrl})
@@ -20,6 +23,20 @@ class ApiClient {
       '--dart-define=API_BASE_URL=https://<backend-domain> '
       'hoặc dùng URL backend đã triển khai.';
 
+  Future<http.Response> _executeWithCatch(
+    Future<http.Response> Function() request,
+  ) async {
+    try {
+      return await request();
+    } on SocketException {
+      throw const NoInternetException();
+    } on TimeoutException {
+      throw const NoInternetException();
+    } on http.ClientException {
+      throw const NoInternetException();
+    }
+  }
+
   /// Fetches a JSON object at [path] with the given [queryParameters].
   /// Values are URL-encoded automatically via [Uri.replace].
   Future<Map<String, dynamic>> getObjectWithQuery(
@@ -27,9 +44,11 @@ class ApiClient {
     Map<String, String> queryParameters,
   ) async {
     final uri = _uri(path).replace(queryParameters: queryParameters);
-    final response = await _client
-        .get(uri, headers: _headers())
-        .timeout(AppConfig.networkTimeout);
+    final response = await _executeWithCatch(
+      () => _client
+          .get(uri, headers: _headers())
+          .timeout(AppConfig.networkTimeout),
+    );
     final decoded = _decode(response);
     if (decoded is Map<String, dynamic>) return decoded;
     throw const ApiException(
@@ -39,9 +58,11 @@ class ApiClient {
   }
 
   Future<Map<String, dynamic>> getObject(String path) async {
-    final response = await _client
-        .get(_uri(path), headers: _headers())
-        .timeout(AppConfig.networkTimeout);
+    final response = await _executeWithCatch(
+      () => _client
+          .get(_uri(path), headers: _headers())
+          .timeout(AppConfig.networkTimeout),
+    );
     final decoded = _decode(response);
     if (decoded is Map<String, dynamic>) return decoded;
     throw const ApiException(
@@ -51,9 +72,11 @@ class ApiClient {
   }
 
   Future<List<dynamic>> getList(String path) async {
-    final response = await _client
-        .get(_uri(path), headers: _headers())
-        .timeout(AppConfig.networkTimeout);
+    final response = await _executeWithCatch(
+      () => _client
+          .get(_uri(path), headers: _headers())
+          .timeout(AppConfig.networkTimeout),
+    );
     final decoded = _decode(response);
     if (decoded is List<dynamic>) return decoded;
     if (decoded is Map<String, dynamic> && decoded['items'] is List<dynamic>) {
@@ -72,15 +95,17 @@ class ApiClient {
     Duration?
     timeout, // FIX: allow provisionSession login to outlast Render cold starts without changing every API call.
   ]) async {
-    final response = await _client
-        .post(
-          _uri(path),
-          headers: _headers(extraHeaders),
-          body: body == null ? null : jsonEncode(body),
-        )
-        .timeout(
-          timeout ?? AppConfig.networkTimeout,
-        ); // FIX: keep existing timeout unless a caller explicitly opts in.
+    final response = await _executeWithCatch(
+      () => _client
+          .post(
+            _uri(path),
+            headers: _headers(extraHeaders),
+            body: body == null ? null : jsonEncode(body),
+          )
+          .timeout(
+            timeout ?? AppConfig.networkTimeout,
+          ), // FIX: keep existing timeout unless a caller explicitly opts in.
+    );
     final decoded = _decode(response);
     if (decoded is Map<String, dynamic>) return decoded;
     throw const ApiException(
@@ -94,21 +119,25 @@ class ApiClient {
     Map<String, dynamic>? body,
     Map<String, String>? extraHeaders,
   ]) async {
-    final response = await _client
-        .patch(
-          _uri(path),
-          headers: _headers(extraHeaders),
-          body: body == null ? null : jsonEncode(body),
-        )
-        .timeout(AppConfig.networkTimeout);
+    final response = await _executeWithCatch(
+      () => _client
+          .patch(
+            _uri(path),
+            headers: _headers(extraHeaders),
+            body: body == null ? null : jsonEncode(body),
+          )
+          .timeout(AppConfig.networkTimeout),
+    );
     _decode(response, allowEmpty: true);
     return response.statusCode;
   }
 
   Future<int> delete(String path) async {
-    final response = await _client
-        .delete(_uri(path), headers: _headers())
-        .timeout(AppConfig.networkTimeout);
+    final response = await _executeWithCatch(
+      () => _client
+          .delete(_uri(path), headers: _headers())
+          .timeout(AppConfig.networkTimeout),
+    );
     _decode(response, allowEmpty: true);
     return response.statusCode;
   }

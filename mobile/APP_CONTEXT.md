@@ -155,6 +155,7 @@ Thành phần chính:
 - `core/services/fcm_service.dart`
 - `core/services/local_notification_service.dart`
 - `core/services/monitoring_suppress_service.dart`
+- `core/services/daily_report_notification_service.dart` (MỚI: Quản lý bật/tắt và lên lịch thông báo báo cáo hàng ngày)
 - `features/notifications/data/datasources/notification_local_data_source.dart`
 - `features/notifications/presentation/cubit/notifications_cubit.dart`
 - `features/notifications/presentation/pages/notifications_page.dart`
@@ -208,14 +209,15 @@ Route hiện có:
 
 Lưu ý:
 
-- Không có nested shell route; `HomePage` tự quản lý 4 tab bằng `IndexedStack`
+- Không có nested shell route; `HomePage` tự quản lý 5 tab bằng `IndexedStack`
 
-4 tab trong `HomePage`:
+5 tab trong `HomePage`:
 
 1. Home
 2. Automation
-3. Reports
-4. Account
+3. Live RTMP
+4. Reports
+5. Account
 
 ## 8. Feature map theo code hiện tại
 
@@ -230,6 +232,9 @@ Thành phần chính:
 - `CameraDetailPage`
 - `SuppressCubit`
 - `MonitoringSuppressService`
+- `CameraEventHistoryCubit`: Tải và quản lý lịch sử sự kiện riêng cho từng camera trong `CameraDetailPage`.
+- `EventFeedbackCubit`: Xử lý gửi phản hồi của người dùng về sự kiện (hữu ích/không) lên backend.
+- `AlertReviewCubit`: Xử lý đánh dấu cảnh báo giả (false alarm).
 - widgets cho safety_weather_card, camera grid, room filter, camera card, camera_action_buttons
 
 `HomeBloc` quản lý ít nhất các việc sau:
@@ -243,6 +248,7 @@ Thành phần chính:
 - backend warm-up state
 - unauthorized state
 - `CameraDetailClosed` (giải phóng phiên stream)
+- **Error Localization**: Xử lý các mã lỗi phổ biến từ Imou (ví dụ: `12012` - "Device no response") và ánh xạ thành thông báo thân thiện bằng tiếng Việt như "Mất kết nối internet" để tránh hiển thị log raw lên UI.
 
 `SuppressCubit` & `MonitoringSuppressService`:
 - Quản lý việc tạm dừng giám sát/gửi cảnh báo từ camera theo thời gian được chọn (30 phút, 2 giờ, 12 giờ, 24 giờ).
@@ -256,7 +262,7 @@ Thành phần chính:
 ### 8.2 `features/devices` (TÁI CẤU TRÚC ĐƠN GIẢN HÓA)
 
 Tính năng quét QR và ghép nối camera đã được đơn giản hóa tối đa nhằm loại bỏ các thành phần phức tạp không cần thiết (đã xóa ONVIF discovery, RTSP/ONVIF configuration, gallery QR import, và thư viện `xml`):
-- `DevicePairingBloc`: Chỉ còn quản lý flow quét mã QR trực tiếp từ camera. Khi quét thành công, trích xuất serial number của thiết bị thông qua hàm `parseSerialNumber(rawQr)`.
+- `DevicePairingBloc`: Chỉ còn quản lý flow quét mã QR trực tiếp từ camera. Khi quét thành công, trích xuất serial number của thiết bị thông qua hàm `parseSerialNumber(rawQr)`. Ngoài ra, tiến trình add camera qua QR sẽ tự động in log (log device API key) ra console để dễ debug quá trình thiết lập.
 - Giao diện `DevicePairingPage` được làm gọn lại theo luồng: Chuẩn bị quét -> Quét QR -> Đang kết nối (`DevicePairingLoading`) -> Thành công (`DevicePairingSuccess`) hoặc Lỗi (`DevicePairingError`).
 - Thiết bị sau khi quét sẽ tự động được gán tên mặc định là `Camera $serialNumber` và gọi API `savePairedDevice` lên backend AI mà không cần bước nhập tên hay cấu hình IP thủ công.
 
@@ -271,6 +277,9 @@ Báo cáo và lịch sử sự kiện:
 - `ReportsPage`
 - `EventHistoryCubit`
 - `EventHistoryRemoteDataSource`
+- `DailySummaryCubit` (MỚI)
+- `DailySummaryRemoteDataSource` (MỚI)
+- `DailySummaryCard`, `ReportMetricGrid`, `ReportSummaryCard`, `RecentEventsSection` (MỚI)
 - `WeeklyEventTrendAggregator`
 - `WeeklyTrendChartCard`
 - `AnimatedWeeklyBarChart`
@@ -279,6 +288,7 @@ Báo cáo và lịch sử sự kiện:
 API đang dùng:
 
 - `GET /api/events/history`
+- `GET /api/reports/daily` (MỚI)
 
 Query params hiện có:
 
@@ -314,27 +324,23 @@ Tình trạng hiện tại:
 - một phần là UI scaffold / coming-soon interaction
 - emergency contacts có feature data local riêng
 
-### 8.5 `features/automation` - emergency contacts
+### 8.5 `features/automation` - emergency contacts (ĐÃ ĐƠN GIẢN HÓA)
 
-Data và state:
+Dựa theo yêu cầu gần đây, luồng tích hợp với bảng contacts phức tạp trước đó đã bị gỡ bỏ để tránh phát sinh lỗi đồng bộ. 
+Tính năng gọi điện khẩn cấp hiện tại (nếu có) được thiết kế tinh gọn hơn hoặc được gỡ bỏ khỏi UI dashboard.
 
-- `EmergencyContactsLocalDataSource`
-- `EmergencyContactsRepositoryImpl`
-- `EmergencyContactsCubit`
-- `EmergencyContactsPage`
-
-Route:
-
+Route (nếu còn):
 - `/emergency-contacts`
 
 ### 8.6 `features/household_invite`
 
 Quản lý lời mời tham gia hộ gia đình:
 - `PendingInvitesCubit` đã được cập nhật: Khi chấp nhận lời mời (`respondToInvite(..., true)`), cubit sẽ gọi API `switchHousehold` đổi hộ gia đình trực tiếp trên backend, sau đó phát sự kiện `HomeStarted` cho `HomeBloc` để làm mới danh sách camera dashboard ngay lập tức mà không cần logout/login.
+- `InviteManagementCubit` (MỚI): Quản lý gửi lời mời mới và xem thành viên. Giao diện qua `invite_management_sheet.dart` và `invite_dialog.dart`.
 
 ### 8.7 `features/account`
 
-Trang account nằm trong tab thứ 4 của `HomePage`.
+Trang account nằm trong tab thứ 5 của `HomePage`.
 
 Hiện có:
 
@@ -345,6 +351,7 @@ Hiện có:
 - `PrivacyPolicyPage`
 - `NotificationSettingsPage`
 - `AccountPageHeader` (Header thống nhất cho các trang con thuộc Account)
+- Các widget hỗ trợ hiển thị Legal content (nằm trong thư mục `legal/` như `legal_bullet_item.dart`), `faq/` và `help_support/`.
 
 Asset markdown:
 
@@ -377,6 +384,16 @@ Flow tổng quát:
 - onboarding completion được lưu qua `OnboardingService`
 - auth router dùng flag này để quyết định vào `/onboarding` hay `/welcome`
 
+### 8.10 `features/rtmp_live`
+
+Tính năng xem livestream độc lập qua giao thức RTMP:
+
+- Nằm ở tab thứ 3 của `HomePage`.
+- `RtmpLivePage`: Giao diện xem stream. Tách biệt UI (view) và business logic.
+- `RtmpLiveBloc`: Quản lý trạng thái luồng stream (Loading, Loaded, Error) và tự động fetch URL.
+- `RtmpStreamRepository` và UseCase `GetRtmpStreamUrl` dùng để lấy luồng RTMP từ backend.
+- Sử dụng `media_kit` (VideoPlayer) tương tự Imou Cloud nhưng hoạt động độc lập, hỗ trợ overlay controls, chuyển đổi fullscreen ngang, và hiển thị badge (HD/SD/Live).
+
 ## 9. Home tab và camera detail
 
 ### 9.1 Home tab
@@ -386,7 +403,7 @@ Flow tổng quát:
 Nó chứa:
 
 - app bar + unread notification badge
-- 4-tab `IndexedStack`
+- 5-tab `IndexedStack`
 - upload progress line
 - FAB thêm device
 - notification snackbar foreground
@@ -420,7 +437,7 @@ Tối ưu hóa chi tiết camera:
 - Đăng ký Client HTTP chuẩn và đăng ký một `ApiClient` riêng có tên instance là `'imou'` dành riêng cho các API của Imou Cloud.
 - Khởi tạo `SharedPreferences` trước khi gọi đăng ký DI để tránh deadlock, sau đó đăng ký bằng `registerLazySingleton`.
 - Loại bỏ toàn bộ các đăng ký liên quan đến ONVIF và các data source QR/ảnh cũ bị xóa.
-- Đăng ký đầy đủ các Bloc/Cubit: `AuthBloc`, `HomeBloc`, `VideoUploadBloc`, `SuppressCubit`, `DevicePairingBloc` (chỉ phụ thuộc vào `DeviceRepository`), `EmergencyContactsCubit`, `PendingInvitesCubit` (phụ thuộc vào `SessionRepository` để chuyển đổi household), và các Cubit báo cáo/feedback sự kiện.
+- Đăng ký đầy đủ các Bloc/Cubit: `AuthBloc`, `HomeBloc`, `VideoUploadBloc`, `RtmpLiveBloc` (cùng `GetRtmpStreamUrl` và `RtmpStreamRepository`), `SuppressCubit`, `DevicePairingBloc` (chỉ phụ thuộc vào `DeviceRepository`), `EmergencyContactsCubit`, `PendingInvitesCubit` (phụ thuộc vào `SessionRepository` để chuyển đổi household), và các Cubit báo cáo/feedback sự kiện.
 
 ## 11. Backend/API nhìn nhanh
 
@@ -443,6 +460,7 @@ Từ code hiện tại có thể thấy app đang gọi nhóm API sau:
 ### 11.3 Event/alert
 
 - `GET /api/events/history`
+- `GET /api/reports/daily` (MỚI)
 - `POST /api/events/upload-video`
 - `PATCH /api/alerts/{event_id}/review`
 - `POST /api/events/{event_id}/feedback`
@@ -451,6 +469,13 @@ Từ code hiện tại có thể thấy app đang gọi nhóm API sau:
 
 - Open-Meteo cho weather
 - Imou Cloud API: Đăng nhập lấy access token `/accessToken`, kích hoạt live stream `/bindDeviceLive`, lấy thông tin luồng trực tiếp `/getLiveStreamInfo`, tắt live stream `/unbindLive`, lấy danh sách thiết bị `/deviceList`.
+
+### 11.5 Household & Invite (MỚI)
+
+- `POST /api/households/invite-by-email`
+- `GET /api/households/invite-requests/pending`
+- `POST /api/households/invite-requests/{id}/respond`
+- `GET /api/households/{householdId}/members`
 
 ## 12. Giao diện (UI/UX) và Design System
 
@@ -464,6 +489,7 @@ Gần đây app đã có nhiều điều chỉnh để nâng cao trải nghiệm
   - Fix lỗi layout bị co rút khi xảy ra lỗi tại sự kiện ở phần bottom screen bằng cách set layout full-width và dùng component `AppEmptyState` đồng bộ.
 - **Video Upload**: Bổ sung Intro Bottom Sheet (`video_upload_intro_sheet.dart`) để giải thích chi tiết về tính năng gửi video phân tích AI trước khi mở thư viện.
 - **Account Tab**: Đồng nhất header (`AccountPageHeader`) và padding cho các trang con (Thông báo, Giao diện, Trợ giúp). Các tính năng chưa hoàn thiện sẽ hiện thông báo "Coming soon". Thêm trang `/notification-settings` cho phép người dùng tùy chỉnh thiết lập cảnh báo.
+- **Notifications Page**: Giao diện thẻ thông báo đã được thiết kế lại (redesign) để trông cao cấp hơn, tinh chỉnh các đường cong (border radius) và layout bo góc đẹp mắt thay vì dùng UI mặc định. Tích hợp trực tiếp email/người gửi vào thẳng UI thông báo.
 - **Camera Detail & Video Player**:
   - Khung video được fix cứng tỷ lệ 16:9 để tránh lỗi layout chiếm toàn màn hình trên iPhone, giúp nội dung phía dưới cuộn (scrollable) bình thường, kèm loading/error states rõ ràng.
   - Sự kiện gần đây được làm mới card layout: loại bỏ mock image thumbnail do thực tế backend không cung cấp ảnh thumbnail, hiển thị thông tin thực tế từ backend gồm Duration, Confidence, Room, Status và Severity Badge thống nhất. Xóa bỏ các số liệu test cứng (`999s` / `95%` confidence) do đây là mock data.

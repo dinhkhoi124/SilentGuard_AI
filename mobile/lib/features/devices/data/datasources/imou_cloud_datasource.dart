@@ -35,6 +35,22 @@ abstract interface class ImouCloudDataSource {
     required String deviceSn,
   });
 
+  /// Creates an RTMP live address for the given device.
+  /// Returns SD rtmp URL and HD rtmpHD URL.
+  /// Does NOT require bindDeviceLive to be called first — this is a separate flow.
+  Future<ImouRtmpLiveInfo> createDeviceRtmpLive({
+    required String accessToken,
+    required String deviceSn,
+    String channelId = '0',
+    int streamId = 2,
+  });
+
+  Future<void> stopDeviceRtmpLive({
+    required String accessToken,
+    required String deviceSn,
+    String channelId = '0',
+  });
+
   void clearAccessToken();
 }
 
@@ -60,7 +76,8 @@ class ImouCloudDataSourceImpl implements ImouCloudDataSource {
   @override
   Future<ImouAccessToken> getAccessToken() async {
     final cached = _cachedToken;
-    if (cached != null && cached.expireAt.isAfter(DateTime.now())) {
+    final buffer = const Duration(minutes: 5);
+    if (cached != null && cached.expireAt.isAfter(DateTime.now().add(buffer))) {
       return cached;
     }
 
@@ -217,6 +234,52 @@ class ImouCloudDataSourceImpl implements ImouCloudDataSource {
     return online == '1' || online?.toLowerCase() == 'true';
   }
 
+  @override
+  Future<ImouRtmpLiveInfo> createDeviceRtmpLive({
+    required String accessToken,
+    required String deviceSn,
+    String channelId = '0',
+    int streamId = 2,
+  }) async {
+    final response = await _post(
+      '/createDeviceRtmpLive',
+      token: accessToken,
+      params: {
+        'deviceId': deviceSn,
+        'channelId': channelId,
+        'streamId': streamId,
+      },
+    );
+    final data = _dataObject(response);
+    final rtmpSd = _readString(data, ['rtmp']);
+    final rtmpHd = _readString(data, ['rtmpHD']);
+    debugPrint(
+      '[ImouCloud] createDeviceRtmpLive deviceId=${_maskDeviceId(deviceSn)} '
+      'result=${_resultLog(response)} rtmp=${_maskUrl(rtmpSd)} rtmpHD=${_maskUrl(rtmpHd)}',
+    );
+    return ImouRtmpLiveInfo(
+      deviceId: deviceSn,
+      channelId: channelId,
+      rtmpSd: rtmpSd,
+      rtmpHd: rtmpHd,
+    );
+  }
+
+  @override
+  Future<void> stopDeviceRtmpLive({
+    required String accessToken,
+    required String deviceSn,
+    String channelId = '0',
+  }) async {
+    debugPrint('[ImouCloud] stopDeviceRtmpLive deviceId=$deviceSn');
+    await _post(
+      '/deleteDeviceRtmpLive',
+      token: accessToken,
+      params: {'deviceId': deviceSn, 'channelId': channelId},
+    );
+    debugPrint('[ImouCloud] stopDeviceRtmpLive success');
+  }
+
   Future<Map<String, dynamic>> _post(
     String path, {
     String? token,
@@ -225,11 +288,11 @@ class ImouCloudDataSourceImpl implements ImouCloudDataSource {
   }) async {
     try {
       final body = _buildRequestBody(token: token, params: params);
-      if (path == '/accessToken') {
+      if (kDebugMode && path == '/accessToken') {
         final system = Map<String, dynamic>.from(body['system'] as Map);
         debugPrint(
           '[ImouCloud] accessToken call — time=${system['time']} '
-          'nonce=${system['nonce']} sign=${system['sign']}',
+          'nonce=${system['nonce']} sign=${_maskToken(system['sign']?.toString())}',
         );
       }
       final response = await _apiClient.postObject(path, body);

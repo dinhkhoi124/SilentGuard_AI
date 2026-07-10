@@ -10,6 +10,18 @@ import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart' as media_kit_video;
 import 'package:mobile/core/utils/app_colors.dart';
 
+enum CameraStreamLoadingPhase { authenticating, connectingStream, loadingFrame }
+
+extension CameraStreamLoadingPhaseLabel on CameraStreamLoadingPhase {
+  String get label {
+    return switch (this) {
+      CameraStreamLoadingPhase.authenticating => 'Đang xác thực camera...',
+      CameraStreamLoadingPhase.connectingStream => 'Đang kết nối luồng hình...',
+      CameraStreamLoadingPhase.loadingFrame => 'Đang tải hình ảnh...',
+    };
+  }
+}
+
 class CameraVideoPlayerController extends ChangeNotifier {
   CameraVideoPlayerController({
     required String currentTime,
@@ -56,16 +68,24 @@ class CameraVideoPlayer extends StatefulWidget {
     super.key,
     required this.controller,
     this.rtspUrl,
+    this.placeholderImage,
     this.onFrameCaptured,
     this.onRetry,
     this.onPlaybackError,
+    this.onFirstFrameRendered,
+    this.loadingPhase = CameraStreamLoadingPhase.loadingFrame,
+    this.showLoadingOverlay = true,
   });
 
   final CameraVideoPlayerController controller;
   final String? rtspUrl;
+  final Uint8List? placeholderImage;
   final ValueChanged<Uint8List>? onFrameCaptured;
   final VoidCallback? onRetry;
   final ValueChanged<String>? onPlaybackError;
+  final VoidCallback? onFirstFrameRendered;
+  final CameraStreamLoadingPhase loadingPhase;
+  final bool showLoadingOverlay;
 
   @override
   State<CameraVideoPlayer> createState() => CameraVideoPlayerState();
@@ -73,6 +93,9 @@ class CameraVideoPlayer extends StatefulWidget {
 
 class CameraVideoPlayerState extends State<CameraVideoPlayer> {
   final _previewKey = GlobalKey<CameraLivePreviewState>();
+  Player? _player;
+  media_kit_video.VideoController? _videoController;
+  bool _isMuted = false;
 
   void updateUrl(String newUrl) {
     _previewKey.currentState?.updateUrl(newUrl);
@@ -105,11 +128,24 @@ class CameraVideoPlayerState extends State<CameraVideoPlayer> {
                   CameraLivePreview(
                     key: _previewKey,
                     rtspUrl: widget.rtspUrl,
+                    placeholderImage: widget.placeholderImage,
                     onFrameCaptured: widget.onFrameCaptured,
                     isLoading: widget.controller.isLoading,
                     errorMessage: widget.controller.errorMessage,
                     onRetry: widget.onRetry,
                     onPlaybackError: widget.onPlaybackError,
+                    onFirstFrameRendered: widget.onFirstFrameRendered,
+                    loadingPhase: widget.loadingPhase,
+                    showLoadingOverlay: widget.showLoadingOverlay,
+                    onPlayerReady: (player, controller) {
+                      if (mounted) {
+                        setState(() {
+                          _player = player;
+                          _videoController = controller;
+                        });
+                        player.setVolume(_isMuted ? 0 : 100);
+                      }
+                    },
                   ),
                   Positioned(
                     top: 10,
@@ -132,20 +168,32 @@ class CameraVideoPlayerState extends State<CameraVideoPlayer> {
                           ],
                         ),
                         const SizedBox(width: 8),
-                        const _RoundOverlayButton(
-                          icon: Icons.volume_up_outlined,
-                          backgroundColor: Colors.white,
-                          iconColor: AppColors.darkText,
+                        GestureDetector(
+                          onTap: () {
+                            if (_player != null) {
+                              setState(() {
+                                _isMuted = !_isMuted;
+                              });
+                              _player!.setVolume(_isMuted ? 0 : 100);
+                            }
+                          },
+                          child: _RoundOverlayButton(
+                            icon: _isMuted
+                                ? Icons.volume_off_outlined
+                                : Icons.volume_up_outlined,
+                            backgroundColor: Colors.white,
+                            iconColor: AppColors.darkText,
+                          ),
                         ),
                       ],
                     ),
                   ),
-                  const Positioned(
+                  Positioned(
                     top: 10,
                     right: 10,
                     child: Row(
                       children: [
-                        _OverlayPill(
+                        const _OverlayPill(
                           color: Colors.black54,
                           children: [
                             Icon(
@@ -163,11 +211,40 @@ class CameraVideoPlayerState extends State<CameraVideoPlayer> {
                             ),
                           ],
                         ),
-                        SizedBox(width: 8),
-                        _RoundOverlayButton(
-                          icon: Icons.fullscreen,
-                          backgroundColor: Colors.black54,
-                          iconColor: Colors.white,
+                        const SizedBox(width: 8),
+                        GestureDetector(
+                          onTap: () {
+                            if (_player != null && _videoController != null) {
+                              Navigator.of(context)
+                                  .push(
+                                    MaterialPageRoute(
+                                      builder: (_) => _FullscreenCameraPage(
+                                        player: _player!,
+                                        videoController: _videoController!,
+                                        isMuted: _isMuted,
+                                        onMuteToggle: () {
+                                          setState(() {
+                                            _isMuted = !_isMuted;
+                                          });
+                                          _player!.setVolume(
+                                            _isMuted ? 0 : 100,
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                  )
+                                  .then((_) {
+                                    SystemChrome.setPreferredOrientations([
+                                      DeviceOrientation.portraitUp,
+                                    ]);
+                                  });
+                            }
+                          },
+                          child: const _RoundOverlayButton(
+                            icon: Icons.fullscreen,
+                            backgroundColor: Colors.black54,
+                            iconColor: Colors.white,
+                          ),
                         ),
                       ],
                     ),
@@ -219,26 +296,36 @@ class CameraLivePreview extends StatefulWidget {
   const CameraLivePreview({
     super.key,
     this.rtspUrl,
+    this.placeholderImage,
     this.onFrameCaptured,
     this.isLoading = false,
     this.errorMessage,
     this.onRetry,
     this.onPlaybackError,
+    this.onFirstFrameRendered,
+    this.loadingPhase = CameraStreamLoadingPhase.loadingFrame,
+    this.showLoadingOverlay = true,
+    this.onPlayerReady,
   });
 
   final String? rtspUrl;
+  final Uint8List? placeholderImage;
   final ValueChanged<Uint8List>? onFrameCaptured;
   final bool isLoading;
   final String? errorMessage;
   final VoidCallback? onRetry;
   final ValueChanged<String>? onPlaybackError;
+  final VoidCallback? onFirstFrameRendered;
+  final CameraStreamLoadingPhase loadingPhase;
+  final bool showLoadingOverlay;
+  final void Function(Player, media_kit_video.VideoController)? onPlayerReady;
 
   @override
   State<CameraLivePreview> createState() => CameraLivePreviewState();
 }
 
 class CameraLivePreviewState extends State<CameraLivePreview> {
-  static const _mediaKitChannel = MethodChannel('SlientGuard/media_kit');
+  static const _mediaKitChannel = MethodChannel('SilentGuard/media_kit');
   static const _playerConfiguration = PlayerConfiguration(
     bufferSize: 32 * 1024 * 1024,
     logLevel: MPVLogLevel.warn,
@@ -434,6 +521,7 @@ class CameraLivePreviewState extends State<CameraLivePreview> {
         '[VideoPlayer] VideoController created at: ${DateTime.now().toIso8601String()}',
       );
       _listenToPlayerLogs(player);
+      widget.onPlayerReady?.call(player, videoController);
       if (mounted) setState(() {});
     } catch (error, stackTrace) {
       _playerInitialization = null;
@@ -608,6 +696,7 @@ class CameraLivePreviewState extends State<CameraLivePreview> {
     _playbackRetryAttempt = 0;
     _reportedPlaybackFailure = false;
     _retryMessage = null;
+    widget.onFirstFrameRendered?.call();
     debugPrint('[VideoPlayer] first frame rendered');
     if (mounted) setState(() {});
   }
@@ -729,12 +818,17 @@ class CameraLivePreviewState extends State<CameraLivePreview> {
     }
     final videoController = _videoController;
     if (videoController == null) {
-      return const _VideoLoadingView();
+      if (!widget.showLoadingOverlay) return const SizedBox.expand();
+      return CameraLoadingOverlay(
+        phase: widget.loadingPhase,
+        placeholderImage: widget.placeholderImage,
+      );
     }
     debugPrint(
       '[VideoPlayer] Video widget built, wid will be assigned by platform',
     );
     _scheduleOpenAfterSurfaceReady();
+    final showLoadingOverlay = widget.showLoadingOverlay && !_hasRenderedFrame;
     return Stack(
       fit: StackFit.expand,
       children: [
@@ -745,8 +839,19 @@ class CameraLivePreviewState extends State<CameraLivePreview> {
         ),
         if (_retryMessage != null)
           _RetryOverlay(message: _retryMessage!)
-        else if (_externalIsLoading || _isOpening)
-          const _VideoLoadingView(),
+        else
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 260),
+            switchInCurve: Curves.easeOutCubic,
+            switchOutCurve: Curves.easeInCubic,
+            child: showLoadingOverlay
+                ? CameraLoadingOverlay(
+                    key: const ValueKey('video-loading'),
+                    phase: widget.loadingPhase,
+                    placeholderImage: widget.placeholderImage,
+                  )
+                : const SizedBox.shrink(key: ValueKey('video-ready')),
+          ),
       ],
     );
   }
@@ -779,37 +884,170 @@ String _redactedStreamUrl(String? url) {
   return '${uri.scheme}://${uri.host}$port${uri.path}';
 }
 
-class _VideoLoadingView extends StatelessWidget {
-  const _VideoLoadingView();
+class CameraLoadingOverlay extends StatefulWidget {
+  const CameraLoadingOverlay({
+    super.key,
+    required this.phase,
+    this.placeholderImage,
+  });
+
+  final CameraStreamLoadingPhase phase;
+  final Uint8List? placeholderImage;
+
+  @override
+  State<CameraLoadingOverlay> createState() => _CameraLoadingOverlayState();
+}
+
+class _CameraLoadingOverlayState extends State<CameraLoadingOverlay>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1600),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return const ColoredBox(
-      color: Colors.black87,
-      child: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SizedBox(
-              width: 32,
-              height: 32,
-              child: CircularProgressIndicator(
-                color: AppColors.primary,
-                strokeWidth: 3,
-              ),
+    final baseColor = Color.lerp(AppColors.darkText, AppColors.primary, 0.18)!;
+    final accentColor = Color.lerp(
+      AppColors.darkText,
+      AppColors.primaryLight,
+      0.34,
+    )!;
+
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        if (widget.placeholderImage != null)
+          Image.memory(widget.placeholderImage!, fit: BoxFit.cover),
+        DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [baseColor, accentColor, AppColors.darkText],
             ),
-            SizedBox(height: 16),
-            Text(
-              'Đang kết nối camera...',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
+          ),
         ),
-      ),
+        AnimatedBuilder(
+          animation: _controller,
+          builder: (context, child) {
+            final shimmerOffset = (_controller.value * 2) - 1;
+            return FractionalTranslation(
+              translation: Offset(shimmerOffset, 0),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.centerLeft,
+                    end: Alignment.centerRight,
+                    colors: [
+                      AppColors.surface.withValues(alpha: 0),
+                      AppColors.surface.withValues(alpha: 0.07),
+                      AppColors.surface.withValues(alpha: 0),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+        Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                AnimatedBuilder(
+                  animation: _controller,
+                  builder: (context, child) {
+                    final pulse = Curves.easeInOut.transform(
+                      _controller.value < 0.5
+                          ? _controller.value * 2
+                          : (1 - _controller.value) * 2,
+                    );
+                    return Transform.scale(
+                      scale: 0.94 + pulse * 0.08,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: AppColors.surface.withValues(alpha: 0.11),
+                          border: Border.all(
+                            color: AppColors.surface.withValues(alpha: 0.22),
+                          ),
+                        ),
+                        child: SizedBox.square(
+                          dimension: 58,
+                          child: Icon(
+                            Icons.videocam_rounded,
+                            color: AppColors.surface.withValues(alpha: 0.92),
+                            size: 28,
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(height: 18),
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 220),
+                  switchInCurve: Curves.easeOutCubic,
+                  switchOutCurve: Curves.easeInCubic,
+                  transitionBuilder: (child, animation) {
+                    return FadeTransition(
+                      opacity: animation,
+                      child: SlideTransition(
+                        position: Tween<Offset>(
+                          begin: const Offset(0, 0.12),
+                          end: Offset.zero,
+                        ).animate(animation),
+                        child: child,
+                      ),
+                    );
+                  },
+                  child: Text(
+                    widget.phase.label,
+                    key: ValueKey(widget.phase),
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: AppColors.surface,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      height: 1.35,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                SizedBox(
+                  width: 112,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(99),
+                    child: LinearProgressIndicator(
+                      minHeight: 3,
+                      backgroundColor: AppColors.surface.withValues(
+                        alpha: 0.16,
+                      ),
+                      valueColor: const AlwaysStoppedAnimation<Color>(
+                        AppColors.primaryLight,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -981,6 +1219,152 @@ class _VideoLabel extends StatelessWidget {
         borderRadius: BorderRadius.circular(6),
       ),
       child: child,
+    );
+  }
+}
+
+class _FullscreenCameraPage extends StatefulWidget {
+  const _FullscreenCameraPage({
+    required this.player,
+    required this.videoController,
+    required this.isMuted,
+    required this.onMuteToggle,
+  });
+
+  final Player player;
+  final media_kit_video.VideoController videoController;
+  final bool isMuted;
+  final VoidCallback onMuteToggle;
+
+  @override
+  State<_FullscreenCameraPage> createState() => _FullscreenCameraPageState();
+}
+
+class _FullscreenCameraPageState extends State<_FullscreenCameraPage> {
+  bool _showControls = false;
+  late bool _isMuted;
+
+  @override
+  void initState() {
+    super.initState();
+    _isMuted = widget.isMuted;
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.landscapeLeft,
+      DeviceOrientation.landscapeRight,
+    ]);
+  }
+
+  void _toggleControls() {
+    setState(() => _showControls = !_showControls);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: GestureDetector(
+        onTap: _toggleControls,
+        child: Stack(
+          children: [
+            Center(
+              child: media_kit_video.Video(
+                controller: widget.videoController,
+                controls: media_kit_video.NoVideoControls,
+                fill: Colors.black,
+              ),
+            ),
+            AnimatedOpacity(
+              opacity: _showControls ? 1.0 : 0.0,
+              duration: const Duration(milliseconds: 200),
+              child: Column(
+                children: [
+                  Container(
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.bottomCenter,
+                        end: Alignment.topCenter,
+                        colors: [Colors.transparent, Colors.black87],
+                      ),
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
+                    child: SafeArea(
+                      bottom: false,
+                      child: Row(
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.close, color: Colors.white),
+                            onPressed: () => Navigator.of(context).pop(),
+                          ),
+                          const Spacer(),
+                          const _OverlayPill(
+                            color: Colors.white24,
+                            children: [
+                              _StatusDot(),
+                              SizedBox(width: 5),
+                              Text(
+                                'TRỰC TIẾP',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const Spacer(),
+                  Container(
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [Colors.transparent, Colors.black87],
+                      ),
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 16,
+                    ),
+                    child: SafeArea(
+                      top: false,
+                      child: Row(
+                        children: [
+                          IconButton(
+                            icon: Icon(
+                              _isMuted
+                                  ? Icons.volume_off_outlined
+                                  : Icons.volume_up_outlined,
+                              color: Colors.white,
+                            ),
+                            onPressed: () {
+                              setState(() => _isMuted = !_isMuted);
+                              widget.onMuteToggle();
+                            },
+                          ),
+                          const Spacer(),
+                          IconButton(
+                            icon: const Icon(
+                              Icons.fullscreen_exit,
+                              color: Colors.white,
+                            ),
+                            onPressed: () => Navigator.of(context).pop(),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

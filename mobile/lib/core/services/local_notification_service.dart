@@ -31,17 +31,25 @@ class LocalNotificationService {
         'Thông báo',
         description: 'Thông báo chung từ SilentGuard',
       );
+  static const AndroidNotificationChannel _dailyReportChannel =
+      AndroidNotificationChannel(
+        'daily_reports',
+        'Báo cáo hằng ngày',
+        description: 'Nhắc xem báo cáo sự kiện hằng ngày',
+        importance: Importance.defaultImportance,
+      );
+  static const int _dailyReportNotificationId = 2100;
 
   final FlutterLocalNotificationsPlugin _plugin =
       FlutterLocalNotificationsPlugin();
+  bool _tzInitialized = false;
 
   Future<NotificationAlert?> initialize({
     required void Function(NotificationAlert alert) onAlertNotificationTap,
+    void Function(String destination)? onNavigateToTap,
   }) async {
-    tz.initializeTimeZones();
-
     const settings = InitializationSettings(
-      android: AndroidInitializationSettings('@mipmap/ic_launcher'),
+      android: AndroidInitializationSettings('@drawable/ic_notification'),
       iOS: DarwinInitializationSettings(
         requestAlertPermission: false,
         requestBadgePermission: false,
@@ -52,7 +60,25 @@ class LocalNotificationService {
     await _plugin.initialize(
       settings: settings,
       onDidReceiveNotificationResponse: (response) {
-        final alert = _alertFromPayload(response.payload);
+        final payload = response.payload;
+        // Check for navigate_to payloads (e.g. daily report notification).
+        if (payload != null && payload.isNotEmpty) {
+          try {
+            final decoded = jsonDecode(payload);
+            if (decoded is Map && decoded.containsKey('navigate_to')) {
+              final destination = decoded['navigate_to']?.toString() ?? '';
+              developer.log(
+                '[FCM] navigate_to notification tapped: destination=$destination',
+                name: 'LocalNotificationService',
+              );
+              onNavigateToTap?.call(destination);
+              return;
+            }
+          } on FormatException {
+            // Not a navigate_to payload; fall through to alert handling.
+          }
+        }
+        final alert = _alertFromPayload(payload);
         developer.log(
           '[FCM] local notification tapped: '
           'messageId=${alert?.rawData['messageId']}, '
@@ -76,9 +102,25 @@ class LocalNotificationService {
 
     final launchDetails = await _plugin.getNotificationAppLaunchDetails();
     if (launchDetails?.didNotificationLaunchApp ?? false) {
-      final alert = _alertFromPayload(
-        launchDetails?.notificationResponse?.payload,
-      );
+      final launchPayload = launchDetails?.notificationResponse?.payload;
+      // Handle navigate_to payloads at launch (app was terminated).
+      if (launchPayload != null && launchPayload.isNotEmpty) {
+        try {
+          final decoded = jsonDecode(launchPayload);
+          if (decoded is Map && decoded.containsKey('navigate_to')) {
+            final destination = decoded['navigate_to']?.toString() ?? '';
+            developer.log(
+              '[FCM] navigate_to launch payload consumed: destination=$destination',
+              name: 'LocalNotificationService',
+            );
+            onNavigateToTap?.call(destination);
+            return null;
+          }
+        } on FormatException {
+          // Not a navigate_to payload; fall through to alert handling.
+        }
+      }
+      final alert = _alertFromPayload(launchPayload);
       developer.log(
         '[FCM] local notification launch payload consumed: '
         'event_id=${alert?.eventId}, severity=${alert?.severity}.',
@@ -174,6 +216,11 @@ class LocalNotificationService {
       1 << 31,
     );
 
+    if (!_tzInitialized) {
+      tz.initializeTimeZones();
+      _tzInitialized = true;
+    }
+
     await _plugin.zonedSchedule(
       id: notificationId,
       title: alert.displayTitle,
@@ -190,6 +237,7 @@ class LocalNotificationService {
           priority: Priority.max,
           playSound: true,
           enableVibration: true,
+          icon: 'ic_notification',
         ),
         iOS: DarwinNotificationDetails(),
       ),
@@ -197,6 +245,49 @@ class LocalNotificationService {
       payload: payload,
     );
     return true;
+  }
+
+  Future<bool> scheduleDailyReportReminder() async {
+    if (!await _requestPermissions()) return false;
+
+    if (!_tzInitialized) {
+      tz.initializeTimeZones();
+      tz.setLocalLocation(tz.getLocation('Asia/Ho_Chi_Minh')); // Fix: ensure VN timezone
+      _tzInitialized = true;
+    }
+
+    final scheduledAt = _nextDailyReportTime();
+    developer.log(
+      'scheduleDailyReportReminder: scheduling at $scheduledAt (tz.local=${tz.local.name})',
+      name: 'LocalNotificationService',
+    );
+
+    await _plugin.zonedSchedule(
+      id: _dailyReportNotificationId,
+      title: 'Báo cáo sự kiện hôm nay',
+      body:
+          'Báo cáo AI hôm nay đã sẵn sàng. Mở ứng dụng để xem tóm tắt mới nhất.',
+      scheduledDate: scheduledAt,
+      notificationDetails: const NotificationDetails(
+        android: AndroidNotificationDetails(
+          'daily_reports',
+          'Báo cáo hằng ngày',
+          channelDescription: 'Nhắc xem báo cáo sự kiện hằng ngày',
+          importance: Importance.defaultImportance,
+          priority: Priority.defaultPriority,
+          icon: 'ic_notification',
+        ),
+        iOS: DarwinNotificationDetails(),
+      ),
+      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      matchDateTimeComponents: DateTimeComponents.time,
+      payload: jsonEncode({'navigate_to': 'reports'}),
+    );
+    return true;
+  }
+
+  Future<void> cancelDailyReportReminder() {
+    return _plugin.cancel(id: _dailyReportNotificationId);
   }
 
   Future<bool> _requestPermissions() async {
@@ -228,6 +319,16 @@ class LocalNotificationService {
     await androidPlugin?.createNotificationChannel(_fallChannel);
     await androidPlugin?.createNotificationChannel(_inviteChannel);
     await androidPlugin?.createNotificationChannel(_generalChannel);
+    await androidPlugin?.createNotificationChannel(_dailyReportChannel);
+  }
+
+  tz.TZDateTime _nextDailyReportTime() {
+    final now = tz.TZDateTime.now(tz.local);
+    var scheduled = tz.TZDateTime(tz.local, now.year, now.month, now.day, 21);
+    if (!scheduled.isAfter(now)) {
+      scheduled = scheduled.add(const Duration(days: 1));
+    }
+    return scheduled;
   }
 
   static AndroidNotificationDetails _androidDetailsFor(
@@ -241,6 +342,7 @@ class LocalNotificationService {
           channelDescription: 'Lời mời tham gia hộ gia đình',
           importance: Importance.high,
           priority: Priority.high,
+          icon: 'ic_notification',
         );
       case 'fall_alert':
         return const AndroidNotificationDetails(
@@ -251,6 +353,7 @@ class LocalNotificationService {
           priority: Priority.max,
           playSound: true,
           enableVibration: true,
+          icon: 'ic_notification',
         );
       default:
         return const AndroidNotificationDetails(
@@ -259,6 +362,7 @@ class LocalNotificationService {
           channelDescription: 'Thông báo chung từ SilentGuard',
           importance: Importance.defaultImportance,
           priority: Priority.defaultPriority,
+          icon: 'ic_notification',
         );
     }
   }

@@ -1,8 +1,7 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:dartz/dartz.dart';
-import 'package:http/http.dart' as http;
+import 'package:mobile/core/error/exceptions.dart';
 import 'package:mobile/core/network/api_client.dart';
 import 'package:mobile/features/reports/data/datasources/event_history_remote_datasource.dart';
 import 'package:mobile/features/reports/domain/entities/event_history_page.dart';
@@ -40,14 +39,8 @@ class EventHistoryRepositoryImpl implements EventHistoryRepository {
         return Left('Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.');
       }
       return Left(e.message);
-    } on TimeoutException {
-      return const Left(
-        'Không thể kết nối máy chủ. Kết nối quá thời gian chờ.',
-      );
-    } on SocketException {
-      return const Left('Không thể kết nối mạng. Vui lòng kiểm tra kết nối.');
-    } on http.ClientException {
-      return const Left('Không thể kết nối mạng. Vui lòng kiểm tra kết nối.');
+    } on NoInternetException catch (e) {
+      return Left(e.message);
     } catch (_) {
       return const Left('Lỗi không xác định. Vui lòng thử lại.');
     }

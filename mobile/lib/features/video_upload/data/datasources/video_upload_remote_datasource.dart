@@ -62,7 +62,7 @@ class VideoUploadRemoteDatasourceImpl implements VideoUploadRemoteDatasource {
         .send(request)
         .timeout(AppConfig.networkTimeout);
     final response = await http.Response.fromStream(streamedResponse);
-    
+
     developer.log(
       '[VideoUpload] [API_RESPONSE] Status: ${response.statusCode}, Body: ${response.body}',
       name: 'VideoUploadRemoteDatasource',

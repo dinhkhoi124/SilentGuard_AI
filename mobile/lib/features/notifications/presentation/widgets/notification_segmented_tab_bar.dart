@@ -59,7 +59,10 @@ class NotificationSegmentedTabBar extends StatelessWidget
                   if (unreadAlerts > 0) ...[
                     const SizedBox(width: 6),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
                       decoration: BoxDecoration(
                         color: AppColors.badgeRed,
                         borderRadius: BorderRadius.circular(10),
@@ -87,7 +90,10 @@ class NotificationSegmentedTabBar extends StatelessWidget
                   if (unreadInvites > 0) ...[
                     const SizedBox(width: 6),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
                       decoration: BoxDecoration(
                         color: AppColors.badgeRed,
                         borderRadius: BorderRadius.circular(10),

@@ -45,5 +45,4 @@ class InviteManagementCubit extends Cubit<InviteManagementState> {
       emit(const InviteEmailError('Đã có lỗi xảy ra. Vui lòng thử lại.'));
     }
   }
-
 }

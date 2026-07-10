@@ -1,6 +1,8 @@
 // lib/features/household_invite/presentation/cubit/pending_invites_cubit.dart
 
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:mobile/core/error/exceptions.dart';
+import 'package:mobile/core/services/daily_report_notification_service.dart';
 import 'package:mobile/features/home/presentation/bloc/home_bloc.dart';
 import 'package:mobile/features/home/presentation/bloc/home_event.dart';
 import 'package:mobile/features/household_invite/data/datasources/household_invite_remote_data_source.dart';
@@ -9,6 +11,7 @@ import 'package:mobile/features/household_invite/presentation/cubit/pending_invi
 import 'package:mobile/features/notifications/data/datasources/notification_local_data_source.dart';
 import 'package:mobile/features/notifications/presentation/cubit/notifications_cubit.dart';
 import 'package:mobile/features/session/domain/repositories/session_repository.dart';
+import 'package:mobile/injection_container.dart' as di;
 
 class PendingInvitesCubit extends Cubit<PendingInvitesState> {
   PendingInvitesCubit(
@@ -77,10 +80,15 @@ class PendingInvitesCubit extends Cubit<PendingInvitesState> {
             await _sessionRepository.provisionSession();
           }
           _homeBloc.add(const HomeStarted());
+          // Fix A: household changed — re-sync daily report notification to new householdId.
+          di.sl<DailyReportNotificationService>().syncSchedule().ignore();
         }
       } catch (_) {
         // Log error but do not emit error state since action succeeded
       }
+    } on NoInternetException catch (e) {
+      emit(PendingInvitesError(e.message, currentInvites));
+      emit(PendingInvitesLoaded(currentInvites)); // Revert
     } catch (e) {
       emit(
         PendingInvitesError(

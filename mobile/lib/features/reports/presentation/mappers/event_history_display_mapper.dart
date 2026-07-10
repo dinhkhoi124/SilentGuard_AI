@@ -88,7 +88,7 @@ class EventHistoryDisplayMapper {
       EventStatus.dismissed => 'Đã bỏ qua',
       EventStatus.escalated => 'Đã chuyển tiếp',
       EventStatus.loggedOnly => 'Chỉ ghi nhận',
-      EventStatus.unknown => 'Không rõ',
+      EventStatus.recovered => 'Đã hồi phục',
     };
   }
 }

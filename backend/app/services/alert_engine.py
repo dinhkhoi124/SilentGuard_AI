@@ -46,19 +46,22 @@ async def process_event(event_data: dict) -> None:
     dedup_window = thresholds.get("dedup_window_sec", 60)
     dedup_time = event_time - timedelta(seconds=dedup_window)
     try:
+        # [BUG-4 FIX] Chỉ dedup với event đang active (pending/escalated).
+        # acknowledged/resolved/logged_only KHÔNG block alert mới — người dùng
+        # có thể đã xử lý xong và bệnh nhân lại ngã lần nữa.
         query = supabase.table("events")\
             .select("id")\
             .eq("household_id", household_id)\
             .eq("event_type", event_type)\
-            .neq("status", "logged_only")\
+            .in_("status", ["pending", "escalated"])\
             .gt("timestamp", dedup_time.isoformat())
-        
+
         # Only exclude self if we have a valid database UUID
         if event_id and str(event_id).strip().lower() != "none":
             query = query.neq("id", event_id)
-            
+
         dup_query = query.execute()
-        
+
         if dup_query.data and len(dup_query.data) > 0:
             # Duplicate found, set status to logged_only and return
             event_data["status"] = "logged_only"

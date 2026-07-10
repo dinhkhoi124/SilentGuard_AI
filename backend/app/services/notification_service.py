@@ -33,6 +33,42 @@ async def send_push(user_id: str, event_data: dict) -> bool:
         if hasattr(timestamp, "isoformat"):
             timestamp = timestamp.isoformat()
 
+        alert_title = f"Cảnh báo {severity} — {room}"
+
+        # [BUG-3 FIX] HIGH/CRITICAL: apns-priority 10 + alert payload
+        # → iOS wake ngay cả khi app bị force-kill
+        # LOW/MEDIUM: priority 5 (background silent push)
+        is_urgent = severity in ("HIGH", "CRITICAL")
+
+        if is_urgent:
+            apns_cfg = messaging.APNSConfig(
+                headers={
+                    "apns-priority": "10",         # immediate delivery
+                    "apns-push-type": "alert",
+                },
+                payload=messaging.APNSPayload(
+                    aps=messaging.Aps(
+                        alert=messaging.ApsAlert(
+                            title=alert_title,
+                            body=body_msg,
+                        ),
+                        sound="default",
+                        badge=1,
+                        content_available=True,
+                    )
+                ),
+            )
+        else:
+            apns_cfg = messaging.APNSConfig(
+                headers={
+                    "apns-priority": "5",
+                    "apns-push-type": "background",
+                },
+                payload=messaging.APNSPayload(
+                    aps=messaging.Aps(content_available=True)
+                ),
+            )
+
         message = messaging.Message(
             data={
                 "type": "fall_alert",
@@ -41,21 +77,15 @@ async def send_push(user_id: str, event_data: dict) -> bool:
                 "severity": severity,
                 "room": room,
                 "clip_url": str(event_data.get("clip_url") or event_data.get("clip_path") or ""),
-                "title": f"Cảnh báo {severity} — {room}",
+                "title": alert_title,
                 "body": body_msg,
                 "timestamp": str(timestamp or ""),
             },
             android=messaging.AndroidConfig(priority="high"),
-            apns=messaging.APNSConfig(
-                headers={
-                    "apns-priority": "5",
-                    "apns-push-type": "background",
-                },
-                payload=messaging.APNSPayload(aps=messaging.Aps(content_available=True)),
-            ),
+            apns=apns_cfg,
             webpush=messaging.WebpushConfig(
                 notification=messaging.WebpushNotification(
-                    title=f"Cảnh báo {severity} — {room}",
+                    title=alert_title,
                     body=body_msg,
                     icon="/icons/Icon-192.png",
                     badge="/icons/Icon-192.png"

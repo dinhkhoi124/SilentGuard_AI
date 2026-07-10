@@ -186,8 +186,8 @@ function Hero() {
               className="mt-12 flex flex-wrap gap-x-8 gap-y-6 text-sm sm:max-w-md sm:justify-between"
             >
               {[
-                { k: "<60s", v: "Phát hiện" },
-                { k: "90%", v: "Độ chính xác" },
+                { k: "< 1s", v: "Phát hiện tại chỗ" },
+                { k: "< 3s", v: "Gửi cảnh báo" },
                 { k: "24/7", v: "Quan sát liên tục" },
               ].map((s) => (
                 <div key={s.v}>
@@ -713,6 +713,17 @@ function AppDownload() {
   const [isAndroidModalOpen, setIsAndroidModalOpen] = useState(false);
   const [isIosModalOpen, setIsIosModalOpen] = useState(false);
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setIsAndroidModalOpen(false);
+        setIsIosModalOpen(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
   return (
     <Section className="pb-24">
       <div className="mx-auto max-w-6xl px-6">
@@ -814,7 +825,7 @@ function AppDownload() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md overflow-y-auto"
             onClick={() => setIsAndroidModalOpen(false)}
           >
             <motion.div
@@ -822,7 +833,7 @@ function AppDownload() {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
               transition={{ type: "spring", duration: 0.5 }}
-              className="relative w-full max-w-2xl overflow-hidden rounded-3xl bg-ink text-background p-6 md:p-8 ring-1 ring-white/20 shadow-2xl"
+              className="relative w-full max-w-2xl my-8 overflow-hidden rounded-3xl bg-ink text-background p-6 md:p-8 ring-1 ring-white/20 shadow-2xl"
               onClick={(e) => e.stopPropagation()}
             >
               {/* Glow Effects */}
@@ -833,13 +844,13 @@ function AppDownload() {
               <button
                 type="button"
                 onClick={() => setIsAndroidModalOpen(false)}
-                className="absolute right-4 top-4 rounded-full p-2 text-background/60 hover:bg-white/10 hover:text-background transition-colors cursor-pointer"
+                className="absolute right-4 top-4 z-20 rounded-full p-2 text-background/60 bg-white/5 border border-white/10 hover:bg-white/10 hover:text-background transition-colors cursor-pointer"
               >
                 <X className="size-5" />
               </button>
 
-              <div className="relative">
-                <div className="mb-6">
+              <div className="relative pt-6">
+                <div className="mb-6 pr-12">
                   <span className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-brand/20 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-brand-glow">
                     Tải xuống APK
                   </span>
@@ -849,8 +860,9 @@ function AppDownload() {
                   </p>
                 </div>
 
-                <div className="space-y-4">
-                  {/* Version 1: ARM64-v8a */}
+                <div className="relative max-h-[60vh] overflow-y-auto pr-4 custom-scrollbar">
+                  <div className="space-y-4">
+                    {/* Version 1: ARM64-v8a */}
                   <div className="relative overflow-hidden rounded-2xl bg-white/5 p-5 ring-1 ring-brand/35 hover:bg-white/10 transition-all">
                     <div className="absolute right-3 top-3">
                       <span className="rounded-full bg-brand px-2.5 py-0.5 text-[10px] font-semibold text-white uppercase tracking-wider shadow-[0_0_10px_var(--brand)]">
@@ -927,6 +939,7 @@ function AppDownload() {
                     </div>
                   </div>
                 </div>
+              </div>
               </div>
             </motion.div>
           </motion.div>
@@ -1119,8 +1132,8 @@ function DemoCTA() {
                 Tải video lên — xem AI phát hiện té ngã trong vài giây
               </h2>
               <p className="mt-4 text-pretty text-brand-foreground/85">
-                Trải nghiệm cùng mô hình thị giác mà SilentGuard dùng trong sản phẩm thật. Không
-                cần đăng ký, không lưu trữ video của bạn.
+                Trải nghiệm cùng mô hình thị giác mà SilentGuard dùng trong sản phẩm thật.
+                Lưu ý: Bản demo trên web cần tải video lên cloud để phân tích (video tự xoá, không lưu trữ). Với camera thực tế, hình ảnh được xử lý 100% tại chỗ (on-device) để bảo vệ quyền riêng tư tuyệt đối.
               </p>
             </div>
             <Link

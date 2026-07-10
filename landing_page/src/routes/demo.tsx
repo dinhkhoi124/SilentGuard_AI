@@ -62,6 +62,8 @@ function DemoPage() {
     confidence: number | null;
     llm_message: string | null;
     room: string | null;
+    thinking: string | null;
+    evidence: any[] | null;
   } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const resultRef = useRef<HTMLDivElement>(null);
@@ -121,7 +123,7 @@ function DemoPage() {
       setStatus("uploading");
       
       // Step 0: Lấy ID hộ gia đình (nhà) thực tế của tài khoản Demo
-      const meRes = await fetch("https://c2-app-128-production.up.railway.app/api/households/me", {
+      const meRes = await fetch("/api/households/me", {
         headers: {
           Authorization: `Bearer ${token}`
         }
@@ -133,7 +135,7 @@ function DemoPage() {
       const actualHouseholdId = meData.household_id;
 
       // Step 1: Xin link upload trực tiếp
-      const reqUploadRes = await fetch("https://c2-app-128-production.up.railway.app/api/events/request-upload-url", {
+      const reqUploadRes = await fetch("/api/events/request-upload-url", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -167,7 +169,7 @@ function DemoPage() {
       }
       
       // Step 3: Gọi backend báo đã upload xong để trigger AI
-      const triggerRes = await fetch("https://c2-app-128-production.up.railway.app/api/events/trigger-ai", {
+      const triggerRes = await fetch("/api/events/trigger-ai", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -199,7 +201,7 @@ function DemoPage() {
             return;
           }
 
-          const statusRes = await fetch(`https://c2-app-128-production.up.railway.app/api/events/upload-status/${upload_token}`);
+          const statusRes = await fetch(`/api/events/upload-status/${upload_token}`);
           if (!statusRes.ok) {
             clearInterval(pollInterval);
             throw new Error("Không thể kiểm tra trạng thái video.");
@@ -214,6 +216,8 @@ function DemoPage() {
               confidence: statusData.event?.confidence || null,
               llm_message: statusData.event?.llm_message || null,
               room: statusData.event?.room || null,
+              thinking: statusData.event?.thinking || null,
+              evidence: statusData.event?.evidence || null,
             });
             setStatus("done");
             
@@ -276,7 +280,7 @@ function DemoPage() {
 
         <div className="grid gap-8 lg:grid-cols-[1.1fr_1fr]">
           {/* Upload area */}
-          <div className="rounded-3xl bg-surface p-6 ring-1 ring-border shadow-soft">
+          <div className="rounded-3xl bg-surface p-6 ring-1 ring-border shadow-soft min-w-0">
             <label
               htmlFor="video-input"
               onDragOver={(e) => e.preventDefault()}
@@ -284,14 +288,19 @@ function DemoPage() {
                 e.preventDefault();
                 selectFile(e.dataTransfer.files?.[0] ?? null);
               }}
-              className="group flex aspect-video w-full cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-border bg-surface-2 text-center transition-colors hover:border-brand hover:bg-brand-light/40"
+              className="group relative flex aspect-video w-full cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-border bg-surface-2 text-center transition-colors hover:border-brand hover:bg-brand-light/40 overflow-hidden"
             >
               {previewUrl ? (
-                <video
-                  src={previewUrl}
-                  controls
-                  className="aspect-video h-full w-full rounded-2xl object-cover"
-                />
+                <div 
+                  className="absolute inset-0 h-full w-full bg-black rounded-2xl"
+                  onClick={(e) => e.preventDefault()}
+                >
+                  <video
+                    src={previewUrl}
+                    controls
+                    className="h-full w-full object-contain"
+                  />
+                </div>
               ) : (
                 <div className="flex flex-col items-center gap-3 p-6 text-ink-soft">
                   <div className="grid size-14 place-items-center rounded-full bg-brand-light text-brand transition-transform group-hover:scale-110">
@@ -312,11 +321,13 @@ function DemoPage() {
             />
 
             <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-2 text-xs text-ink-soft">
-                <Film className="size-4" />
-                {file ? `${file.name} · ${(file.size / 1024 / 1024).toFixed(1)} MB` : "Chưa chọn video"}
+              <div className="flex items-center gap-2 text-xs text-ink-soft max-w-full min-w-0">
+                <Film className="size-4 shrink-0" />
+                <span className="truncate">
+                  {file ? `${file.name} · ${(file.size / 1024 / 1024).toFixed(1)} MB` : "Chưa chọn video"}
+                </span>
               </div>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap sm:flex-nowrap gap-2 w-full sm:w-auto mt-3 sm:mt-0">
                 {file && (
                   <button
                     onClick={() => {
@@ -360,7 +371,7 @@ function DemoPage() {
               <p className="mb-4 text-xs text-ink-soft">
                 Nếu chưa có sẵn video, bạn có thể tải về các video mẫu ngã thật dưới đây để tải lên hệ thống kiểm tra:
               </p>
-              <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
                 {[
                   "20240912_101331.mp4",
                   "20240912_101427.mp4",
@@ -388,7 +399,7 @@ function DemoPage() {
           </div>
 
           {/* Result */}
-          <div ref={resultRef} className="rounded-3xl bg-surface p-6 ring-1 ring-border shadow-soft scroll-mt-20">
+          <div ref={resultRef} className="rounded-3xl bg-surface p-6 ring-1 ring-border shadow-soft scroll-mt-20 min-w-0">
             <h2 className="mb-4 text-sm font-semibold uppercase tracking-widest text-ink-soft">
               Kết quả phân tích từ AI
             </h2>
@@ -438,7 +449,7 @@ function DemoPage() {
   );
 }
 
-function ResultCard({ r }: { r: { event_type: string | null; severity: string | null; confidence: number | null; llm_message: string | null; room: string | null } }) {
+function ResultCard({ r }: { r: { event_type: string | null; severity: string | null; confidence: number | null; llm_message: string | null; room: string | null; thinking: string | null; evidence: any[] | null; } }) {
   const isFall = r.event_type === "fall";
                  
   const sevColor =
@@ -521,6 +532,17 @@ function ResultCard({ r }: { r: { event_type: string | null; severity: string | 
           isFall ? "text-red-900" : "text-emerald-900"
         }`}>{cleanMessage}</p>
       </div>
+
+      {r.thinking && (
+        <div className="rounded-xl border border-border bg-surface-2 p-4">
+          <h4 className="mb-2 text-xs font-semibold uppercase tracking-widest text-ink-soft">
+            Quá trình AI phân tích (Thinking log)
+          </h4>
+          <div className="text-xs text-ink-soft whitespace-pre-wrap font-mono custom-scrollbar max-h-60 overflow-y-auto pr-2">
+            {r.thinking}
+          </div>
+        </div>
+      )}
     </motion.div>
   );
 }

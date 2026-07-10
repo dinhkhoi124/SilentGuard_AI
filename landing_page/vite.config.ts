@@ -9,6 +9,10 @@ import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 export default defineConfig({
   nitro: {
     preset: "node-server",
+    routeRules: {
+      "/api/**": { proxy: "https://c2-app-128-production-e0f9.up.railway.app/api/**" },
+      "/downloads/**/*.ipa": { headers: { "Content-Type": "application/octet-stream", "Content-Disposition": "attachment" } }
+    }
   },
   tanstackStart: {
     // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
@@ -19,7 +23,7 @@ export default defineConfig({
     server: {
       proxy: {
         "/api": {
-          target: "https://c2-app-128-production.up.railway.app/",
+          target: "https://c2-app-128-production-e0f9.up.railway.app/",
           changeOrigin: true,
           secure: false,
         },

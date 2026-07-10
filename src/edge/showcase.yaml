@@ -1,0 +1,43 @@
+model:
+  path: yolov8n-pose.pt
+  image_size: 416
+  device: cpu
+  tracker: bytetrack.yaml
+  pose_confidence: 0.40
+  single_person_mode: true
+
+fall:
+  descending_velocity_bh_s: 0.60
+  lying_torso_angle_deg: 50.0
+  transition_limit_sec: 2.0
+  lying_confirmation_sec: 1.0
+  lying_gap_tolerance_sec: 0.35
+  recovery_angle_deg: 30.0
+  recovery_upright_sec: 3.0
+  track_expiry_sec: 5.0
+
+stream:
+  url: ""
+  url_endpoint: /api/cameras/{camera_id}/stream-url
+  camera_id: ""
+  fallback_video: ""
+  refresh_margin_sec: 300
+  reconnect_max_sec: 15
+  buffer_size: 1
+
+backend:
+  base_url: https://c2-app-128-production-e0f9.up.railway.app
+  event_path: /api/events/detect
+  device_key: ""
+  auth_token: ""
+  request_timeout_sec: 10
+  retry_delays_sec: [1, 2, 4, 8]
+
+runtime:
+  dry_run: true
+  room: showcase
+  model_version: fall-engine-v2-showcase
+  source_name: imou_rtmp
+  health_port: 8080
+  stale_frame_sec: 30
+  diagnostics_path: reports/latest_run.json
